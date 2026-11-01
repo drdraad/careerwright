@@ -90,7 +90,7 @@ class StartRoleResearch(StrictModel):
     )
 
 
-def _no_list_holds(tx: Tx, title: str) -> None:
+def no_list_holds(tx: Tx, title: str) -> None:
     """Research is for a title no list holds: one ESCO holds as a label, or the UK job-title
     index lists, is already recognised without it."""
     if taxonomy_store.label_match_uris(tx, title) or uk_titles.listed(tx, [title]):
@@ -127,7 +127,7 @@ def start_research(
             stage=ErrorStage.REQUEST,
             details={"field": "title", "reason": "empty"},
         )
-    _no_list_holds(tx, title)
+    no_list_holds(tx, title)
     context = RoleSearchInput(title=title)
     if role_prompt_bytes(context) > MAX_PROMPT_BYTES:
         raise CareerwrightError(

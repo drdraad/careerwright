@@ -16,15 +16,17 @@ import sqlalchemy as sa
 
 from careerwright.capability.commands import committed_data, pack_targets
 from careerwright.capability.strength import SCRIPTED_STRENGTHS
-from careerwright.catalogue import taxonomy_store
+from careerwright.catalogue import taxonomy_store, uk_titles
 from careerwright.catalogue.esco import ESCO_RELEASE
 from careerwright.catalogue.reference import DATASETS
 from careerwright.catalogue.taxonomy import MAX_REACH, search_essential_skills
 from careerwright.cli import import_reference_data, import_taxonomy, migrate_app
 from careerwright.db import Tx, system_transaction
+from careerwright.evidence import role_research
 from careerwright.profile.records import TargetLink
 from careerwright.profile.slate import POOL_LIMIT, POOL_TARGET
 from careerwright.profile.targets import resolve_target
+from tests.eval.test_titles_on_no_list import ON_NO_LIST
 from tests.support.infra import Infra, migrator_engine
 from tools.datasets import DATASETS_DIR
 from tools.evaluation import (
@@ -440,6 +442,20 @@ def test_the_demo_s_scripted_strengths_are_essential_esco_skills_named_as_esco_n
         found = {row["esco_uri"]: row["preferred_label"] for row in rows}
 
     assert found == {s.skill_uri: s.skill_label for s in SCRIPTED_STRENGTHS}
+
+
+@pytest.mark.req("DIV1-15", "TEST1-16")
+@pytest.mark.parametrize("title", ON_NO_LIST)
+def test_the_titles_said_to_be_on_no_list_are_on_none_of_the_pinned_lists(
+    full_release: sa.Engine, title: str
+) -> None:
+    # Session W2's Sam and the live run's default title (fix round 1, review I4): the
+    # product's own refusal (an ESCO label, hidden ones included, or a UK index title) lets
+    # each be researched, on the full ESCO release and the pinned UK job-title index.
+    with system_transaction(full_release) as tx:
+        assert taxonomy_store.label_match_uris(tx, title) == []
+        assert uk_titles.listed(tx, [title]) == {}
+        role_research.no_list_holds(tx, title)  # raises if a list holds it
 
 
 @pytest.mark.req("REC1-11", "TEST1-10")

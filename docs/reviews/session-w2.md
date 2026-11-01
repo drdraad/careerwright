@@ -25,8 +25,9 @@ until you answer it.
    - It runs every live workspace on Muse Wonder.
    - Each run can spend at most $0.75, and each workspace at most $5 more this month.
 3. Open `http://127.0.0.1:53000` in your browser and sign in as Ada.
-4. Make a new workspace for each person. Choose the data mode **Live-assisted** and untick
-   "This workspace holds synthetic test data only", so it uses Muse Wonder.
+4. Make a new workspace for each person, named so it says they're made up, such as
+   "Maya (made up)". Choose the data mode **Live-assisted** and untick "This workspace holds
+   synthetic test data only", so it uses Muse Wonder.
 5. Paste your own Meta API key when the app asks. It's stored sealed and never shown again.
    This is also the first live run of the real path with your key.
 6. When you've finished, type `make session-ledger` (it records what the session spent),
@@ -59,28 +60,26 @@ What to do:
 
 Look for: no job title or income she never said, and nothing called "close to what you do now".
 
-### Sam, a bookkeeping assistant (made up)
+### Sam, a client onboarding assistant (made up)
 
-Sam's job is on no list Careerwright holds.
+Sam's job title isn't on any of Careerwright's lists, so it's the one to research.
 
-- Works as a bookkeeping assistant at a small firm in York.
-- Enjoys tidying up messy spreadsheets and helping customers on the phone.
+- Works as a client onboarding assistant at a small accountancy firm in York.
+- Sets up new clients' records, tidies messy spreadsheets and helps customers on the phone.
 - Wants something with more variety.
 
 What to do:
 
-1. At the first question, type "Bookkeeping assistant" and choose **Use my own words**.
+1. At the first question, type "Client onboarding assistant" and choose **Use my own words**.
 2. Tell it what Sam enjoys, then ask for suggestions.
 3. Under the suggestions, find **Titles no list holds**. Click **Research this role** beside
-   "Bookkeeping assistant". It shows what it may cost first.
+   "Client onboarding assistant". It shows what it may cost first.
 4. Wait for the result. Open **The pages Careerwright read** to see each quote and its date.
 
 Look for: Sam's own title kept in his words, and a result that only says what Careerwright
 checked.
 
 ### Jo, unsure and between jobs (made up; optional)
-
-This is P02 from the test pack.
 
 - Unsure, not working at the moment, would work in Leeds or Manchester.
 - Enjoys repairing things and working outdoors. Could study 12 hours a week.
@@ -156,5 +155,14 @@ Notes for Claude (you can skip these):
   INT-16, INT-17, DSC-21, STR-01 and STR-02, with Task 6f's browser test of the no-job answer.
 - Research this role sends only the title and "England". It counts a role as found only on
   two independent sources or one official page.
+- Sam's title, "Client onboarding assistant", must be on no list, or "Research this role"
+  isn't offered for it. How it's checked: `tests/eval/test_titles_on_no_list.py` (in
+  `make check`) shows it is no target of any option pack version, and
+  `tests/integration/test_evaluation.py` shows the product's own check accepts it against
+  the full ESCO release and the UK job-title index. That second test needs the datasets
+  `make setup` fetches; it hasn't run on the cloud machine, which has none. Run it before
+  the session; if it fails, pick another title and check again. (Sam was a bookkeeping
+  assistant before: the option pack holds that title.)
+- Jo is persona P02 from the supplied test pack.
 - Saved questions come from the progress ledger's "Session W2" lines and Task 6f's review
   (M4, M5).
