@@ -176,3 +176,121 @@ checked"; a record sheet. Every item "not run — requires human". It passes
 
 ## Paths a reviewer can skip
 `apps/web/src/generated/**` (regenerated client).
+
+## Fix round 1
+
+Main tree, branch `claude/confident-ramanujan-ux3saw`, from 8d0191d. No live call, no web
+request, no Docker. Migration **0043** (`r0043_role_page_passages.py`, `down_revision =
+"0042"`; Task 12c's follow-up renumbered itself to 0044). DBOS `application_version` unchanged.
+
+### Commits
+- `5480e16` I1 and M1: copies by any passage, one site is one source, hidden text left out
+  (migration 0043).
+- `c1128d0` I2, I3 and M9: role pages never job sources; the live tool ledgers first; its
+  in-process reading said; `TITLE` quoted safely.
+- `217974a` M2, M3, M6, M7: `on_a_list`; ideas stay ideas; ID-only receipts; "nothing else
+  about you"; client regenerated.
+- `1cd6b26` I4, M8: Sam's new title checked in code; Maya named as made up; P02 dropped from
+  the person's text; ADR 0015 and ADR 0009 fix round lines.
+- last commit: the register row (DIV1-15) and this section.
+
+### What changed, finding by finding
+- **I1** (`evidence/corroboration.py`). At each of the title's first 16 places, the title with
+  the 24 words after it, and the 24 words before it with the title, are fingerprinted
+  (`passages`). A side with fewer than 8 words (the text ends) isn't; a place with neither side
+  stands for the whole text. Two pages sharing any fingerprint are copies. Sources are compared
+  by registrable domain (`site`: last two labels, or three under the UK's two-level suffixes,
+  four under `service.gov.uk`). `TitleCheck.passage_sha256` became `passages`; migration 0043
+  replaces the column with `passages text[]` (backfilled; CHECKs: non-empty exactly when
+  verified, at most 32, each a SHA-256 in hex). The reviewer's probe is pinned:
+  `test_one_advert_on_two_boards_counts_once_whatever_each_board_puts_around_it` (identical
+  body, each board with its own `<title>`, navigation and footer naming the title first →
+  not found, one group). Also: the advert naming the title only at its end; two boards with
+  their own adverts stay two sources; four subdomain pairs are one source; three pairs under a
+  public suffix (`co.uk`, `gov.uk`, `.example`) stay two.
+- **I2** (`evidence/store.py`). `coverage`, `url_history` and `urls_in_flight` leave out
+  attempts (or targets) carrying a role title (`_not_a_role_page`). So the Jobs chapter's
+  coverage and empty reason ignore role pages, a job request never joins a role reading, and
+  a role page's failures never back off a job fetch. Integration assertions added:
+  coverage `{}` and `no_sources_checked` after a reading; a job request for a page a reading
+  is waiting on starts its own run.
+- **I3** (`tools/live_role_research.py`). The ledger row (search notes only) is written and the
+  markdown rendered as soon as the call returns, and the key scan runs, before any page is
+  read. The pages' results (hosts, classes, verified, the verdict; never a URL) are printed as
+  one line with the row's number, key-scanned too; they are no provider call, so no ledger row.
+  **Changed for the controller:** the verdict is in the command's output, not the row's notes.
+- **I4** (`docs/reviews/session-w2.md`). Sam is now a client onboarding assistant ("Client
+  onboarding assistant"). `tests/eval/test_titles_on_no_list.py` (in `make check`) checks it and
+  the live tool's default ("Biodiversity net gain officer") against every pinned option pack
+  version (it fails for "Bookkeeping assistant": shown by calling it, `('Bookkeeping
+  assistant', '0.1.0')`), and that the package names it. A new integration test in
+  `tests/integration/test_evaluation.py` runs the product's own refusal (`no_list_holds`, made
+  public from `_no_list_holds`), `label_match_uris` and `uk_titles.listed` on the full ESCO
+  release and the UK index. **Not run: no datasets here**, so whether ESCO or the ONS index
+  holds either title is still unchecked. The package's notes say so and ask for it before the
+  session.
+- **M1** (`evidence/pages.py`). `role_text` now reads only text nodes with no `script`, `style`,
+  `noscript`, `template`, `[hidden]`, or inline `display:none` / `visibility:hidden` ancestor
+  (an XPath through Scrapling; no new import). `visible_text` (model extraction) and the
+  body-keeping checks are unchanged. Tests: seven hidden forms; text after a hidden span still
+  read; the left boundary and hyphen; punctuation; either apostrophe form folds alike.
+  **Ruling:** a possessive ("technician's") is not the title: the shared quotation rule
+  (`span_offsets`) treats an inner apostrophe as part of the word. Kept, pinned by a test
+  (errs towards "not yet found").
+- **M2, M3** (`profile/records.py`, `api/*_schemas.py`, `Directions.tsx`, `vocabulary.ts`).
+  `TargetRecord.on_a_list` (not own words, any ESCO label match, or a pack target by its
+  title); served as `on_a_list` on `TargetRecordOut` and `RoleOut`. `researchable` requires it
+  false, and takes ideas before targets, so an idea made a target keeps "A title Careerwright
+  thought of" and shows "Saved as one of your targets". That line no longer says "not yet
+  found" (it contradicted a found result). **Ruling:** the pack counts as a list in the web
+  (as I4 counts it); the API still refuses only ESCO and UK index titles.
+- **M6** (`api/routes_research.py`). Both role research commands' receipts are
+  `{"research_id": ...}`; the answer is read again after `run_idempotent`, so a replay answers
+  with the research as it is now. Integration assertion added on `command_receipts`.
+- **M7**: "It sends only the title and “England”, nothing else about you."
+- **M8**: workspaces named "Maya (made up)" and so on; "This is P02 from the test pack" moved to
+  the notes for Claude.
+- **M9**: the tool's docstring, its ledger purpose and ADR 0009's line say the live run reads
+  pages in its own process (holding the Meta key), not through the restricted worker's
+  service. The Makefile passes `--title "$$TITLE"` (make exports a command-line variable, so
+  the shell expands it as a word; checked with a throwaway makefile: quotes, backquotes and
+  `; ls` stay in the title).
+
+### Checks (on the final code)
+- `export PATH=/opt/node24/bin:$PATH; env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY make check`
+  after each change; last run **rc 0**: ruff and mypy clean; pytest **1,854 passed**, 8
+  skipped, 434 deselected; fixture validator passed; client current; Biome, `tsc` clean; Vitest
+  **44 files, 467 passed**.
+- RED then GREEN: the I1 tests (6 failed, then pass); M1 (9 failed, then pass after one test
+  input was corrected, below); `on_a_list` (1 failed, then pass); the web `researchable` tests
+  (3 failed, then pass); M7 (1 failed, then pass); I3 (collection error on `PAGES_PRINTED`,
+  then 2 pass); I4 (the package test failed, then pass).
+- **Not run: the controller runs acceptance:** `tests/integration/test_role_research.py`
+  (with the new I2 and M6 assertions), the new `test_evaluation.py` test (also needs the
+  datasets), `make acceptance`, Playwright, Storybook. **Not run, the controller's:** both live
+  runs. **Not run — requires human:** session W2.
+
+### Changed test inputs and assertions (disclosure)
+- `tests/domain/test_role_research.py`: `inside.passage_sha256 is None` became
+  `inside.passages == ()` (plus `found.passages` non-empty); the `TitleCheck` field set
+  names `passages`. My own first possessive case expected the title verified; corrected to
+  "not verified" (the shared rule), with the reason.
+- `tests/tools/test_live_role_research.py`: the verdict and pages are asserted from the printed
+  line, not the row's notes (the row now holds the search's notes only).
+- `RoleResearch.test.tsx`: the "which titles" cases now pass `on_a_list`; the expected order is
+  role, ideas, targets; the role example's title is "Client onboarding assistant"; the sends
+  text expects "nothing else about you".
+- `on_a_list` added to fixtures: `Directions.test.tsx` (true, an ESCO title),
+  `YouChapter.test.tsx` and `Conversation.stories.tsx` (true for `ons`), `model.test.ts` and
+  `stories/data.ts` (false).
+- `tests/integration/test_role_research.py`: the cancel test now also starts and cancels a job
+  acquisition of the same page (new assertions); no existing assertion changed.
+
+### Concerns
+- Whether ESCO or the ONS index holds "Client onboarding assistant" (or the default live
+  title) is unchecked until the new integration test runs with the datasets.
+- Style-sheet hiding (a class with `display: none`) still counts as visible (recorded in ADR
+  0015).
+- On a replay, the research commands answer with today's state, not the first answer's.
+- The API's refusal doesn't include option pack titles; the web's list does.
+- Listed for later (not done): M4, M5 (a session W2 question), M10, M11.
