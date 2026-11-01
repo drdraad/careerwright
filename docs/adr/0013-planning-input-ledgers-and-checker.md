@@ -364,7 +364,7 @@ Requirements: FUNDING-06, FUNDING-04 (its L0 change), FIN1-02, FIN1-10. Rulings 
    `VariantInputs.tuition_fee_loan` (its amount, null when not known, and the funding statuses:
    eligibility and application, the four of each), stored in the planning inputs document
    through Task 12a's one command (an expected version and an Idempotency-Key through
-   `run_idempotent`). Migration 0040 adds two CHECKs repeating its rules. In the planning
+   `run_idempotent`). Migration 0041 adds two CHECKs repeating its rules. In the planning
    model it is `catalogue.TuitionFeeLoan` on the variant: the person's assumption
    (`accepted_assumption`), so a route resting on it is qualified. It is no `Support` and no
    `InstrumentKind`: a support of kind `loan` is still refused, a maintenance loan included.
