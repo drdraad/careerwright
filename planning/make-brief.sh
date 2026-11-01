@@ -3,7 +3,7 @@
 # IDs may carry a letter suffix (6b, 7b, 13a); the heading must be "## Task <ID>:" exactly,
 # so Task 7 never swallows Task 7b.
 set -euo pipefail
-cd /Users/darianraad/Code/careerwright
+cd "$(dirname "$0")/.."
 WS=planning
 PLAN=docs/plan/l0-sprint-tasks.md
 id=$1

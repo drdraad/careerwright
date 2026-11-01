@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Usage: review-pkg.sh BASE HEAD  -> writes review-<b>..<h>.diff excluding lockfiles/generated/data
 set -euo pipefail
-cd /Users/darianraad/Code/careerwright
+cd "$(dirname "$0")/.."
 WS=planning
 b=$(git rev-parse --short "$1"); h=$(git rev-parse --short "$2")
 out="$PWD/$WS/review-$b..$h.diff"

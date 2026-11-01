@@ -6,6 +6,16 @@ You fix Task 6d slice C (Careerwright L0, branch `l0-local-release`, main tree
 rename commit came after. FIX_BASE: the head when you start. You are a fresh implementer: the
 original's report (`task-6dC-report.md`) tells you what was built and why.
 
+**This machine (added 2026-11-01, binding):** the build now runs in a cloud container. Read
+`planning/env-cloud.md` first: your main tree is `/home/user/careerwright`, branch
+`claude/confident-ramanujan-ux3saw` (head b47cac2 includes everything above), Node 24 must be
+put on PATH, checks run with the Adzuna variables unset, and Docker is down (integration and
+`make acceptance` can't run: report them as not run; never start Docker). Running beside you
+in worktree `/home/user/careerwright-wt/12c`: Task 12c (planning only; it may add migration
+0040 too; if you need a migration, take 0040 and the worktree renumbers at its rebase).
+Review captures need the stack only if `review-screenshots` needs Docker; if so, report them
+as not run.
+
 R16 applies (the product owner's speed rules): this is the only fix round. Only the items
 below are fixed; the controller checks your diff and tests afterwards.
 
