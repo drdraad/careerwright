@@ -489,7 +489,8 @@ describe("[PROF-09][DIV1-13] the title field goes through the support screen, as
       "Careerwright keeps it as your job title only if you choose to. You can also type again or skip this question.",
     );
     expect(panel).toHaveTextContent("Samaritans: Call 116 123");
-    expect(shown).toHaveBeenLastCalledWith(true); // the world is drawn still
+    // The world is drawn still: the signal follows the panel's render, so wait for it.
+    await waitFor(() => expect(shown).toHaveBeenLastCalledWith(true));
     // Nothing is offered in those words, and they are never repeated back.
     expect(screen.queryByRole("option")).toBeNull();
     expect(document.body).not.toHaveTextContent(RISK);
