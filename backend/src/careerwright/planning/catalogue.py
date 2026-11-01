@@ -97,6 +97,9 @@ class ActionConcept(StrictModel):
     as_of: date | None = None  # the retrieval date of its evidence: never "current"
     exclusive_group: str | None = None  # at most one selected concept per group
     synthetic: bool
+    # An option the person added themselves (S5.7, Task 12b): their own record, `proposed`,
+    # never reviewed, so a route through it is always qualified.
+    added_by_person: bool = False
     cited: Citation | None = None
     facts: list[Fact] = Field(default_factory=list)  # credential, level, assessment, claims
     # Stated entry requirements: until the person confirms they meet them, a route through
@@ -161,6 +164,26 @@ class Session(StrictModel):
         )
 
 
+class SuppliedFact(StrEnum):
+    """A fact the route search needs that the person supplied as their own figure for an
+    offering (Task 12b): labelled theirs and not reviewed, so a route resting on it is
+    qualified."""
+
+    START_DATE = "start_date"
+    FINISH_DATE = "finish_date"
+    COST = "cost"
+    WEEKLY_HOURS = "weekly_hours"
+
+
+class Duration(StrictModel):
+    """One exact length a page states (never a typical, open or ranged one): with a start, it
+    gives the finish (`pack.finish_from`)."""
+
+    unit: Literal["weeks", "months", "years"]
+    count: Annotated[int, Field(ge=1)]
+    cited: Citation | None = None
+
+
 class OfferGate(StrictModel):
     """A job or an apprenticeship starts only when an offer is accepted: its wages and its
     experience start at that gate, never before (FIN1-04, PLN-05)."""
@@ -199,6 +222,12 @@ class Offering(StrictModel):
     synthetic: bool
     cited: Citation | None = None
     facts: list[Fact] = Field(default_factory=list)  # every consequential field, cited
+    # Task 12b. Its one exact stated length, if any: a start the person supplies then gives
+    # its finish. The intake months its page states, which the person may choose as its start.
+    duration: Duration | None = None
+    stated_intakes: list[date] = Field(default_factory=list)
+    # The facts the person supplied for it as their own figures (`planning.inputs`).
+    supplied: list[SuppliedFact] = Field(default_factory=list)
 
     def plan(self, plan_id: str | None) -> PaymentPlan | None:
         return next((p for p in self.payment_plans if p.plan_id == plan_id), None)
@@ -438,6 +467,11 @@ class Variant(StrictModel):
         default=None,
         description="Whether the person meets the stated entry requirements: null is not yet "
         "confirmed; false is their own 'no', still never ineligible.",
+    )
+    entry_expected: bool = Field(
+        default=False,
+        description="A stated entry requirement is named only by a qualification the person "
+        "expects (Task 6f): met only if they get their grades, so unresolved, never met.",
     )
 
 

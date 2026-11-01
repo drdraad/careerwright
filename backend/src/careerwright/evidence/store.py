@@ -1184,3 +1184,21 @@ def pasted_document(tx: Tx, attempt_id: uuid.UUID) -> tuple[str, SealedValue] | 
     if row is None:
         return None
     return row.content_sha256, SealedValue(row.key_version, bytes(row.nonce), bytes(row.ciphertext))
+
+
+def workspace_pasted_document(
+    tx: Tx, workspace_id: uuid.UUID, attempt_id: uuid.UUID
+) -> tuple[str, str | None, SealedValue] | None:
+    """`pasted_document` for a text pasted in this workspace, with the source address the
+    person gave for it (Task 12b, an option's page); None for any other."""
+    source = tx.execute(
+        sa.text(
+            "SELECT requested_url FROM careerwright.source_attempts WHERE attempt_id = :id "
+            "AND workspace_id = :ws AND route = 'pasted_text'"
+        ),
+        {"id": attempt_id, "ws": workspace_id},
+    ).one_or_none()
+    found = pasted_document(tx, attempt_id) if source is not None else None
+    if source is None or found is None:
+        return None
+    return found[0], source.requested_url, found[1]

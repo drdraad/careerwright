@@ -50,6 +50,7 @@ from careerwright.planning.catalogue import (
     CatalogueLabel,
     Citation,
     CitationBasis,
+    Duration,
     Fact,
     FundingInstrument,
     InstrumentKind,
@@ -68,6 +69,7 @@ MONTHS_PER_YEAR = 12
 WHOLE_FEE_DUE = 0  # month offset of a total fee with no stated schedule (session 2, D12 yes)
 # The pack's claim fields for an eligibility condition of an offering's funding.
 ELIGIBILITY_FIELD_PREFIX = "eligibility_"
+STATED_INTAKES_FIELD = "intakes_stated"  # an option's intake months, as its page lists them
 PROVIDER_OUTCOME_NOTE = (
     "a provider's employment-outcome claim: unverified, since no method or denominator is "
     "given (spec section 10)"
@@ -217,6 +219,7 @@ class _Reader:
                 mode = way.get("mode") if isinstance(way, dict) else None
                 offering_id = f"{source.record_id}#{mode or len(found) + 1}"
             finish, finish_why = _finish(start, start_why, part, duration)
+            exact = _exact(part, duration)
             hours, hours_why = self._hours(source.schedule)
             unknown = {
                 name: why
@@ -247,6 +250,8 @@ class _Reader:
                     eligibility_conditions=[
                         f for f in funding if f.field.startswith(ELIGIBILITY_FIELD_PREFIX)
                     ],
+                    duration=exact,
+                    stated_intakes=self._stated_intakes(source.option_id),
                     synthetic=False,
                     facts=[
                         self.fact("intake", source.intake, note=start_note),
@@ -274,6 +279,23 @@ class _Reader:
             note = "the month only: its first day stands for it on the monthly grid"
             return date.fromisoformat(f"{value}-01"), None, note
         return date.fromisoformat(value), None, None
+
+    def _stated_intakes(self, option_id: str) -> list[date]:
+        """The intake months the option's page states (`intakes_stated`), each as its first
+        day, for the person to choose one as the start (Task 12b); past ones included, since
+        whether one is still open is the person's to say."""
+        option = next(o for o in self.pack.learning_options if o.record_id == option_id)
+        found: set[date] = set()
+        for claim_id in option.facts:
+            claim = self.claims[claim_id]
+            if claim.field != STATED_INTAKES_FIELD or not isinstance(claim.value, list):
+                continue
+            found |= {
+                date.fromisoformat(f"{v}-01" if len(v) == len("YYYY-MM") else v)
+                for v in claim.value
+                if isinstance(v, str)
+            }
+        return sorted(found)
 
     def _date(self, ref: Ref) -> date | None:
         value = self.pack.value(ref)
@@ -377,10 +399,30 @@ def _finish(
         return None, "a range of durations, not one finish"
     if start is None:
         return None, start_why
-    if unit == "weeks":
-        return start + timedelta(days=DAYS_PER_WEEK * low - 1), None
-    months = low * MONTHS_PER_YEAR if unit == "years" else low
-    return _plus_months(start, months) - timedelta(days=1), None
+    exact = _exact(part, duration)
+    if exact is None:  # every other form returned its reason above
+        return None, "no single duration is stated"
+    return finish_from(start, exact), None
+
+
+def _exact(part: object, duration: Fact) -> Duration | None:
+    """The one exact length a duration states in weeks, months or years, or None."""
+    if duration.unknown is not None or not isinstance(part, dict):
+        return None
+    low, high, unit = part.get("minimum"), part.get("maximum"), part.get("unit")
+    if part.get("typical") or part.get("unbounded") or not isinstance(low, int) or low != high:
+        return None
+    if unit not in ("weeks", "months", "years") or low < 1:
+        return None
+    return Duration(unit=unit, count=low, cited=duration.cited)
+
+
+def finish_from(start: date, duration: Duration) -> date:
+    """The last day of an exact length from its first day."""
+    if duration.unit == "weeks":
+        return start + timedelta(days=DAYS_PER_WEEK * duration.count - 1)
+    months = duration.count * MONTHS_PER_YEAR if duration.unit == "years" else duration.count
+    return _plus_months(start, months) - timedelta(days=1)
 
 
 def _plus_months(day: date, months: int) -> date:

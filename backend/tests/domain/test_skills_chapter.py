@@ -54,7 +54,7 @@ from careerwright.errors import CareerwrightError, ErrorCode
 from careerwright.profile.document import QualificationStatus
 from tests.support.capability import gate_row, self_report, skill_row, statement, synthetic_matrix
 
-DATA = committed_data()  # what the app reads: the reviewed pack 0.2.0 and its reference
+DATA = committed_data()  # what the app reads: the reviewed pack 0.4.0 and reference 0.2.0
 PACK = DATA.pack
 REFERENCE = DATA.reference
 OUTCOMES = list(DATA.outcomes)
@@ -113,12 +113,13 @@ def reviewed(row: MatrixRow) -> MatrixRow:
 
 
 @pytest.mark.req("OPTN-08")
-def test_skills_reads_the_reviewed_pack_0_2_0_and_its_reference_through_their_pins() -> None:
-    assert (PACK.pack_version, PACK.dated) == ("0.2.0", date(2026, 10, 30))
+def test_skills_reads_the_reviewed_pack_0_4_0_and_reference_0_2_0_through_their_pins() -> None:
+    # Task 12b: the school-leaver pack 0.4.0, with reference 0.2.0 carried to it unchanged.
+    assert (PACK.pack_version, PACK.dated) == ("0.4.0", date(2026, 11, 1))
     assert (REFERENCE.reference_version, REFERENCE.pack_version) == ("0.2.0", "0.2.0")
-    pack_bytes = pack_path("0.2.0").read_bytes()
+    pack_bytes = pack_path("0.4.0").read_bytes()
     reference_bytes = reference_path("0.2.0").read_bytes()
-    assert hashlib.sha256(pack_bytes).hexdigest() == PACK_PINS["0.2.0"]
+    assert hashlib.sha256(pack_bytes).hexdigest() == PACK_PINS["0.4.0"]
     assert hashlib.sha256(reference_bytes).hexdigest() == REFERENCE_PINS["0.2.0"]
 
 

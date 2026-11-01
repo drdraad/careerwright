@@ -61,12 +61,17 @@ from careerwright.planning.compiler import (
     PlanningInputs,
     WorkRights,
 )
+from careerwright.planning.figures import OfferingFigures, with_figures
 from careerwright.planning.months import MAX_HORIZON_MONTHS
+from careerwright.planning.own_options import OwnOption, OwnOptionInput, stamped_options
+from careerwright.planning.own_options import as_input as option_input
 
 INPUTS_SCHEMA_VERSION: Literal["1"] = "1"
 CONTINUATION_LABEL = "continuation"
 MAX_SUPPORTS = 4  # supports confirmed on one option: more is never a real case in L0
 MAX_LISTED = 50  # commitments, debts, options, admissions and outcome decisions, each
+MAX_OWN_OPTIONS = 24  # options a person adds, across their targets: the M0 concept bound
+MAX_EXCLUDED = 200  # options left out of the search, across every target
 Identifier = Annotated[str, Field(min_length=1, max_length=200)]
 Reason = Annotated[str, Field(min_length=1, max_length=400)]
 
@@ -80,6 +85,9 @@ class BaselineKind(StrEnum):
 
     CURRENT_ROLE = "current_role"
     JOB_SEARCH = "job_search"
+    # Plan v1.6 (a school leaver): carrying on in school or college; with no job, its pay is
+    # the person's own "0 hours, £0", a stated figure, never an unknown read as zero.
+    STAYING_IN_EDUCATION = "staying_in_education"
     OTHER = "other"
 
 
@@ -286,12 +294,27 @@ class StatedInputs(StrictModel):
         description="Schemes the person confirmed may pay for more than one of their options, "
         "each one of their stated supports' instrument IDs.",
     )
+    # Task 12b (ADR 0013's Task 12b amendment).
+    offering_figures: list[OfferingFigures] = Field(
+        default_factory=list,
+        max_length=MAX_LISTED,
+        description="The person's own figures for facts an offering lacks: theirs, not "
+        "reviewed, so every route resting on one is qualified.",
+    )
+    excluded_variants: list[Identifier] = Field(
+        default_factory=list,
+        max_length=MAX_EXCLUDED,
+        description="Options the person leaves out of the route search (the rest are "
+        "retained): how a comparison over the model's bounds is narrowed, never silently.",
+    )
 
     @model_validator(mode="after")
     def _one_answer_each(self) -> Self:
         _unique(self.admissions, "admission")
         _unique([v.variant_id for v in self.variants], "option")
         _unique(self.shared_schemes, "shared scheme")
+        _unique([f.offering_id for f in self.offering_figures], "offering's figures")
+        _unique(self.excluded_variants, "left-out option")
         stated = {s.instrument_id for v in self.variants for s in v.supports}
         if set(self.shared_schemes) - stated:
             raise ValueError("a shared scheme is one of the person's stated supports")
@@ -304,10 +327,16 @@ class PlanningInputsIn(StatedInputs):
     outcome_decisions: list[OutcomeDecisionInput] = Field(
         default_factory=list, max_length=MAX_LISTED
     )
+    own_options: list[OwnOptionInput] = Field(
+        default_factory=list,
+        max_length=MAX_OWN_OPTIONS,
+        description="Options the person added themselves: their own records, never reviewed.",
+    )
 
     @model_validator(mode="after")
     def _one_decision_each(self) -> Self:
         _unique([d.outcome_id for d in self.outcome_decisions], "outcome decision")
+        _unique([o.option_id for o in self.own_options], "own option")
         return self
 
 
@@ -316,10 +345,12 @@ class PlanningInputsDocument(StatedInputs):
 
     schema_version: Literal["1"] = INPUTS_SCHEMA_VERSION
     outcome_decisions: list[OutcomeDecision] = Field(default_factory=list, max_length=MAX_LISTED)
+    own_options: list[OwnOption] = Field(default_factory=list, max_length=MAX_OWN_OPTIONS)
 
     @model_validator(mode="after")
     def _one_decision_each(self) -> Self:
         _unique([d.outcome_id for d in self.outcome_decisions], "outcome decision")
+        _unique([o.option_id for o in self.own_options], "own option")
         return self
 
 
@@ -344,7 +375,11 @@ def stamped(
                 OutcomeDecision(**decision.model_dump(), recorded_by=by, recorded_at=at)
             )
     return PlanningInputsDocument(
-        **new.model_dump(exclude={"outcome_decisions"}), outcome_decisions=decisions
+        **new.model_dump(exclude={"outcome_decisions", "own_options"}),
+        outcome_decisions=decisions,
+        own_options=stamped_options(
+            new.own_options, previous.own_options if previous else [], by=by, at=at
+        ),
     )
 
 
@@ -357,8 +392,9 @@ def _as_input(decision: OutcomeDecision) -> OutcomeDecisionInput:
 def as_submitted(document: PlanningInputsDocument) -> PlanningInputsIn:
     """A stored document as its client would send it back: without the decisions' stamps."""
     return PlanningInputsIn(
-        **document.model_dump(exclude={"schema_version", "outcome_decisions"}),
+        **document.model_dump(exclude={"schema_version", "outcome_decisions", "own_options"}),
         outcome_decisions=[_as_input(d) for d in document.outcome_decisions],
+        own_options=[option_input(o) for o in document.own_options],
     )
 
 
@@ -450,9 +486,12 @@ def prepare(
     horizon_months: int,
     synthetic: bool,
     version: int,
+    expected_entry: frozenset[str] = frozenset(),
 ) -> Prepared:
     """The monthly model's inputs for one comparison, from stored version `version`. Refused,
-    naming them, while an input a solve needs is not stated: never filled with a default."""
+    naming them, while an input a solve needs is not stated: never filled with a default.
+    `expected_entry`: the concepts whose stated entry requirements are named only by a
+    qualification the person expects (`checkpoint.expected_entry`)."""
     blocking = [n for n in needs(document, caps) if n.effect is NeedEffect.BLOCKS_A_SOLVE]
     missing = [n.input.value for n in blocking]
     objective, continuation = document.objective_basis, document.continuation
@@ -479,7 +518,7 @@ def prepare(
         )
     cited = Citation(basis=CitationBasis.PERSON, locator=f"planning inputs, version {version}")
     months = horizon_months
-    person = _with_answers(catalogue, document, cited)
+    person = with_answers(catalogue, document, cited, expected_entry=expected_entry)
     admitted = set(document.admissions)
     baseline = document.baseline
     inputs = PlanningInputs(
@@ -537,16 +576,29 @@ def prepare(
     return Prepared(inputs=inputs, catalogue=person)
 
 
-def _with_answers(
-    catalogue: Catalogue, document: PlanningInputsDocument, cited: Citation
+def with_answers(
+    catalogue: Catalogue,
+    document: StatedInputs,
+    cited: Citation,
+    *,
+    expected_entry: frozenset[str] = frozenset(),
 ) -> Catalogue:
-    """The catalogue with the person's answers in each variant they name, and an accepted
-    offer on each offering they hold a place or an offer for."""
+    """The catalogue with the person's answers in each variant they name, their own figures
+    in each offering they supplied them for, an accepted offer on each offering they hold a
+    place or an offer for, and without the options they left out of the search."""
     answers = {v.variant_id: v for v in document.variants}
     admitted = set(document.admissions)
+    left_out = set(document.excluded_variants)
+    concepts = {c.concept_id: c for c in catalogue.concepts}
+    offered = {o.offering_id: o.concept_id for o in catalogue.offerings}
     variants = []
     for variant in catalogue.variants:
+        if variant.variant_id in left_out:
+            continue
         found = answers.get(variant.variant_id)
+        concept = concepts[offered[variant.offering_id]]
+        if concept.concept_id in expected_entry and concept.entry_requirements:
+            variant = variant.model_copy(update={"entry_expected": True})
         if found is None:
             variants.append(variant)
             continue
@@ -570,12 +622,16 @@ def _with_answers(
                 }
             )
         )
-    offerings = [
-        o.model_copy(update={"offer_gate": o.offer_gate.model_copy(update={"accepted": True})})
-        if o.offering_id in admitted and o.offer_gate is not None
-        else o
-        for o in catalogue.offerings
-    ]
+    figures = {f.offering_id: f for f in document.offering_figures}
+    offerings = []
+    for offering in catalogue.offerings:
+        supplied = figures.get(offering.offering_id)
+        if supplied is not None:
+            offering = with_figures(offering, supplied, cited)
+        if offering.offering_id in admitted and offering.offer_gate is not None:
+            gate = offering.offer_gate.model_copy(update={"accepted": True})
+            offering = offering.model_copy(update={"offer_gate": gate})
+        offerings.append(offering)
     return catalogue.model_copy(update={"variants": variants, "offerings": offerings})
 
 

@@ -558,6 +558,64 @@ def test_a_solve_that_finds_routes_stores_and_serves_them_with_their_schedules(
     assert no_reason_anywhere(result)
 
 
+C01_FULL_TIME = "offering:C01#full_time"
+C01_CONDITIONS = (
+    "eligibility_area",
+    "eligibility_age",
+    "eligibility_earnings",
+    "eligibility_no_other_funded_training",
+)
+
+
+@pytest.mark.req("OPTN-13", "OPTN-09", "OPT1-07", "API-06")
+def test_p01_with_the_missing_facts_supplied_gets_routes_each_qualified_and_without_them_names_them(
+    person: Person, workers: Any
+) -> None:
+    """Task 12b's P01 acceptance at the API: without the facts the search lacks, the result
+    names them on each option set aside, never "no route"; with them supplied at the
+    checkpoint, computed routes, the one resting on the person's figures qualified."""
+    person.ready_for_the_target()
+    without = person.ask().json()["run"]["run_id"]
+    worker = workers("worker")
+    person.wait_terminal(without)
+    person.state(
+        stated(
+            offering_figures=[
+                {
+                    "offering_id": C01_FULL_TIME,
+                    "start": {"on": f"{next_month()}-01", "basis": "own_figure"},
+                    "weekly_hours": 9,
+                    "cost": gbp(0),
+                }
+            ],
+            variants=[
+                {
+                    "variant_id": C01_FULL_TIME,
+                    "condition_statuses": dict.fromkeys(C01_CONDITIONS, "confirmed"),
+                }
+            ],
+        )
+    )
+    supplied = person.ask().json()["run"]["run_id"]
+    person.wait_terminal(supplied)
+    worker.stop()
+    before = person.solve(without).json()["result"]
+    after = person.solve(supplied).json()["result"]
+
+    assert before["outcome"] != "no_route_in_bounded_model"
+    aside = {s["variant_id"]: s for s in before["set_aside"]}
+    assert {"dates_unknown", "cost_unknown", "workload_unknown"} <= set(
+        aside[C01_FULL_TIME]["unresolved"]
+    )
+    assert after["outcome"] == "routes_found"
+    routes = {tuple(s["route"]): s for s in after["schedules"]}
+    assert (C01_FULL_TIME,) in routes
+    assert "supplied_figures" in routes[(C01_FULL_TIME,)]["qualifications"]
+    assert "supplied_figures" not in routes[()]["qualifications"]
+    assert C01_FULL_TIME not in {s["variant_id"] for s in after["set_aside"]}
+    assert no_reason_anywhere(after)
+
+
 @pytest.mark.req("OPT1-04", "LIMITS-02")
 def test_two_solves_asked_together_run_one_at_a_time_each_on_its_own_clock(
     person: Person, workers: Any

@@ -44,15 +44,15 @@ def test_each_target_s_pack_options_are_served_with_their_labels(api: ApiClient,
     body = options(api, ada, workspace_id)
 
     assert (body["synthetic"], body["data_mode"]) == (True, "live_assisted")
-    assert body["pack"]["pack_version"] == "0.2.0"  # the reviewed pack (Task 10A fix round 1)
-    assert body["pack"]["dated"] == "2026-10-30"
+    assert body["pack"]["pack_version"] == "0.4.0"  # the reviewed school-leaver pack (Task 12b)
+    assert body["pack"]["dated"] == "2026-11-01"
     data, unmatched = body["targets"]
     assert data["target_title"] == DATA
     assert data["pack_target_id"] == "data-quality-analyst-manchester"
     catalogue = data["catalogue"]
     assert catalogue["label"] == {
-        "name": "nessa-england-option-pack 0.2.0",
-        "dated": "2026-10-30",
+        "name": "nessa-england-option-pack 0.4.0",
+        "dated": "2026-11-01",
         "synthetic": False,
     }
     assert sorted(c["concept_id"] for c in catalogue["concepts"]) == ["option:C01", "option:C04"]

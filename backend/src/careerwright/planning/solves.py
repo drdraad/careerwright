@@ -33,11 +33,11 @@ from careerwright.identity.records import Run, RunKind
 from careerwright.identity.runs import open_output, submit_keyless_run, visible_run
 from careerwright.identity.workspaces import visible_workspace
 from careerwright.planning import store
-from careerwright.planning.commands import current_inputs
+from careerwright.planning.checkpoint import expected_entry
+from careerwright.planning.commands import current_inputs, person_entry, target_catalogues
 from careerwright.planning.compiler import ReadinessBasis, compile_input
 from careerwright.planning.inputs import decided_outcomes, prepare
 from careerwright.planning.months import MAX_HORIZON_MONTHS, Month
-from careerwright.planning.pack import target_options
 from careerwright.planning.search import (
     ALGORITHM_VERSION,
     PRUNING_VERSION,
@@ -52,6 +52,7 @@ from careerwright.planning.solve_records import (
     SolveSnapshot,
     solve_identity,
 )
+from careerwright.profile.commands import current_profile
 from careerwright.profile.document import TextValue
 from careerwright.vocabulary import WorkState
 
@@ -113,12 +114,17 @@ def request_solve(
         raise CareerwrightError(
             ErrorCode.NOT_FOUND, "That is not one of your target roles.", stage=ErrorStage.PLANNING
         )
-    options = target_options(matrix, data.pack)
+    # The pack's options and the person's own beside them (Task 12b).
+    [(_, options)] = target_catalogues(
+        tx, keyring, workspace_id, [matrix], inputs.document.own_options, data
+    )
     if options.catalogue is None:
         raise _refused("no_options", note=options.note or "no_pack_target")
     start = Month.parse(request.planning_start)
     if start < Month.of(now.date()):
         raise _refused("planning_start_past")
+    profile = current_profile(tx, workspace_id).document
+    qualifications, keys = person_entry(tx, profile, [options.catalogue])
     prepared = prepare(
         inputs.document,
         options.catalogue,
@@ -127,6 +133,7 @@ def request_solve(
         horizon_months=request.horizon_months,
         synthetic=inputs.synthetic,
         version=inputs.version,
+        expected_entry=expected_entry(options.catalogue, qualifications, keys),
     )
     basis = ReadinessBasis(
         matrix=matrix,

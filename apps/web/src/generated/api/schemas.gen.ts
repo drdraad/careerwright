@@ -230,6 +230,11 @@ export const ActionConceptSchema = {
             type: 'boolean',
             title: 'Synthetic'
         },
+        added_by_person: {
+            type: 'boolean',
+            title: 'Added By Person',
+            default: false
+        },
         cited: {
             anyOf: [
                 {
@@ -471,6 +476,32 @@ export const AdzunaQuerySchema = {
     ],
     title: 'AdzunaQuery',
     description: 'One bounded search: a role and a place, one page of at most 50 results.'
+} as const;
+
+export const AgeRuleSchema = {
+    properties: {
+        field: {
+            type: 'string',
+            title: 'Field'
+        },
+        value: {
+            $ref: '#/components/schemas/JsonValue'
+        },
+        applied: {
+            type: 'boolean',
+            const: false,
+            title: 'Applied',
+            default: false
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'field',
+        'value'
+    ],
+    title: 'AgeRule',
+    description: 'A stated age rule, beside its scheme or offering: never applied, because Careerwright\ndoes not know the person\'s age.'
 } as const;
 
 export const AiEvidenceOutSchema = {
@@ -1306,6 +1337,7 @@ export const BaselineKindSchema = {
     enum: [
         'current_role',
         'job_search',
+        'staying_in_education',
         'other'
     ],
     title: 'BaselineKind',
@@ -1652,6 +1684,130 @@ export const ChallengeSchema = {
     title: 'Challenge'
 } as const;
 
+export const CheckpointOutSchema = {
+    properties: {
+        inputs_version: {
+            type: 'integer',
+            title: 'Inputs Version'
+        },
+        profile_version: {
+            type: 'integer',
+            title: 'Profile Version'
+        },
+        synthetic: {
+            type: 'boolean',
+            title: 'Synthetic'
+        },
+        data_mode: {
+            $ref: '#/components/schemas/DataMode'
+        },
+        pack: {
+            $ref: '#/components/schemas/PackLabel'
+        },
+        needs: {
+            items: {
+                $ref: '#/components/schemas/Need'
+            },
+            type: 'array',
+            title: 'Needs'
+        },
+        direct_spend_cap: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        monthly_payment_cap: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        payment_cap_basis: {
+            type: 'string',
+            const: 'payments_and_debt_repayments',
+            title: 'Payment Cap Basis',
+            default: 'payments_and_debt_repayments'
+        },
+        work_status: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/WorkStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'The profile\'s answer; null: not given.'
+        },
+        baseline: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/BaselineInput'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        continuation: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ContinuationInput'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        not_working: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Not Working',
+            description: 'The continuation is the person\'s own 0 hours and £0 a month (a stated figure, never an unknown read as zero); null while it is not stated.'
+        },
+        targets: {
+            items: {
+                $ref: '#/components/schemas/TargetCheckpoint'
+            },
+            type: 'array',
+            title: 'Targets'
+        }
+    },
+    type: 'object',
+    required: [
+        'inputs_version',
+        'profile_version',
+        'synthetic',
+        'data_mode',
+        'pack',
+        'needs',
+        'direct_spend_cap',
+        'monthly_payment_cap',
+        'work_status',
+        'baseline',
+        'continuation',
+        'not_working',
+        'targets'
+    ],
+    title: 'CheckpointOut',
+    description: 'The Options chapter\'s review checkpoint: for each target, its options with the facts the\nroute search still lacks, what the person supplied, entry requirements beside their\nqualifications, eligibility conditions, age rules (never applied) and the scope against\nthe model\'s bounds; and the planning inputs a solve still needs.'
+} as const;
+
 export const ChooseClosestSchema = {
     properties: {
         expected_version: {
@@ -1859,6 +2015,17 @@ export const CitationBasisSchema = {
     ],
     title: 'CitationBasis',
     description: 'Where a cited value comes from (named apart from the profile\'s `Basis`).'
+} as const;
+
+export const CitedFigureSchema = {
+    type: 'string',
+    enum: [
+        'start',
+        'finish',
+        'weekly_hours',
+        'cost'
+    ],
+    title: 'CitedFigure'
 } as const;
 
 export const CityListInputSchema = {
@@ -2156,6 +2323,26 @@ export const CommitmentKindSchema = {
     title: 'CommitmentKind'
 } as const;
 
+export const ConceptStartsSchema = {
+    properties: {
+        concept_id: {
+            type: 'string',
+            title: 'Concept Id'
+        },
+        starts: {
+            type: 'integer',
+            title: 'Starts'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'concept_id',
+        'starts'
+    ],
+    title: 'ConceptStarts'
+} as const;
+
 export const ConditionSchema = {
     properties: {
         kind: {
@@ -2204,6 +2391,37 @@ export const ConditionSchema = {
     ],
     title: 'Condition',
     description: 'What the route rests on that has not happened, with its blocking verification: an\noffer to accept, an award to approve, a place to win by applying in time (an application\nthe route itself does not hold, with no admission recorded), or a tuition fee loan to be\napproved (never an award: a loan is never support).'
+} as const;
+
+export const ConditionFactSchema = {
+    properties: {
+        field: {
+            type: 'string',
+            title: 'Field'
+        },
+        value: {
+            $ref: '#/components/schemas/JsonValue'
+        },
+        status: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/EligibilityStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'field',
+        'value',
+        'status'
+    ],
+    title: 'ConditionFact',
+    description: 'An eligibility condition of the option\'s stated fee, with the person\'s status for it\n(null: not answered; only `confirmed` meets it).'
 } as const;
 
 export const ConfidenceSchema = {
@@ -2810,6 +3028,43 @@ export const DiscoveryProposalOutSchema = {
     description: 'The validated searches. They name no suggestion: the slate is computed from them.'
 } as const;
 
+export const DurationSchema = {
+    properties: {
+        unit: {
+            type: 'string',
+            enum: [
+                'weeks',
+                'months',
+                'years'
+            ],
+            title: 'Unit'
+        },
+        count: {
+            type: 'integer',
+            minimum: 1,
+            title: 'Count'
+        },
+        cited: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Citation'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'unit',
+        'count'
+    ],
+    title: 'Duration',
+    description: 'One exact length a page states (never a typical, open or ranged one): with a start, it\ngives the finish (`pack.finish_from`).'
+} as const;
+
 export const EditRowSchema = {
     properties: {
         expected_version: {
@@ -3010,6 +3265,34 @@ export const EntryModeSchema = {
     ],
     title: 'EntryMode',
     description: 'How the person chose to start (spec section 3, the You chapter).'
+} as const;
+
+export const EntryRequirementSchema = {
+    properties: {
+        field: {
+            type: 'string',
+            title: 'Field'
+        },
+        value: {
+            $ref: '#/components/schemas/JsonValue'
+        },
+        qualifications: {
+            items: {
+                $ref: '#/components/schemas/EntryFact'
+            },
+            type: 'array',
+            title: 'Qualifications'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'field',
+        'value',
+        'qualifications'
+    ],
+    title: 'EntryRequirement',
+    description: 'One stated entry requirement, with the person\'s qualifications that name it.'
 } as const;
 
 export const EntryStandingSchema = {
@@ -4004,7 +4287,8 @@ export const FindingCodeSchema = {
         'job_transitions',
         'scheme_shared_unconfirmed',
         'exclusive_schemes',
-        'loan_amount_unknown'
+        'loan_amount_unknown',
+        'entry_requirements_expected'
     ],
     title: 'FindingCode'
 } as const;
@@ -5891,6 +6175,20 @@ export const MethodSchema = {
     title: 'Method'
 } as const;
 
+export const MissingFactSchema = {
+    type: 'string',
+    enum: [
+        'start_date',
+        'finish_date',
+        'cost',
+        'weekly_hours',
+        'entry_confirmation',
+        'eligibility_confirmation'
+    ],
+    title: 'MissingFact',
+    description: 'A fact the route search needs for an option that is not known yet: what the checkpoint\nnames for each option (OPTN-13).'
+} as const;
+
 export const ModelExtractionOutSchema = {
     properties: {
         state: {
@@ -6996,6 +7294,31 @@ export const OfferingSchema = {
             },
             type: 'array',
             title: 'Facts'
+        },
+        duration: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Duration'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        stated_intakes: {
+            items: {
+                type: 'string',
+                format: 'date'
+            },
+            type: 'array',
+            title: 'Stated Intakes'
+        },
+        supplied: {
+            items: {
+                $ref: '#/components/schemas/SuppliedFact'
+            },
+            type: 'array',
+            title: 'Supplied'
         }
     },
     additionalProperties: false,
@@ -7011,6 +7334,70 @@ export const OfferingSchema = {
     ],
     title: 'Offering',
     description: 'One dated intake of a concept (spec section 18, Offering).'
+} as const;
+
+export const OfferingFiguresSchema = {
+    properties: {
+        offering_id: {
+            type: 'string',
+            maxLength: 200,
+            minLength: 1,
+            title: 'Offering Id'
+        },
+        start: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SuppliedStart'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        finish: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Finish'
+        },
+        weekly_hours: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 168,
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Weekly Hours'
+        },
+        cost: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'The whole of what the person will pay for it, due in its first month.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'offering_id'
+    ],
+    title: 'OfferingFigures',
+    description: 'The person\'s own figures for one offering: theirs, not reviewed. Null: not supplied.'
 } as const;
 
 export const OneWordWorkStyleSchema = {
@@ -7106,6 +7493,198 @@ export const OnetMatchOutSchema = {
         'top_tasks'
     ],
     title: 'OnetMatchOut'
+} as const;
+
+export const OptionFactsSchema = {
+    properties: {
+        variant_id: {
+            type: 'string',
+            title: 'Variant Id'
+        },
+        offering_id: {
+            type: 'string',
+            title: 'Offering Id'
+        },
+        concept_id: {
+            type: 'string',
+            title: 'Concept Id'
+        },
+        plan_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Plan Id'
+        },
+        review_states: {
+            items: {
+                $ref: '#/components/schemas/RecordState'
+            },
+            type: 'array',
+            title: 'Review States'
+        },
+        as_of: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'As Of'
+        },
+        added_by_person: {
+            type: 'boolean',
+            title: 'Added By Person'
+        },
+        missing: {
+            items: {
+                $ref: '#/components/schemas/MissingFact'
+            },
+            type: 'array',
+            title: 'Missing'
+        },
+        supplied: {
+            items: {
+                $ref: '#/components/schemas/SuppliedFact'
+            },
+            type: 'array',
+            title: 'Supplied'
+        },
+        stated_intakes: {
+            items: {
+                type: 'string',
+                format: 'date'
+            },
+            type: 'array',
+            title: 'Stated Intakes'
+        },
+        entry_requirements: {
+            items: {
+                $ref: '#/components/schemas/EntryRequirement'
+            },
+            type: 'array',
+            title: 'Entry Requirements'
+        },
+        entry_requirements_met: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Entry Requirements Met'
+        },
+        entry_expected: {
+            type: 'boolean',
+            title: 'Entry Expected'
+        },
+        eligibility_conditions: {
+            items: {
+                $ref: '#/components/schemas/ConditionFact'
+            },
+            type: 'array',
+            title: 'Eligibility Conditions'
+        },
+        age_rules: {
+            items: {
+                $ref: '#/components/schemas/AgeRule'
+            },
+            type: 'array',
+            title: 'Age Rules'
+        },
+        left_out: {
+            type: 'boolean',
+            title: 'Left Out'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'variant_id',
+        'offering_id',
+        'concept_id',
+        'plan_id',
+        'review_states',
+        'as_of',
+        'added_by_person',
+        'missing',
+        'supplied',
+        'stated_intakes',
+        'entry_requirements',
+        'entry_requirements_met',
+        'entry_expected',
+        'eligibility_conditions',
+        'age_rules',
+        'left_out'
+    ],
+    title: 'OptionFacts'
+} as const;
+
+export const OptionTextOutSchema = {
+    properties: {
+        text_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Text Id'
+        },
+        sha256: {
+            type: 'string',
+            title: 'Sha256'
+        },
+        text: {
+            type: 'string',
+            title: 'Text'
+        },
+        source_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source Url'
+        }
+    },
+    type: 'object',
+    required: [
+        'text_id',
+        'sha256',
+        'text',
+        'source_url'
+    ],
+    title: 'OptionTextOut',
+    description: 'A pasted text as it was kept (third parties\' contact details removed): spans of an\noption are chosen in these words, in UTF-16 code units.'
+} as const;
+
+export const OptionTextRefSchema = {
+    properties: {
+        text_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Text Id'
+        },
+        sha256: {
+            type: 'string',
+            title: 'Sha256'
+        }
+    },
+    type: 'object',
+    required: [
+        'text_id',
+        'sha256'
+    ],
+    title: 'OptionTextRef'
 } as const;
 
 export const OptionsOutSchema = {
@@ -7446,6 +8025,276 @@ export const OutcomeTypeSchema = {
     title: 'OutcomeType'
 } as const;
 
+export const OwnOptionSchema = {
+    properties: {
+        option_id: {
+            type: 'string',
+            pattern: '^[a-z0-9][a-z0-9-]{0,59}$',
+            title: 'Option Id',
+            description: 'The person\'s own short name for it, unique.'
+        },
+        target: {
+            type: 'string',
+            maxLength: 300,
+            minLength: 1,
+            title: 'Target',
+            description: 'The target role it is for: one of the profile\'s.'
+        },
+        kind: {
+            type: 'string',
+            enum: [
+                'learning',
+                'apprenticeship'
+            ],
+            title: 'Kind',
+            default: 'learning'
+        },
+        text_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Text Id',
+            description: 'The text they pasted for it, if any: its source.'
+        },
+        title: {
+            $ref: '#/components/schemas/OwnWords'
+        },
+        provider: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/OwnWords'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start'
+        },
+        finish: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Finish'
+        },
+        weekly_hours: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 168,
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Weekly Hours'
+        },
+        cost: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'The whole of what they will pay, due in its first month.'
+        },
+        entry_requirements: {
+            items: {
+                $ref: '#/components/schemas/OwnWords'
+            },
+            type: 'array',
+            maxItems: 5,
+            title: 'Entry Requirements'
+        },
+        cited: {
+            additionalProperties: {
+                $ref: '#/components/schemas/AdvertSpan'
+            },
+            propertyNames: {
+                $ref: '#/components/schemas/CitedFigure'
+            },
+            type: 'object',
+            title: 'Cited',
+            description: 'For a typed figure, the span of the pasted text it comes from.'
+        },
+        recorded_by: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Recorded By'
+        },
+        recorded_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Recorded At'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'option_id',
+        'target',
+        'title',
+        'recorded_by',
+        'recorded_at'
+    ],
+    title: 'OwnOption',
+    description: 'A stored option: who added it and when (its date), kept while it is unchanged.'
+} as const;
+
+export const OwnOptionInputSchema = {
+    properties: {
+        option_id: {
+            type: 'string',
+            pattern: '^[a-z0-9][a-z0-9-]{0,59}$',
+            title: 'Option Id',
+            description: 'The person\'s own short name for it, unique.'
+        },
+        target: {
+            type: 'string',
+            maxLength: 300,
+            minLength: 1,
+            title: 'Target',
+            description: 'The target role it is for: one of the profile\'s.'
+        },
+        kind: {
+            type: 'string',
+            enum: [
+                'learning',
+                'apprenticeship'
+            ],
+            title: 'Kind',
+            default: 'learning'
+        },
+        text_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Text Id',
+            description: 'The text they pasted for it, if any: its source.'
+        },
+        title: {
+            $ref: '#/components/schemas/OwnWords'
+        },
+        provider: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/OwnWords'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start'
+        },
+        finish: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Finish'
+        },
+        weekly_hours: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 168,
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Weekly Hours'
+        },
+        cost: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'The whole of what they will pay, due in its first month.'
+        },
+        entry_requirements: {
+            items: {
+                $ref: '#/components/schemas/OwnWords'
+            },
+            type: 'array',
+            maxItems: 5,
+            title: 'Entry Requirements'
+        },
+        cited: {
+            additionalProperties: {
+                $ref: '#/components/schemas/AdvertSpan'
+            },
+            propertyNames: {
+                $ref: '#/components/schemas/CitedFigure'
+            },
+            type: 'object',
+            title: 'Cited',
+            description: 'For a typed figure, the span of the pasted text it comes from.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'option_id',
+        'target',
+        'title'
+    ],
+    title: 'OwnOptionInput',
+    description: 'An option as the person adds it: every value theirs. Null: not given yet.'
+} as const;
+
 export const OwnTitleMatchedSchema = {
     properties: {
         reason: {
@@ -7478,6 +8327,38 @@ export const OwnTitleMatchedSchema = {
     ],
     title: 'OwnTitleMatched',
     description: 'The person\'s own title, matched to this occupation.'
+} as const;
+
+export const OwnWordsSchema = {
+    properties: {
+        typed: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 300,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Typed'
+        },
+        span: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/AdvertSpan'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    title: 'OwnWords',
+    description: 'Words the person typed, or a span they chose in their pasted text: exactly one.'
 } as const;
 
 export const PackLabelSchema = {
@@ -7632,6 +8513,37 @@ export const PartialReplyOutSchema = {
     ],
     title: 'PartialReplyOut',
     description: 'The turn\'s reply as it streams: unvalidated text, never a proposal. The turn\'s run\nstate and, once complete, its proposal are authoritative.'
+} as const;
+
+export const PasteOptionTextSchema = {
+    properties: {
+        text: {
+            type: 'string',
+            maxLength: 50000,
+            minLength: 1,
+            title: 'Text'
+        },
+        source_url: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 2048,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source Url',
+            description: 'Where the person copied it from, as a reference only.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'text'
+    ],
+    title: 'PasteOptionText'
 } as const;
 
 export const PasteTextSchema = {
@@ -8273,6 +9185,26 @@ export const PlanningInputsDocumentSchema = {
             title: 'Shared Schemes',
             description: 'Schemes the person confirmed may pay for more than one of their options, each one of their stated supports\' instrument IDs.'
         },
+        offering_figures: {
+            items: {
+                $ref: '#/components/schemas/OfferingFigures'
+            },
+            type: 'array',
+            maxItems: 50,
+            title: 'Offering Figures',
+            description: 'The person\'s own figures for facts an offering lacks: theirs, not reviewed, so every route resting on one is qualified.'
+        },
+        excluded_variants: {
+            items: {
+                type: 'string',
+                maxLength: 200,
+                minLength: 1
+            },
+            type: 'array',
+            maxItems: 200,
+            title: 'Excluded Variants',
+            description: 'Options the person leaves out of the route search (the rest are retained): how a comparison over the model\'s bounds is narrowed, never silently.'
+        },
         schema_version: {
             type: 'string',
             const: '1',
@@ -8286,6 +9218,14 @@ export const PlanningInputsDocumentSchema = {
             type: 'array',
             maxItems: 50,
             title: 'Outcome Decisions'
+        },
+        own_options: {
+            items: {
+                $ref: '#/components/schemas/OwnOption'
+            },
+            type: 'array',
+            maxItems: 24,
+            title: 'Own Options'
         }
     },
     additionalProperties: false,
@@ -8481,6 +9421,26 @@ export const PlanningInputsInSchema = {
             title: 'Shared Schemes',
             description: 'Schemes the person confirmed may pay for more than one of their options, each one of their stated supports\' instrument IDs.'
         },
+        offering_figures: {
+            items: {
+                $ref: '#/components/schemas/OfferingFigures'
+            },
+            type: 'array',
+            maxItems: 50,
+            title: 'Offering Figures',
+            description: 'The person\'s own figures for facts an offering lacks: theirs, not reviewed, so every route resting on one is qualified.'
+        },
+        excluded_variants: {
+            items: {
+                type: 'string',
+                maxLength: 200,
+                minLength: 1
+            },
+            type: 'array',
+            maxItems: 200,
+            title: 'Excluded Variants',
+            description: 'Options the person leaves out of the route search (the rest are retained): how a comparison over the model\'s bounds is narrowed, never silently.'
+        },
         outcome_decisions: {
             items: {
                 $ref: '#/components/schemas/OutcomeDecisionInput'
@@ -8488,6 +9448,15 @@ export const PlanningInputsInSchema = {
             type: 'array',
             maxItems: 50,
             title: 'Outcome Decisions'
+        },
+        own_options: {
+            items: {
+                $ref: '#/components/schemas/OwnOptionInput'
+            },
+            type: 'array',
+            maxItems: 24,
+            title: 'Own Options',
+            description: 'Options the person added themselves: their own records, never reviewed.'
         }
     },
     additionalProperties: false,
@@ -11336,7 +12305,9 @@ export const RouteQualificationSchema = {
         'conditional_award',
         'conditional_application',
         'conditional_loan',
-        'readiness_not_assessed'
+        'readiness_not_assessed',
+        'supplied_figures',
+        'own_options'
     ],
     title: 'RouteQualification'
 } as const;
@@ -12397,6 +13368,102 @@ export const ScheduleSchema = {
     ],
     title: 'Schedule',
     description: 'One feasible schedule reaching the milestone: its identity, objectives and check.'
+} as const;
+
+export const SchemeFactsSchema = {
+    properties: {
+        instrument_id: {
+            type: 'string',
+            title: 'Instrument Id'
+        },
+        kind: {
+            $ref: '#/components/schemas/InstrumentKind'
+        },
+        review_state: {
+            $ref: '#/components/schemas/RecordState'
+        },
+        as_of: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'As Of'
+        },
+        age_rules: {
+            items: {
+                $ref: '#/components/schemas/AgeRule'
+            },
+            type: 'array',
+            title: 'Age Rules'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'instrument_id',
+        'kind',
+        'review_state',
+        'as_of',
+        'age_rules'
+    ],
+    title: 'SchemeFacts'
+} as const;
+
+export const ScopeSchema = {
+    properties: {
+        concepts: {
+            type: 'integer',
+            title: 'Concepts'
+        },
+        max_concepts: {
+            type: 'integer',
+            title: 'Max Concepts'
+        },
+        most_starts: {
+            type: 'integer',
+            title: 'Most Starts'
+        },
+        max_starts: {
+            type: 'integer',
+            title: 'Max Starts'
+        },
+        over_starts: {
+            items: {
+                $ref: '#/components/schemas/ConceptStarts'
+            },
+            type: 'array',
+            title: 'Over Starts'
+        },
+        code: {
+            anyOf: [
+                {
+                    type: 'string',
+                    const: 'retain_variants'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Code'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'concepts',
+        'max_concepts',
+        'most_starts',
+        'max_starts',
+        'over_starts',
+        'code'
+    ],
+    title: 'Scope',
+    description: 'The retained options against the M0 bounds. Over either bound, `code` asks the person\nto retain options (leave others out); nothing is cut silently.'
 } as const;
 
 export const SearchCandidateSchema = {
@@ -14715,6 +15782,15 @@ export const SpendStateSchema = {
     title: 'SpendState'
 } as const;
 
+export const StartBasisSchema = {
+    type: 'string',
+    enum: [
+        'own_figure',
+        'stated_intake'
+    ],
+    title: 'StartBasis'
+} as const;
+
 export const StartRoleResearchSchema = {
     properties: {
         expected_profile_version: {
@@ -15380,6 +16456,38 @@ export const SuggestionOutSchema = {
     description: 'A career hypothesis (spec section 4\'s `CareerSuggestion`): an ESCO occupation, the\nanswers that found it and ESCO\'s facts about it, as facts the web words. Becoming a\ntarget needs the person\'s choice (`POST .../targets`).'
 } as const;
 
+export const SuppliedFactSchema = {
+    type: 'string',
+    enum: [
+        'start_date',
+        'finish_date',
+        'cost',
+        'weekly_hours'
+    ],
+    title: 'SuppliedFact',
+    description: 'A fact the route search needs that the person supplied as their own figure for an\noffering (Task 12b): labelled theirs and not reviewed, so a route resting on it is\nqualified.'
+} as const;
+
+export const SuppliedStartSchema = {
+    properties: {
+        on: {
+            type: 'string',
+            format: 'date',
+            title: 'On'
+        },
+        basis: {
+            $ref: '#/components/schemas/StartBasis'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'on',
+        'basis'
+    ],
+    title: 'SuppliedStart'
+} as const;
+
 export const SupportSchema = {
     properties: {
         instrument_id: {
@@ -15610,6 +16718,85 @@ export const SupportResourceOutSchema = {
         'checked_on'
     ],
     title: 'SupportResourceOut'
+} as const;
+
+export const TargetCheckpointSchema = {
+    properties: {
+        target_title: {
+            type: 'string',
+            title: 'Target Title'
+        },
+        pack_target_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Pack Target Id'
+        },
+        note: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: [
+                        'no_pack_target',
+                        'ambiguous_crosswalk'
+                    ]
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Note'
+        },
+        label: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/CatalogueLabel'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        reviewed_options: {
+            type: 'integer',
+            title: 'Reviewed Options'
+        },
+        options: {
+            items: {
+                $ref: '#/components/schemas/OptionFacts'
+            },
+            type: 'array',
+            title: 'Options'
+        },
+        schemes: {
+            items: {
+                $ref: '#/components/schemas/SchemeFacts'
+            },
+            type: 'array',
+            title: 'Schemes'
+        },
+        scope: {
+            $ref: '#/components/schemas/Scope'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'target_title',
+        'pack_target_id',
+        'note',
+        'label',
+        'reviewed_options',
+        'options',
+        'schemes',
+        'scope'
+    ],
+    title: 'TargetCheckpoint'
 } as const;
 
 export const TargetCoverageSchema = {
@@ -17904,6 +19091,12 @@ export const VariantSchema = {
             ],
             title: 'Entry Requirements Met',
             description: 'Whether the person meets the stated entry requirements: null is not yet confirmed; false is their own \'no\', still never ineligible.'
+        },
+        entry_expected: {
+            type: 'boolean',
+            title: 'Entry Expected',
+            description: 'A stated entry requirement is named only by a qualification the person expects (Task 6f): met only if they get their grades, so unresolved, never met.',
+            default: false
         }
     },
     additionalProperties: false,

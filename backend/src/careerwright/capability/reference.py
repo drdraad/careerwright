@@ -29,7 +29,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from careerwright.catalogue.option_pack import Pack, SourceKind
+from careerwright.catalogue.option_pack import Pack, SourceKind, load_pack
 
 # The format's name from before the product was renamed: the pinned versions carry it, so it
 # stays as written.
@@ -43,6 +43,12 @@ PINS: dict[str, str] = {
     "0.1.0": "906b4e9670bd930213c8a9a6d95c78af342e1fd1b2023e5a68d8902d911bb640",
     "0.2.0": "2df1c70d156ee036c990be688b9722dea496a6a699d76ce0e16ac82b01c72e86",
 }
+# A committed reference carried, unchanged, to a later option pack whose capability parts
+# (targets, skill rows, skill requirements and job postings) are its own pack's, byte for byte
+# as parsed (Task 12b): nothing in it is rewritten or invented, and `load_reference` checks the
+# parts are the same before it is used with that pack. Option pack 0.4.0 adds school-leaver
+# courses and funding only (Task 7f), so reference 0.2.0 fits it.
+CARRIED_TO: dict[str, frozenset[str]] = {"0.2.0": frozenset({"0.4.0"})}
 ESCO_OCCUPATION_URI = r"^http://data\.europa\.eu/esco/occupation/[0-9a-f-]{36}$"
 ESCO_SKILL_URI = r"^http://data\.europa\.eu/esco/skill/[0-9a-f-]{36}$"
 LEVELS = (0, 1, 2, 3, 4)
@@ -154,7 +160,8 @@ def parse_reference(data: object) -> Reference:
 def check_reference(reference: Reference, pack: Pack) -> list[str]:
     """Every problem, each named; an empty list is a reference that fits its pack."""
     found: list[str] = []
-    if reference.pack_version != pack.pack_version:
+    carried = pack.pack_version in CARRIED_TO.get(reference.reference_version, frozenset())
+    if reference.pack_version != pack.pack_version and not carried:
         found.append(f"written for option pack {reference.pack_version}, not {pack.pack_version}")
     found += _pack_references(pack)
     found += _targets(reference, pack)
@@ -281,6 +288,19 @@ def load_reference(version: str, pack: Pack, *, pins: dict[str, str] | None = No
     if reference.reference_version != version:
         raise ReferenceError(f"the file of version {version} says {reference.reference_version}")
     problems = check_reference(reference, pack)
+    if reference.pack_version != pack.pack_version:
+        problems += carried_changes(load_pack(reference.pack_version), pack)
     if problems:
         raise ReferenceError(f"capability reference {version}: {problems[0]}")
     return reference
+
+
+def carried_changes(written_for: Pack, pack: Pack) -> list[str]:
+    """What differs between the capability parts of the pack a reference was written for and
+    the pack it is carried to: an empty list is a reference that fits unchanged."""
+    return [
+        f"option pack {pack.pack_version} changes the {part} of {written_for.pack_version}"
+        for part in ("targets", "skills", "skill_requirements", "job_postings")
+        if [r.model_dump() for r in getattr(written_for, part)]
+        != [r.model_dump() for r in getattr(pack, part)]
+    ]

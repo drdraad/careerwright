@@ -132,6 +132,10 @@ export type ActionConcept = {
      * Synthetic
      */
     synthetic: boolean;
+    /**
+     * Added By Person
+     */
+    added_by_person?: boolean;
     cited?: Citation | null;
     /**
      * Facts
@@ -290,6 +294,24 @@ export type AdzunaQuery = {
      * Results Per Page
      */
     results_per_page?: number;
+};
+
+/**
+ * AgeRule
+ *
+ * A stated age rule, beside its scheme or offering: never applied, because Careerwright
+ * does not know the person's age.
+ */
+export type AgeRule = {
+    /**
+     * Field
+     */
+    field: string;
+    value: JsonValue;
+    /**
+     * Applied
+     */
+    applied?: false;
 };
 
 /**
@@ -896,6 +918,7 @@ export type BaselineInput = {
 export const BaselineKind = {
     CURRENT_ROLE: 'current_role',
     JOB_SEARCH: 'job_search',
+    STAYING_IN_EDUCATION: 'staying_in_education',
     OTHER: 'other'
 } as const;
 
@@ -1121,6 +1144,57 @@ export type Challenge = {
 };
 
 /**
+ * CheckpointOut
+ *
+ * The Options chapter's review checkpoint: for each target, its options with the facts the
+ * route search still lacks, what the person supplied, entry requirements beside their
+ * qualifications, eligibility conditions, age rules (never applied) and the scope against
+ * the model's bounds; and the planning inputs a solve still needs.
+ */
+export type CheckpointOut = {
+    /**
+     * Inputs Version
+     */
+    inputs_version: number;
+    /**
+     * Profile Version
+     */
+    profile_version: number;
+    /**
+     * Synthetic
+     */
+    synthetic: boolean;
+    data_mode: DataMode;
+    pack: PackLabel;
+    /**
+     * Needs
+     */
+    needs: Array<Need>;
+    direct_spend_cap: Money | null;
+    monthly_payment_cap: Money | null;
+    /**
+     * Payment Cap Basis
+     */
+    payment_cap_basis?: 'payments_and_debt_repayments';
+    /**
+     * The profile's answer; null: not given.
+     */
+    work_status: WorkStatus | null;
+    baseline: BaselineInput | null;
+    continuation: ContinuationInput | null;
+    /**
+     * Not Working
+     *
+     * The continuation is the person's own 0 hours and £0 a month (a stated figure, never an unknown read as zero); null while it is not stated.
+     */
+    not_working: boolean | null;
+    /**
+     * Targets
+     */
+    targets: Array<TargetCheckpoint>;
+};
+
+/**
  * ChooseClosest
  *
  * The answer to "Which of these is closest?" for the person's current or last role.
@@ -1239,6 +1313,21 @@ export const CitationBasis = {
  * Where a cited value comes from (named apart from the profile's `Basis`).
  */
 export type CitationBasis = typeof CitationBasis[keyof typeof CitationBasis];
+
+/**
+ * CitedFigure
+ */
+export const CitedFigure = {
+    START: 'start',
+    FINISH: 'finish',
+    WEEKLY_HOURS: 'weekly_hours',
+    COST: 'cost'
+} as const;
+
+/**
+ * CitedFigure
+ */
+export type CitedFigure = typeof CitedFigure[keyof typeof CitedFigure];
 
 /**
  * CityListInput
@@ -1440,6 +1529,20 @@ export const CommitmentKind = {
 export type CommitmentKind = typeof CommitmentKind[keyof typeof CommitmentKind];
 
 /**
+ * ConceptStarts
+ */
+export type ConceptStarts = {
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    /**
+     * Starts
+     */
+    starts: number;
+};
+
+/**
  * Condition
  *
  * What the route rests on that has not happened, with its blocking verification: an
@@ -1464,6 +1567,21 @@ export type Condition = {
      * Verification
      */
     verification: 'confirm_offer_accepted' | 'verify_funding_award' | 'confirm_admission' | 'confirm_loan_approved';
+};
+
+/**
+ * ConditionFact
+ *
+ * An eligibility condition of the option's stated fee, with the person's status for it
+ * (null: not answered; only `confirmed` meets it).
+ */
+export type ConditionFact = {
+    /**
+     * Field
+     */
+    field: string;
+    value: JsonValue;
+    status: EligibilityStatus | null;
 };
 
 /**
@@ -1882,6 +2000,24 @@ export type DiscoveryProposalOut = {
 };
 
 /**
+ * Duration
+ *
+ * One exact length a page states (never a typical, open or ranged one): with a start, it
+ * gives the finish (`pack.finish_from`).
+ */
+export type Duration = {
+    /**
+     * Unit
+     */
+    unit: 'weeks' | 'months' | 'years';
+    /**
+     * Count
+     */
+    count: number;
+    cited?: Citation | null;
+};
+
+/**
  * EditRow
  *
  * Set a row's importance, or challenge its source, at the checkpoint.
@@ -2054,6 +2190,23 @@ export const EntryMode = { SURE: 'sure', UNSURE: 'unsure' } as const;
  * How the person chose to start (spec section 3, the You chapter).
  */
 export type EntryMode = typeof EntryMode[keyof typeof EntryMode];
+
+/**
+ * EntryRequirement
+ *
+ * One stated entry requirement, with the person's qualifications that name it.
+ */
+export type EntryRequirement = {
+    /**
+     * Field
+     */
+    field: string;
+    value: JsonValue;
+    /**
+     * Qualifications
+     */
+    qualifications: Array<EntryFact>;
+};
 
 /**
  * EntryStanding
@@ -2793,7 +2946,8 @@ export const FindingCode = {
     JOB_TRANSITIONS: 'job_transitions',
     SCHEME_SHARED_UNCONFIRMED: 'scheme_shared_unconfirmed',
     EXCLUSIVE_SCHEMES: 'exclusive_schemes',
-    LOAN_AMOUNT_UNKNOWN: 'loan_amount_unknown'
+    LOAN_AMOUNT_UNKNOWN: 'loan_amount_unknown',
+    ENTRY_REQUIREMENTS_EXPECTED: 'entry_requirements_expected'
 } as const;
 
 /**
@@ -3950,6 +4104,29 @@ export const Method = {
 export type Method = typeof Method[keyof typeof Method];
 
 /**
+ * MissingFact
+ *
+ * A fact the route search needs for an option that is not known yet: what the checkpoint
+ * names for each option (OPTN-13).
+ */
+export const MissingFact = {
+    START_DATE: 'start_date',
+    FINISH_DATE: 'finish_date',
+    COST: 'cost',
+    WEEKLY_HOURS: 'weekly_hours',
+    ENTRY_CONFIRMATION: 'entry_confirmation',
+    ELIGIBILITY_CONFIRMATION: 'eligibility_confirmation'
+} as const;
+
+/**
+ * MissingFact
+ *
+ * A fact the route search needs for an option that is not known yet: what the checkpoint
+ * names for each option (OPTN-13).
+ */
+export type MissingFact = typeof MissingFact[keyof typeof MissingFact];
+
+/**
  * ModelExtractionOut
  *
  * How model extraction went for a retrieved page whose structured data gave no posting
@@ -4697,6 +4874,40 @@ export type Offering = {
      * Facts
      */
     facts?: Array<Fact>;
+    duration?: Duration | null;
+    /**
+     * Stated Intakes
+     */
+    stated_intakes?: Array<string>;
+    /**
+     * Supplied
+     */
+    supplied?: Array<SuppliedFact>;
+};
+
+/**
+ * OfferingFigures
+ *
+ * The person's own figures for one offering: theirs, not reviewed. Null: not supplied.
+ */
+export type OfferingFigures = {
+    /**
+     * Offering Id
+     */
+    offering_id: string;
+    start?: SuppliedStart | null;
+    /**
+     * Finish
+     */
+    finish?: string | null;
+    /**
+     * Weekly Hours
+     */
+    weekly_hours?: number | null;
+    /**
+     * The whole of what the person will pay for it, due in its first month.
+     */
+    cost?: Money | null;
 };
 
 /**
@@ -4751,6 +4962,115 @@ export type OnetMatchOut = {
      * Top Tasks
      */
     top_tasks: Array<ObservedTaskOut>;
+};
+
+/**
+ * OptionFacts
+ */
+export type OptionFacts = {
+    /**
+     * Variant Id
+     */
+    variant_id: string;
+    /**
+     * Offering Id
+     */
+    offering_id: string;
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    /**
+     * Plan Id
+     */
+    plan_id: string | null;
+    /**
+     * Review States
+     */
+    review_states: Array<RecordState>;
+    /**
+     * As Of
+     */
+    as_of: string | null;
+    /**
+     * Added By Person
+     */
+    added_by_person: boolean;
+    /**
+     * Missing
+     */
+    missing: Array<MissingFact>;
+    /**
+     * Supplied
+     */
+    supplied: Array<SuppliedFact>;
+    /**
+     * Stated Intakes
+     */
+    stated_intakes: Array<string>;
+    /**
+     * Entry Requirements
+     */
+    entry_requirements: Array<EntryRequirement>;
+    /**
+     * Entry Requirements Met
+     */
+    entry_requirements_met: boolean | null;
+    /**
+     * Entry Expected
+     */
+    entry_expected: boolean;
+    /**
+     * Eligibility Conditions
+     */
+    eligibility_conditions: Array<ConditionFact>;
+    /**
+     * Age Rules
+     */
+    age_rules: Array<AgeRule>;
+    /**
+     * Left Out
+     */
+    left_out: boolean;
+};
+
+/**
+ * OptionTextOut
+ *
+ * A pasted text as it was kept (third parties' contact details removed): spans of an
+ * option are chosen in these words, in UTF-16 code units.
+ */
+export type OptionTextOut = {
+    /**
+     * Text Id
+     */
+    text_id: string;
+    /**
+     * Sha256
+     */
+    sha256: string;
+    /**
+     * Text
+     */
+    text: string;
+    /**
+     * Source Url
+     */
+    source_url: string | null;
+};
+
+/**
+ * OptionTextRef
+ */
+export type OptionTextRef = {
+    /**
+     * Text Id
+     */
+    text_id: string;
+    /**
+     * Sha256
+     */
+    sha256: string;
 };
 
 /**
@@ -4921,6 +5241,134 @@ export const OutcomeType = {
 export type OutcomeType = typeof OutcomeType[keyof typeof OutcomeType];
 
 /**
+ * OwnOption
+ *
+ * A stored option: who added it and when (its date), kept while it is unchanged.
+ */
+export type OwnOption = {
+    /**
+     * Option Id
+     *
+     * The person's own short name for it, unique.
+     */
+    option_id: string;
+    /**
+     * Target
+     *
+     * The target role it is for: one of the profile's.
+     */
+    target: string;
+    /**
+     * Kind
+     */
+    kind?: 'learning' | 'apprenticeship';
+    /**
+     * Text Id
+     *
+     * The text they pasted for it, if any: its source.
+     */
+    text_id?: string | null;
+    title: OwnWords;
+    provider?: OwnWords | null;
+    /**
+     * Start
+     */
+    start?: string | null;
+    /**
+     * Finish
+     */
+    finish?: string | null;
+    /**
+     * Weekly Hours
+     */
+    weekly_hours?: number | null;
+    /**
+     * The whole of what they will pay, due in its first month.
+     */
+    cost?: Money | null;
+    /**
+     * Entry Requirements
+     */
+    entry_requirements?: Array<OwnWords>;
+    /**
+     * Cited
+     *
+     * For a typed figure, the span of the pasted text it comes from.
+     */
+    cited?: {
+        [key in CitedFigure]?: AdvertSpan;
+    };
+    /**
+     * Recorded By
+     */
+    recorded_by: string;
+    /**
+     * Recorded At
+     */
+    recorded_at: string;
+};
+
+/**
+ * OwnOptionInput
+ *
+ * An option as the person adds it: every value theirs. Null: not given yet.
+ */
+export type OwnOptionInput = {
+    /**
+     * Option Id
+     *
+     * The person's own short name for it, unique.
+     */
+    option_id: string;
+    /**
+     * Target
+     *
+     * The target role it is for: one of the profile's.
+     */
+    target: string;
+    /**
+     * Kind
+     */
+    kind?: 'learning' | 'apprenticeship';
+    /**
+     * Text Id
+     *
+     * The text they pasted for it, if any: its source.
+     */
+    text_id?: string | null;
+    title: OwnWords;
+    provider?: OwnWords | null;
+    /**
+     * Start
+     */
+    start?: string | null;
+    /**
+     * Finish
+     */
+    finish?: string | null;
+    /**
+     * Weekly Hours
+     */
+    weekly_hours?: number | null;
+    /**
+     * The whole of what they will pay, due in its first month.
+     */
+    cost?: Money | null;
+    /**
+     * Entry Requirements
+     */
+    entry_requirements?: Array<OwnWords>;
+    /**
+     * Cited
+     *
+     * For a typed figure, the span of the pasted text it comes from.
+     */
+    cited?: {
+        [key in CitedFigure]?: AdvertSpan;
+    };
+};
+
+/**
  * OwnTitleMatched
  *
  * The person's own title, matched to this occupation.
@@ -4939,6 +5387,19 @@ export type OwnTitleMatched = {
      * Answer
      */
     answer: string;
+};
+
+/**
+ * OwnWords
+ *
+ * Words the person typed, or a span they chose in their pasted text: exactly one.
+ */
+export type OwnWords = {
+    /**
+     * Typed
+     */
+    typed?: string | null;
+    span?: AdvertSpan | null;
 };
 
 /**
@@ -5060,6 +5521,22 @@ export type PartialReplyOut = {
      * When the text was last written (freshness).
      */
     updated_at: string | null;
+};
+
+/**
+ * PasteOptionText
+ */
+export type PasteOptionText = {
+    /**
+     * Text
+     */
+    text: string;
+    /**
+     * Source Url
+     *
+     * Where the person copied it from, as a reference only.
+     */
+    source_url?: string | null;
 };
 
 /**
@@ -5405,6 +5882,18 @@ export type PlanningInputsDocument = {
      */
     shared_schemes?: Array<string>;
     /**
+     * Offering Figures
+     *
+     * The person's own figures for facts an offering lacks: theirs, not reviewed, so every route resting on one is qualified.
+     */
+    offering_figures?: Array<OfferingFigures>;
+    /**
+     * Excluded Variants
+     *
+     * Options the person leaves out of the route search (the rest are retained): how a comparison over the model's bounds is narrowed, never silently.
+     */
+    excluded_variants?: Array<string>;
+    /**
      * Schema Version
      */
     schema_version?: '1';
@@ -5412,6 +5901,10 @@ export type PlanningInputsDocument = {
      * Outcome Decisions
      */
     outcome_decisions?: Array<OutcomeDecision>;
+    /**
+     * Own Options
+     */
+    own_options?: Array<OwnOption>;
 };
 
 /**
@@ -5476,9 +5969,27 @@ export type PlanningInputsIn = {
      */
     shared_schemes?: Array<string>;
     /**
+     * Offering Figures
+     *
+     * The person's own figures for facts an offering lacks: theirs, not reviewed, so every route resting on one is qualified.
+     */
+    offering_figures?: Array<OfferingFigures>;
+    /**
+     * Excluded Variants
+     *
+     * Options the person leaves out of the route search (the rest are retained): how a comparison over the model's bounds is narrowed, never silently.
+     */
+    excluded_variants?: Array<string>;
+    /**
      * Outcome Decisions
      */
     outcome_decisions?: Array<OutcomeDecisionInput>;
+    /**
+     * Own Options
+     *
+     * Options the person added themselves: their own records, never reviewed.
+     */
+    own_options?: Array<OwnOptionInput>;
 };
 
 /**
@@ -7225,7 +7736,9 @@ export const RouteQualification = {
     CONDITIONAL_AWARD: 'conditional_award',
     CONDITIONAL_APPLICATION: 'conditional_application',
     CONDITIONAL_LOAN: 'conditional_loan',
-    READINESS_NOT_ASSESSED: 'readiness_not_assessed'
+    READINESS_NOT_ASSESSED: 'readiness_not_assessed',
+    SUPPLIED_FIGURES: 'supplied_figures',
+    OWN_OPTIONS: 'own_options'
 } as const;
 
 /**
@@ -7784,6 +8297,59 @@ export type Schedule = {
      * Layer
      */
     layer: number | null;
+};
+
+/**
+ * SchemeFacts
+ */
+export type SchemeFacts = {
+    /**
+     * Instrument Id
+     */
+    instrument_id: string;
+    kind: InstrumentKind;
+    review_state: RecordState;
+    /**
+     * As Of
+     */
+    as_of: string | null;
+    /**
+     * Age Rules
+     */
+    age_rules: Array<AgeRule>;
+};
+
+/**
+ * Scope
+ *
+ * The retained options against the M0 bounds. Over either bound, `code` asks the person
+ * to retain options (leave others out); nothing is cut silently.
+ */
+export type Scope = {
+    /**
+     * Concepts
+     */
+    concepts: number;
+    /**
+     * Max Concepts
+     */
+    max_concepts: number;
+    /**
+     * Most Starts
+     */
+    most_starts: number;
+    /**
+     * Max Starts
+     */
+    max_starts: number;
+    /**
+     * Over Starts
+     */
+    over_starts: Array<ConceptStarts>;
+    /**
+     * Code
+     */
+    code: 'retain_variants' | null;
 };
 
 /**
@@ -9200,6 +9766,16 @@ export const SpendState = {
 export type SpendState = typeof SpendState[keyof typeof SpendState];
 
 /**
+ * StartBasis
+ */
+export const StartBasis = { OWN_FIGURE: 'own_figure', STATED_INTAKE: 'stated_intake' } as const;
+
+/**
+ * StartBasis
+ */
+export type StartBasis = typeof StartBasis[keyof typeof StartBasis];
+
+/**
  * StartRoleResearch
  */
 export type StartRoleResearch = {
@@ -9630,6 +10206,40 @@ export type SuggestionOut = {
 };
 
 /**
+ * SuppliedFact
+ *
+ * A fact the route search needs that the person supplied as their own figure for an
+ * offering (Task 12b): labelled theirs and not reviewed, so a route resting on it is
+ * qualified.
+ */
+export const SuppliedFact = {
+    START_DATE: 'start_date',
+    FINISH_DATE: 'finish_date',
+    COST: 'cost',
+    WEEKLY_HOURS: 'weekly_hours'
+} as const;
+
+/**
+ * SuppliedFact
+ *
+ * A fact the route search needs that the person supplied as their own figure for an
+ * offering (Task 12b): labelled theirs and not reviewed, so a route resting on it is
+ * qualified.
+ */
+export type SuppliedFact = typeof SuppliedFact[keyof typeof SuppliedFact];
+
+/**
+ * SuppliedStart
+ */
+export type SuppliedStart = {
+    /**
+     * On
+     */
+    on: string;
+    basis: StartBasis;
+};
+
+/**
  * Support
  *
  * One use of a non-repayable instrument on one variant. Paid to the provider, it reduces
@@ -9767,6 +10377,38 @@ export type SupportResourceOut = {
      * When the service's own page was last checked.
      */
     checked_on: string;
+};
+
+/**
+ * TargetCheckpoint
+ */
+export type TargetCheckpoint = {
+    /**
+     * Target Title
+     */
+    target_title: string;
+    /**
+     * Pack Target Id
+     */
+    pack_target_id: string | null;
+    /**
+     * Note
+     */
+    note: 'no_pack_target' | 'ambiguous_crosswalk' | null;
+    label: CatalogueLabel | null;
+    /**
+     * Reviewed Options
+     */
+    reviewed_options: number;
+    /**
+     * Options
+     */
+    options: Array<OptionFacts>;
+    /**
+     * Schemes
+     */
+    schemes: Array<SchemeFacts>;
+    scope: Scope;
 };
 
 /**
@@ -11209,6 +11851,12 @@ export type Variant = {
      * Whether the person meets the stated entry requirements: null is not yet confirmed; false is their own 'no', still never ineligible.
      */
     entry_requirements_met?: boolean | null;
+    /**
+     * Entry Expected
+     *
+     * A stated entry requirement is named only by a qualification the person expects (Task 6f): met only if they get their grades, so unresolved, never met.
+     */
+    entry_expected?: boolean;
 };
 
 /**
@@ -14931,6 +15579,120 @@ export type WritePlanningInputsResponses = {
 };
 
 export type WritePlanningInputsResponse = WritePlanningInputsResponses[keyof WritePlanningInputsResponses];
+
+export type GetOptionCheckpointData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/planning/checkpoint';
+};
+
+export type GetOptionCheckpointErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetOptionCheckpointError = GetOptionCheckpointErrors[keyof GetOptionCheckpointErrors];
+
+export type GetOptionCheckpointResponses = {
+    /**
+     * Successful Response
+     */
+    200: CheckpointOut;
+};
+
+export type GetOptionCheckpointResponse = GetOptionCheckpointResponses[keyof GetOptionCheckpointResponses];
+
+export type PasteOptionTextData = {
+    body: PasteOptionText;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/planning/option-texts';
+};
+
+export type PasteOptionTextErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type PasteOptionTextError = PasteOptionTextErrors[keyof PasteOptionTextErrors];
+
+export type PasteOptionTextResponses = {
+    /**
+     * Successful Response
+     */
+    201: OptionTextRef;
+};
+
+export type PasteOptionTextResponse = PasteOptionTextResponses[keyof PasteOptionTextResponses];
+
+export type GetOptionTextData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Text Id
+         */
+        text_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/planning/option-texts/{text_id}';
+};
+
+export type GetOptionTextErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetOptionTextError = GetOptionTextErrors[keyof GetOptionTextErrors];
+
+export type GetOptionTextResponses = {
+    /**
+     * Successful Response
+     */
+    200: OptionTextOut;
+};
+
+export type GetOptionTextResponse = GetOptionTextResponses[keyof GetOptionTextResponses];
 
 export type RequestRouteSolveData = {
     body: SolveRequest;

@@ -91,7 +91,8 @@ class SkillsView:
     qualifications: list[PersonQualification]
 
 
-def _qualifications(document: ProfileDocument) -> list[PersonQualification]:
+def person_qualifications(document: ProfileDocument) -> list[PersonQualification]:
+    """The qualifications the person gave (Task 6f), each achieved or expected; none unasked."""
     field = document.qualifications
     if field.state is not FieldState.PROVIDED or not field.value:
         return []
@@ -125,7 +126,7 @@ def skills_view(
 ) -> SkillsView:
     view = capability_view(tx, workspace_id, data)
     document = current_profile(tx, workspace_id).document
-    qualifications = _qualifications(document)
+    qualifications = person_qualifications(document)
     details = target_details(tx, workspace_id, document)
     examples = acquisition.examples(tx, keyring, workspace_id)
     selections = {(s.target_key, s.job_id): s for s in store.span_selections(tx, workspace_id)}
