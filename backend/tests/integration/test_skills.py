@@ -100,7 +100,7 @@ def test_a_target_outside_the_pack_is_not_assessed_yet_and_shows_what_it_asks(
     assert {r["as_of"] for r in data["requirements"]} == {"2026-10-29"}
     assert data["matrix_version"]
     assert data["definition_version"]
-    assert (body["pack"]["pack_version"], body["pack"]["dated"]) == ("0.1.0", "2026-10-29")
+    assert (body["pack"]["pack_version"], body["pack"]["dated"]) == ("0.2.0", "2026-10-30")
     assert body["reference"]["review_state"] == "proposed"
     assert (body["synthetic"], body["data_mode"]) == (True, "live_assisted")
     # The evidence questions, shared across targets, come with it.

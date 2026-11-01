@@ -364,12 +364,14 @@ export const AdvertSpanSchema = {
         start: {
             type: 'integer',
             minimum: 0,
-            title: 'Start'
+            title: 'Start',
+            description: 'Inclusive, in UTF-16 code units of the text.'
         },
         end: {
             type: 'integer',
             minimum: 1,
-            title: 'End'
+            title: 'End',
+            description: 'Exclusive, in UTF-16 code units of the text.'
         }
     },
     additionalProperties: false,
@@ -379,7 +381,7 @@ export const AdvertSpanSchema = {
         'end'
     ],
     title: 'AdvertSpan',
-    description: 'Character offsets into an example\'s text: `start` inclusive, `end` exclusive.'
+    description: 'Offsets into an example\'s text in UTF-16 code units, as a browser\'s selection counts\nthem (an emoji or a mathematical bold letter is two): `start` inclusive, `end` exclusive.\nThe server converts them to characters and refuses an offset inside a character.'
 } as const;
 
 export const AdvertiserKindSchema = {
@@ -12928,7 +12930,7 @@ export const SelectAdvertSpansSchema = {
         'spans'
     ],
     title: 'SelectAdvertSpans',
-    description: 'The parts of one of the person\'s own example adverts that say what the target asks\nfor, as character offsets into its text. An empty list clears the selection.'
+    description: 'The parts of one of the person\'s own example adverts that say what the target asks\nfor, as offsets into its text in UTF-16 code units (a browser\'s selection), converted to\ncharacters on the server. An empty list clears the selection.'
 } as const;
 
 export const SelectedSpanSchema = {
@@ -12936,12 +12938,14 @@ export const SelectedSpanSchema = {
         start: {
             type: 'integer',
             minimum: 0,
-            title: 'Start'
+            title: 'Start',
+            description: 'Inclusive, in UTF-16 code units of the text.'
         },
         end: {
             type: 'integer',
             minimum: 1,
-            title: 'End'
+            title: 'End',
+            description: 'Exclusive, in UTF-16 code units of the text.'
         },
         excerpt: {
             type: 'string',

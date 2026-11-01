@@ -896,7 +896,7 @@ export const editMatrixRow = <ThrowOnError extends boolean = false>(options: Opt
  * Post Advert Spans
  *
  * The parts of one of the person's own example adverts that say what a target asks for
- * (offsets into its text; an empty list clears them). No model run.
+ * (offsets into its text in UTF-16 code units; an empty list clears them). No model run.
  */
 export const selectAdvertSpans = <ThrowOnError extends boolean = false>(options: Options<SelectAdvertSpansData, ThrowOnError>): RequestResult<SelectAdvertSpansResponses, SelectAdvertSpansErrors, ThrowOnError> => (options.client ?? client).post<SelectAdvertSpansResponses, SelectAdvertSpansErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

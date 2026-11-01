@@ -59,6 +59,14 @@ from tests.support.reference_data import sample_files
 pytestmark = pytest.mark.integration
 
 
+def decisions(records: list[TargetRecord]) -> list[TargetRecord]:
+    """Records as decisions, apart from the pack version each was decided against: migrations
+    0034-0036 decided against pack 0.1.0, the app now decides against the reviewed 0.2.0
+    (Task 10A fix round 1), and both packs hold the same targets and crosswalks
+    (`tests/domain/test_targets.py`)."""
+    return [dataclasses.replace(r, pack_version="") for r in records]
+
+
 def head() -> str:
     config = Config()
     config.set_main_option("script_location", "careerwright:migrations")
@@ -388,7 +396,7 @@ def test_0034_gives_each_stored_target_its_record_and_folds_ampersands_and_accen
     assert [len(set(keys.values())) for keys in before] == [2, 2]  # the defect: two keys
     assert [len(set(keys.values())) for keys in after] == [1, 1]
     # The backfill and the resolver agree, title for title.
-    assert stored == decided
+    assert decisions(stored) == decisions(decided)
     assert [(r.link, r.coverage) for r in stored] == [
         (TargetLink.PACK_CROSSWALK, TargetCoverage.PACK_TARGET),
         (TargetLink.OCCUPATION_CHOICE, TargetCoverage.NOT_COVERED),
@@ -529,7 +537,7 @@ def test_0035_gives_every_version_s_targets_a_record_so_an_older_discovery_still
     # After 0035 every title of every version has its stored record, decided as
     # `resolve_target` decides it, the bracketed qualifiers left out to reach a pack target by
     # its title.
-    assert stored == decided
+    assert decisions(stored) == decisions(decided)
     assert [(r.title, r.link, r.coverage, r.pack_target_id) for r in stored] == [
         ("Saute cooks", TargetLink.EXACT_LABEL, TargetCoverage.NOT_COVERED, None),
         (
@@ -593,7 +601,7 @@ def test_0036_records_uk_titles_and_takes_another_nursing_field_off_the_adult_pa
         (TargetKind.OWN_WORDS, TargetLink.PACK_CROSSWALK, "registered-nurse-manchester"),
         (TargetKind.OWN_WORDS, TargetLink.PACK_CROSSWALK, "registered-nurse-manchester"),
     ]
-    assert after == decided
+    assert decisions(after) == decisions(decided)
     assert (after[0].kind, after[0].soc_codes, after[0].isco_codes) == (
         TargetKind.ONS,
         ("2134",),

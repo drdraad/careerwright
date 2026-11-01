@@ -238,7 +238,7 @@ def post_advert_spans(
     key: IdempotencyKey,
 ) -> JSONResponse:
     """The parts of one of the person's own example adverts that say what a target asks for
-    (offsets into its text; an empty list clears them). No model run."""
+    (offsets into its text in UTF-16 code units; an empty list clears them). No model run."""
 
     def execute(tx: Tx) -> CommandResult:
         change = select_advert_spans(

@@ -2,8 +2,8 @@
 Sprint 4 acceptance: "Review false-positive readiness mappings individually; any unsupported
 consequential outcome blocks publication of the affected route"; OUT-1; ADR 0012 decision 6).
 
-Each of the option pack's planned outcomes (C01-C10, in the reviewed pack 0.2.0 and in 0.1.0,
-which the app still reads) is listed below with what its page shows and why it gives no level
+Each of the option pack's planned outcomes (C01-C10, in the reviewed pack 0.2.0, which the app
+reads, and in 0.1.0) is listed below with what its page shows and why it gives no level
 on completion. Then each is checked in the capability model: completing its offering, even
 with the mapping accepted as the person's own assumption, never raises the row it maps to,
 never satisfies a protected gate, and never makes its target ready or conditionally ready, so
