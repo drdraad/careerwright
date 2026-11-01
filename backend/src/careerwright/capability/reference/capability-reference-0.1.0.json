@@ -1,0 +1,230 @@
+{
+  "reference": "nessa-capability-reference",
+  "format_version": 1,
+  "reference_version": "0.1.0",
+  "dated": "2026-10-29",
+  "pack_version": "0.1.0",
+  "esco_release": "esco-v1.2.1-en-csv",
+  "review_state": "proposed",
+  "label_review": "not run - requires human domain reviewer",
+  "notes": [
+    "Written by an agent (Task 9) for the England option pack 0.1.0: proposed rubrics, ESCO crosswalks and gate types, none reviewed. Provisional - no specialist review.",
+    "Levels follow spec section 8: 0 no evidence of performance; 1 performs with guidance; 2 independently handles routine tasks; 3 handles complex or non-routine tasks; 4 designs or leads and can justify trade-offs. Unknown is not a level, and levels are never added together.",
+    "Required levels are proposals for entry-level roles in the pack's postings; the postings state no behaviourally anchored level.",
+    "ESCO crosswalks name one ESCO skill per row, chosen for its description; each named skill is an essential relation of the target's crosswalked occupation in ESCO v1.2.1."
+  ],
+  "targets": [
+    {
+      "target_id": "data-quality-analyst-manchester",
+      "esco_occupation": "http://data.europa.eu/esco/occupation/7086d0ca-1e77-4690-89c9-7ed1a0478fa3",
+      "esco_label": "data quality specialist",
+      "note": "ESCO holds no label 'data quality analyst'; its data quality specialists review data for accuracy and integrity."
+    },
+    {
+      "target_id": "it-support-technician-bristol",
+      "esco_occupation": "http://data.europa.eu/esco/occupation/aaeec9a7-dc57-4485-890c-86b3eef735f9",
+      "esco_label": "ICT help desk agent",
+      "note": "ESCO lists 'IT support technician' as an alternative label of this occupation."
+    },
+    {
+      "target_id": "registered-nurse-manchester",
+      "esco_occupation": "http://data.europa.eu/esco/occupation/8d3e8aaa-791b-4c75-a465-f3f827028f50",
+      "esco_label": "nurse responsible for general care",
+      "note": "ESCO lists 'adult nurse' as an alternative label and records the occupation as regulated."
+    },
+    {
+      "target_id": "bookkeeping-assistant-leeds",
+      "esco_occupation": "http://data.europa.eu/esco/occupation/c3aae59e-1441-4b3e-bdd1-6da50dc7cf42",
+      "esco_label": "bookkeeper",
+      "note": "ESCO holds no label 'bookkeeping assistant'; its bookkeepers record day-to-day transactions in the ledgers and balance them."
+    }
+  ],
+  "rubrics": [
+    {
+      "skill_id": "pack:data-quality-analyst-manchester:independent-querying",
+      "version": "0.1.0",
+      "observable_task": "Write and check a SQL query that joins two tables to answer a question about the data.",
+      "required_level": 2,
+      "anchors": {
+        "0": "No evidence yet of writing a query against a database.",
+        "1": "Writes a simple query with a filter when given an example or step-by-step help.",
+        "2": "Independently joins two tables, explains how missing keys change the row count and checks the result.",
+        "3": "Writes multi-step queries (grouping, subqueries or window functions) on unfamiliar tables and finds why a result looks wrong.",
+        "4": "Designs the querying approach for others, reviews their queries and justifies trade-offs between correctness, clarity and speed."
+      },
+      "acceptable_proof": [
+        "A recent example: the tables joined, the question answered and how the result was checked",
+        "A short work sample: join two given tables and explain the row count"
+      ],
+      "esco_skill": "http://data.europa.eu/esco/skill/9cf681c7-89ec-470c-b651-7fe03786f586",
+      "esco_label": "query languages"
+    },
+    {
+      "skill_id": "pack:data-quality-analyst-manchester:data-validation",
+      "version": "0.1.0",
+      "observable_task": "Find a data quality problem (missing, duplicated or inconsistent values), trace its cause and fix or report it.",
+      "required_level": 2,
+      "anchors": {
+        "0": "No evidence yet of checking data for quality problems.",
+        "1": "Spots an obvious problem, such as a blank or a duplicate, when shown what to look for.",
+        "2": "Independently checks a dataset for missing, duplicated and inconsistent values, traces a problem to its source and records the fix.",
+        "3": "Investigates problems that cross systems or have no obvious cause, and designs checks that stop them recurring.",
+        "4": "Sets data quality rules and processes for a team and justifies which problems to fix first."
+      },
+      "acceptable_proof": [
+        "A recent example of a data problem found, its cause and what was done about it",
+        "A short work sample: list the quality problems in a small given table"
+      ],
+      "esco_skill": "http://data.europa.eu/esco/skill/713fb616-118e-40bc-9366-4a69879a49d5",
+      "esco_label": "implement data quality processes"
+    },
+    {
+      "skill_id": "pack:data-quality-analyst-manchester:communication",
+      "version": "0.1.0",
+      "observable_task": "Explain what an analysis found, and how far it can be trusted, to a colleague without a technical background.",
+      "required_level": 2,
+      "anchors": {
+        "0": "No evidence yet of explaining findings to others.",
+        "1": "Shares results for others to interpret, or explains them with help.",
+        "2": "Independently explains a finding and its limits in plain words to a non-technical colleague and checks they understood it.",
+        "3": "Handles a disagreement or a difficult message about the data, adapting the explanation to different audiences.",
+        "4": "Leads how findings are reported across a team and justifies what to leave out and why."
+      },
+      "acceptable_proof": [
+        "A structured account of explaining a result, or of resolving a disagreement about it",
+        "Optionally, a short note or slide written for a non-technical reader"
+      ],
+      "esco_skill": "http://data.europa.eu/esco/skill/c544a9f3-5945-4b54-afed-de0697852817",
+      "esco_label": "report analysis results"
+    },
+    {
+      "skill_id": "pack:it-support-technician-bristol:hardware-troubleshooting",
+      "version": "0.1.0",
+      "observable_task": "Find the cause of a fault on a computer, printer or other device and fix it, or escalate it with a clear record.",
+      "required_level": 2,
+      "anchors": {
+        "0": "No evidence yet of diagnosing a device fault.",
+        "1": "Fixes a common fault by following a set checklist, with help.",
+        "2": "Independently diagnoses common hardware faults and fixes them, or escalates with a clear record of what was tried.",
+        "3": "Diagnoses intermittent or unusual faults across several devices or components.",
+        "4": "Designs the fault-finding procedures others use and justifies repair-or-replace decisions."
+      },
+      "acceptable_proof": [
+        "A recent example: the fault, how it was diagnosed and how it was resolved",
+        "A short work sample: talk through diagnosing a described fault"
+      ],
+      "esco_skill": "http://data.europa.eu/esco/skill/9e06bac6-6b91-48ca-8b7d-c1f48cdecd7c",
+      "esco_label": "solve ICT system problems"
+    },
+    {
+      "skill_id": "pack:it-support-technician-bristol:windows-m365-support",
+      "version": "0.1.0",
+      "observable_task": "Resolve a user's Windows or Microsoft 365 problem (sign-in, mail, files or settings) and explain the fix to them.",
+      "required_level": 2,
+      "anchors": {
+        "0": "No evidence yet of supporting someone else's computer use.",
+        "1": "Resolves a familiar problem for a user by following a guide, with help.",
+        "2": "Independently resolves common Windows and Microsoft 365 problems for users and explains the fix in plain words.",
+        "3": "Resolves unfamiliar or account-wide problems (permissions, device management or licensing) and documents them for others.",
+        "4": "Designs how user support is given for a team and justifies its standards and trade-offs."
+      },
+      "acceptable_proof": [
+        "A recent example: the user's problem, what was done and how the user was told",
+        "A short work sample: talk through resolving a described sign-in or mail problem"
+      ],
+      "esco_skill": "http://data.europa.eu/esco/skill/db36f7f1-5900-45bd-9ffb-f2b19c4362ac",
+      "esco_label": "support ICT system users"
+    },
+    {
+      "skill_id": "pack:it-support-technician-bristol:service-desk-ticketing",
+      "version": "0.1.0",
+      "observable_task": "Log, prioritise, update and close incidents and requests in a service desk tool.",
+      "required_level": 2,
+      "anchors": {
+        "0": "No evidence yet of using a ticketing or service desk tool.",
+        "1": "Logs a ticket when shown how, with help to choose its category and priority.",
+        "2": "Independently logs, prioritises, updates and closes incidents and requests, keeping the record clear for the next person.",
+        "3": "Handles escalations and major incidents, and spots patterns across tickets that point to an underlying problem.",
+        "4": "Designs the service desk's processes (for example along ITIL lines) and justifies their priorities and targets."
+      },
+      "acceptable_proof": [
+        "A recent example: an incident logged, prioritised and closed, and the tool used",
+        "A short work sample: prioritise and write up three described requests"
+      ],
+      "esco_skill": "http://data.europa.eu/esco/skill/6430eb0d-c6de-46b7-a7fc-3dd2e8e62a69",
+      "esco_label": "use ICT ticketing system"
+    },
+    {
+      "skill_id": "pack:bookkeeping-assistant-leeds:reconciliation",
+      "version": "0.1.0",
+      "observable_task": "Reconcile a bank, supplier or customer account against its statement and resolve the differences.",
+      "required_level": 2,
+      "anchors": {
+        "0": "No evidence yet of reconciling an account.",
+        "1": "Matches transactions to a statement when shown how, with help to explain differences.",
+        "2": "Independently reconciles a bank or ledger account to its statement, finds the differences and records how each was resolved.",
+        "3": "Reconciles accounts with unusual or long-standing differences and corrects the errors behind them.",
+        "4": "Designs reconciliation routines and controls for others and justifies them."
+      },
+      "acceptable_proof": [
+        "A recent example: the account reconciled, the differences found and how they were resolved",
+        "A short work sample: reconcile a small given statement to a ledger"
+      ],
+      "esco_skill": "http://data.europa.eu/esco/skill/8a326ee1-169c-4c44-b38b-8f1bb20ec79b",
+      "esco_label": "identify accounting errors"
+    },
+    {
+      "skill_id": "pack:bookkeeping-assistant-leeds:records",
+      "version": "0.1.0",
+      "observable_task": "Record purchase and sales transactions in the ledgers accurately and keep them up to date.",
+      "required_level": 2,
+      "anchors": {
+        "0": "No evidence yet of keeping ledger or transaction records.",
+        "1": "Enters transactions into a ledger or accounting system when shown how, with checking.",
+        "2": "Independently records purchase and sales transactions accurately and keeps the ledgers up to date.",
+        "3": "Handles non-routine entries (credit notes, accruals or corrections) and keeps the ledgers consistent with each other.",
+        "4": "Designs how records are kept for others and justifies its controls."
+      },
+      "acceptable_proof": [
+        "A recent example: the ledgers kept, the system used and how accuracy was checked",
+        "A short work sample: post a few given transactions to the right ledgers"
+      ],
+      "esco_skill": "http://data.europa.eu/esco/skill/faf8943c-72ff-4736-a587-25508695d6f0",
+      "esco_label": "maintain financial records"
+    }
+  ],
+  "gates": [
+    {
+      "gate_key": "nmc-registration",
+      "kind": "legal_practice",
+      "label": "Registration with the Nursing and Midwifery Council",
+      "issuing_body": "Nursing and Midwifery Council (NMC)",
+      "jurisdiction": "GB",
+      "verification": "Your own entry on the NMC register",
+      "acceptable_proof": [
+        "An NMC PIN that shows on the NMC register"
+      ],
+      "pack_rows": [
+        "pack:registered-nurse-manchester:nmc-registration"
+      ],
+      "gate_words": [
+        "statutory registration",
+        "statutory registration (pending allowed within two months)"
+      ]
+    },
+    {
+      "gate_key": "uk-right-to-work",
+      "kind": "eligibility",
+      "label": "Right to work in the UK",
+      "issuing_body": "UK Home Office",
+      "jurisdiction": "GB",
+      "verification": "An employer's right to work check",
+      "acceptable_proof": [
+        "Documents that pass an employer's right to work check"
+      ],
+      "gate_words": [
+        "work rights"
+      ]
+    }
+  ]
+}

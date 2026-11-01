@@ -1,0 +1,1256 @@
+/*
+ * The living world, Horizon made livelier: the design reference for the shell and the six
+ * places (plan section 4, ADR 0014). Colour, type, space and motion come only from
+ * ../tokens/tokens.css. The world is drawn still here (references are static; the motion
+ * vocabulary is in ../README.md); the app draws the same states moving.
+ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-body);
+  line-height: var(--leading-body);
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--world-ground);
+  color: var(--text-on-space);
+  font-size: var(--type-16);
+}
+
+h1,
+h2,
+h3,
+p,
+ul,
+ol,
+dl,
+dd,
+figure {
+  margin: 0;
+}
+
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+
+button {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring-space);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px var(--surface-space);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.glyph {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+/* ---------- The world, behind everything ---------- */
+
+.world {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.world svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Distress stills and dims the world: nothing glows (ADR 0007, plan section 4). */
+.world[data-distress="true"] svg {
+  filter: saturate(0.35) brightness(0.45);
+}
+
+.world-words {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* A long name wraps rather than leaving the window: it stays beside its light, never hidden. */
+.world-label {
+  position: absolute;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 6px;
+  max-width: min(360px, calc(100vw - 32px));
+  width: max-content;
+  padding: 2px var(--space-12);
+  border-radius: var(--radius-control);
+  background: var(--surface-label);
+  color: var(--text-on-space);
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: var(--type-14);
+  line-height: 1.5;
+  transform: translateX(-50%);
+}
+
+.world-label[data-leader="above"]::after,
+.world-label[data-leader="below"]::after {
+  content: "";
+  position: absolute;
+  left: var(--leader-x, 50%);
+  width: 1px;
+  height: var(--leader, 0);
+  background: rgb(242 246 255 / 0.45);
+}
+
+.world-label[data-leader="above"]::after {
+  top: 100%;
+}
+
+.world-label[data-leader="below"]::after {
+  bottom: 100%;
+}
+
+.world-label .caption {
+  color: var(--text-on-space-muted);
+  font-family: var(--font-body);
+  font-weight: 400;
+}
+
+.world-label[data-kind="origin"] {
+  font-weight: 700;
+}
+
+/* A destination's name carries its light's shape: a warm disc, or a warm ring when suggested.
+   The diamond is kept for gates and conditions. The mark leads the name's own text, so a long
+   name wraps after it and never leaves it on a line of its own. */
+.world-label[data-kind="destination"] .name::before,
+.world-label[data-kind="suggested"] .name::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--light-destination);
+  vertical-align: middle;
+}
+
+.world-label[data-kind="suggested"] .name::before {
+  background: transparent;
+  border: 2px solid var(--light-destination);
+}
+
+.world-label[data-selected="true"] {
+  box-shadow: inset 0 0 0 1.5px var(--selection-space);
+}
+
+.world-label[data-kind="gate"] {
+  font-family: var(--font-body);
+  font-weight: 600;
+}
+
+/* The key to the lights: open on a wide screen, "What the lights mean" on a narrow one. It sits
+   above the shell (it is a control) wherever the world leaves room; names stay clear of it. */
+.legend {
+  position: fixed;
+  right: var(--space-24);
+  bottom: var(--space-24);
+  z-index: 3;
+  max-width: calc(100vw - 32px);
+  border: 1px solid var(--line-reading-hairline);
+  border-radius: var(--radius-control);
+  background: var(--surface-reading);
+  backdrop-filter: blur(var(--glass-blur));
+  color: var(--text-on-reading-muted);
+  font-size: var(--type-14);
+}
+
+.legend summary {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--space-12);
+  color: var(--text-on-reading);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.legend ul {
+  display: grid;
+  gap: var(--space-4);
+  padding: 0 var(--space-12) var(--space-12);
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+/* Each key is drawn as the world draws its light or trail. */
+.key {
+  display: inline-block;
+  flex: none;
+  width: 18px;
+  height: 10px;
+  position: relative;
+}
+
+.key::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+}
+
+.key-disc-destination::after {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--light-destination);
+}
+
+.key-ring-destination::after {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--light-destination);
+}
+
+.key-disc-said::after {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #cfe0ff;
+  box-shadow: 0 0 6px 1px var(--trail-near);
+}
+
+.key-ring-usual::after {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--trail-near);
+}
+
+.key-ring-none::after {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid var(--trail-shadow);
+}
+
+.key-ring-next::after {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--light-chosen);
+}
+
+.key-dot-opening::after,
+.key-dot-stale::after {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--light-person);
+}
+
+.key-dot-stale::after {
+  background: var(--trail-stale);
+}
+
+.key-line-shadow::after,
+.key-line-said::after,
+.key-line-usual::after,
+.key-line-route::after,
+.key-line-bridge::after,
+.key-line-chosen::after,
+.key-line-stale::after {
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.key-line-shadow::after {
+  background: var(--trail-shadow);
+}
+
+.key-line-said::after,
+.key-line-route::after,
+.key-line-bridge::after {
+  background: linear-gradient(90deg, var(--trail-near), var(--trail-far));
+}
+
+.key-line-usual::after {
+  height: 2px;
+  background: linear-gradient(90deg, var(--trail-near), var(--trail-far));
+  opacity: var(--trail-opacity-usual);
+}
+
+.key-line-chosen::after {
+  background: var(--light-chosen);
+}
+
+.key-line-stale::after {
+  background: var(--trail-stale);
+}
+
+.key-gate::after {
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--text-on-reading);
+  transform: rotate(45deg);
+}
+
+/* ---------- The shell over the world ---------- */
+
+.shell {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 100dvh;
+}
+
+.rail {
+  grid-row: 1 / span 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-24);
+  padding: var(--space-24) 0;
+  background-image: linear-gradient(90deg, var(--surface-rail) 55%, var(--surface-rail-edge));
+}
+
+.wordmark {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--type-12);
+  color: var(--text-on-space);
+  text-decoration: none;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+}
+
+.wordmark svg {
+  width: 30px;
+  height: 30px;
+}
+
+/* The wordmark takes its own width, inside the rail (a chapter's link is 72 px). */
+.rail .wordmark {
+  width: auto;
+  padding: 0;
+}
+
+.rail ol {
+  position: relative;
+  display: grid;
+  gap: var(--space-8);
+}
+
+.rail ol::before {
+  content: "";
+  position: absolute;
+  top: 22px;
+  bottom: 40px;
+  left: 50%;
+  width: 1px;
+  background: linear-gradient(180deg, var(--trail-near), var(--trail-far));
+  opacity: 0.55;
+}
+
+.rail a {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  width: 72px;
+  padding: var(--space-8) 0;
+  border-radius: var(--radius-control);
+  color: var(--text-on-space-muted);
+  text-decoration: none;
+  font-family: var(--font-display);
+  font-size: var(--type-14);
+}
+
+.landmark {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-space-control);
+  box-shadow: 0 0 0 3px var(--surface-space);
+}
+
+.rail a[data-progress="visited"] .landmark {
+  border: 2px solid var(--text-on-space-muted);
+}
+
+/* A chapter not built yet in the app says so under its name, before it is clicked (Task W2E,
+   the audit's F2). */
+.rail .later {
+  font-family: var(--font-body);
+  font-size: var(--type-12);
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--text-on-space-muted);
+  text-align: center;
+}
+
+.rail a[aria-current="page"] {
+  color: var(--text-on-space);
+  font-weight: 600;
+}
+
+.rail a[aria-current="page"] .landmark {
+  border: 2px solid var(--selection-space);
+  box-shadow:
+    0 0 0 4px var(--surface-space),
+    0 0 0 5px var(--selection-space),
+    0 0 14px 4px var(--glow-selection);
+}
+
+.strip {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-12) var(--space-24);
+  min-height: 60px;
+  padding: var(--space-12) var(--space-32);
+  background: var(--surface-glass);
+  backdrop-filter: blur(var(--glass-blur));
+  border-bottom: 1px solid var(--line-space-hairline);
+  font-size: var(--type-14);
+  color: var(--text-on-space-muted);
+}
+
+.strip strong {
+  color: var(--text-on-space);
+  font-weight: 600;
+}
+
+.strip-end {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8) var(--space-16);
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: 40px;
+  padding: 0 var(--space-8);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-on-space-muted);
+  font-size: var(--type-14);
+}
+
+.toggle .switch {
+  position: relative;
+  width: 26px;
+  height: 14px;
+  border: 1.5px solid var(--line-space-control);
+  border-radius: 999px;
+}
+
+.toggle .switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-on-space-muted);
+}
+
+.toggle[aria-pressed="true"] {
+  color: var(--text-on-space);
+}
+
+.toggle[aria-pressed="true"] .switch::after {
+  transform: translateX(12px);
+  background: var(--text-on-space);
+  border-color: var(--text-on-space);
+}
+
+.synthetic {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px var(--space-12) 2px var(--space-8);
+  border-radius: 999px;
+  border: 1px solid var(--line-space-control);
+  color: var(--text-on-space);
+  white-space: nowrap;
+}
+
+.work {
+  grid-column: 2;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-24) var(--space-32) var(--space-32);
+  gap: var(--space-24);
+}
+
+/* ---------- Glass panels and place cards ---------- */
+
+.panel {
+  display: grid;
+  gap: var(--space-16);
+  max-width: 560px;
+  padding: var(--space-24) var(--space-32);
+  border: 1px solid var(--line-reading-hairline);
+  border-radius: var(--radius-card);
+  background: var(--surface-reading);
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--shadow-card-on-space);
+  color: var(--text-on-reading);
+}
+
+.panel-wide {
+  max-width: 760px;
+}
+
+/* Narrower, so the chosen destination's openings have room for their names beside it. */
+.panel-roles {
+  max-width: 480px;
+}
+
+.panel.low {
+  margin-top: auto;
+}
+
+.kicker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-on-reading-muted);
+  font-size: var(--type-14);
+  font-weight: 600;
+}
+
+.kicker[data-tone="unknown"] {
+  color: var(--status-unknown-on-reading);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-weight: var(--weight-display);
+  font-size: var(--type-39);
+  line-height: var(--leading-display);
+  letter-spacing: var(--tracking-display);
+}
+
+.question {
+  font-family: var(--font-display);
+  font-weight: var(--weight-display);
+  font-size: var(--type-31);
+  line-height: var(--leading-display);
+  letter-spacing: var(--tracking-display);
+}
+
+.sentence {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--type-25);
+  line-height: 1.2;
+}
+
+.where {
+  font-family: var(--font-display);
+  font-size: var(--type-20);
+  line-height: 1.3;
+}
+
+.muted {
+  color: var(--text-on-reading-muted);
+}
+
+.small {
+  font-size: var(--type-14);
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8) var(--space-12);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  min-height: 44px;
+  padding: 0 var(--space-16);
+  border-radius: var(--radius-control);
+  border: 1px solid transparent;
+  font-weight: 600;
+  font-size: var(--type-14);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--action-reading);
+  color: var(--text-on-action-reading);
+  box-shadow: 0 0 22px -6px var(--glow-action);
+}
+
+.btn-secondary {
+  background: transparent;
+  border-color: var(--line-reading-control);
+  color: var(--text-on-reading);
+}
+
+/* A link or quiet action is white and underlined: teal stays with the one primary action. */
+.link {
+  color: var(--text-on-reading);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  background: none;
+  border: 0;
+  padding: 0;
+  font-weight: 600;
+}
+
+/* What a place not built yet will hold, one step away. */
+.more summary {
+  width: max-content;
+  color: var(--text-on-reading);
+  font-size: var(--type-14);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.more p {
+  margin-top: var(--space-8);
+}
+
+.answer {
+  padding: var(--space-12) var(--space-16);
+  border-radius: var(--radius-card) var(--radius-card) 4px var(--radius-card);
+  background: var(--surface-card);
+  border: 1px solid var(--line-reading-hairline);
+  justify-self: end;
+  max-width: 88%;
+}
+
+.answer[data-failed="true"] {
+  border-color: var(--status-error-on-reading);
+}
+
+/* ---------- You: the console's views (Sprint W, SW.4) ---------- */
+
+/* The three views as tabs; the one you're in is marked in sea-glass (a selection). */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-8);
+  border-bottom: 1px solid var(--line-reading-hairline);
+}
+
+.tabs a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--space-8);
+  border-bottom: 3px solid transparent;
+  color: var(--text-on-reading-muted);
+  font-size: var(--type-14);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.tabs a[aria-selected="true"] {
+  color: var(--text-on-reading);
+  border-bottom-color: var(--selection-reading);
+}
+
+.view {
+  display: grid;
+  gap: var(--space-16);
+}
+
+/* The You console, as wide as the app's. */
+.panel.console {
+  max-width: 600px;
+}
+
+/* The suggestions view: the view controls, the group headings, plain lists. */
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.segmented .btn {
+  min-height: 40px;
+}
+
+.segmented .btn[aria-pressed="true"] {
+  border-color: var(--selection-reading);
+  box-shadow: inset 0 -3px 0 var(--selection-reading);
+}
+
+.group {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.group-title {
+  color: var(--text-on-reading-muted);
+  font-size: var(--type-14);
+  font-weight: 600;
+}
+
+.bullets {
+  display: grid;
+  gap: var(--space-8);
+  padding-left: var(--space-24);
+  list-style: disc;
+  font-size: var(--type-14);
+}
+
+/* The slate's notes on how it searched, one step away. */
+.notes summary {
+  width: max-content;
+  max-width: 100%;
+  font-size: var(--type-14);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.notes ul {
+  margin-top: var(--space-8);
+}
+
+.reply {
+  display: flex;
+  gap: var(--space-12);
+}
+
+.reply .glyph {
+  width: 22px;
+  height: 22px;
+  color: var(--text-on-reading-muted);
+}
+
+.tray {
+  display: grid;
+  gap: var(--space-12);
+}
+
+/* What a decision did, with Undo beside it while it can apply. */
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8) var(--space-16);
+}
+
+.proposal {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.proposal,
+.notice {
+  padding: var(--space-12) var(--space-16);
+  border: 1px solid var(--line-reading-hairline);
+  border-radius: var(--radius-control);
+  background: var(--surface-card);
+}
+
+/* Careerwright's reading, not a fact until accepted: a dashed edge. A chosen proposal is marked
+   by its Confirm alone, never also a teal edge (teal is selection and the one primary). */
+.proposal[data-basis="inferred"] {
+  border-style: dashed;
+  border-color: var(--line-reading-control);
+}
+
+/* The two decisions on a proposed change, colour coded as well as worded (session 2, C3):
+   leaf green accepts or confirms, on a faint leaf tint with a doubled edge once chosen (never a
+   second bright fill beside the one primary); orchid undoes the last save. */
+.btn-accept {
+  background: transparent;
+  border-color: var(--decision-accept);
+  color: var(--decision-accept);
+}
+
+.btn-accept[aria-pressed="true"] {
+  background: var(--surface-decision-chosen);
+  box-shadow: inset 0 0 0 1px var(--decision-accept);
+}
+
+.btn-undo {
+  background: transparent;
+  border-color: var(--decision-undo);
+  color: var(--decision-undo);
+}
+
+.btn .glyph {
+  width: 18px;
+  height: 18px;
+}
+
+/* What we know's answers, one row each (its own name: Routes' and Plan's `.facts` below is a
+   two-column list, and the two must never meet, design review I1). */
+.known-facts {
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--line-reading-hairline);
+  border-radius: var(--radius-control);
+  background: var(--line-reading-hairline);
+  overflow: hidden;
+}
+
+.known-facts > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-12);
+  padding: var(--space-8) var(--space-16);
+  background: var(--surface-card);
+  font-size: var(--type-14);
+}
+
+.known-facts dt {
+  color: var(--text-on-reading-muted);
+}
+
+.known-facts dd {
+  font-weight: 600;
+  text-align: right;
+}
+
+/* A limit's meaning in plain words, under its name. */
+.explained {
+  display: block;
+  margin-top: 2px;
+}
+
+.suggestion {
+  display: grid;
+  gap: var(--space-8);
+  padding: var(--space-12) var(--space-16);
+  border: 1px solid var(--line-reading-hairline);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+}
+
+/* The open suggestion is the selected one, edged in sea-glass; it holds the bright action. */
+.suggestion[data-open="true"] {
+  padding: var(--space-16) var(--space-24);
+  border-color: var(--selection-reading);
+  box-shadow: inset 4px 0 0 var(--selection-reading);
+}
+
+.suggestion h4 button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  width: 100%;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-on-reading);
+  font-family: var(--font-display);
+  font-size: var(--type-20);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.suggestion[data-open="true"] h4 button {
+  font-size: var(--type-25);
+}
+
+.suggestion h4 .glyph {
+  width: 20px;
+  height: 20px;
+  color: var(--text-on-reading-muted);
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: 48px;
+  padding: 0 var(--space-12);
+  border: 1px solid var(--line-reading-control);
+  border-radius: var(--radius-control);
+  background: var(--surface-card);
+  color: var(--text-on-space-subtle);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--type-14);
+  font-weight: 600;
+}
+
+.status[data-tone="error"] {
+  color: var(--status-error-on-reading);
+}
+
+.status[data-tone="stale"] {
+  color: var(--status-stale-on-reading);
+}
+
+.status[data-tone="unknown"] {
+  color: var(--status-unknown-on-reading);
+}
+
+.status[data-tone="neutral"] {
+  color: var(--text-on-reading);
+}
+
+.alert {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-12);
+  padding: var(--space-12) var(--space-16);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--status-error-on-reading);
+  background: var(--surface-card);
+}
+
+.alert[data-tone="stale"] {
+  border-color: var(--status-stale-on-reading);
+}
+
+.alert[data-tone="unknown"],
+.alert[data-tone="neutral"] {
+  border-color: var(--line-reading-control);
+}
+
+.alert > .glyph {
+  width: 20px;
+  height: 20px;
+}
+
+.alert[data-tone="error"] > .glyph {
+  color: var(--status-error-on-reading);
+}
+
+.alert[data-tone="stale"] > .glyph {
+  color: var(--status-stale-on-reading);
+}
+
+.alert[data-tone="unknown"] > .glyph {
+  color: var(--status-unknown-on-reading);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-4) var(--space-16);
+  font-size: var(--type-14);
+}
+
+.facts dt {
+  color: var(--text-on-reading-muted);
+}
+
+.facts dd {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.list {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4) var(--space-12);
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-control);
+  background: var(--surface-card);
+  font-size: var(--type-14);
+}
+
+.list li[data-selected="true"] {
+  box-shadow: inset 3px 0 0 var(--selection-reading);
+}
+
+.list .glyph {
+  color: var(--text-on-reading-muted);
+}
+
+.quote {
+  padding: var(--space-8) var(--space-12);
+  border-left: 3px solid var(--line-reading-control);
+  background: var(--surface-card-sunken);
+  font-size: var(--type-14);
+}
+
+.support {
+  border-color: var(--line-reading-control);
+}
+
+.support li {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* The time and cost instrument: exact, in DOM and SVG over the world. */
+.instrument svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.instrument text {
+  fill: var(--text-on-reading-muted);
+  font-size: 12px;
+  font-family: var(--font-body);
+}
+
+.instrument .mark-label {
+  fill: var(--text-on-reading);
+  font-weight: 600;
+}
+
+.instrument .axis-name {
+  fill: var(--text-on-reading);
+  font-size: 13px;
+}
+
+/* ---------- Tablet and phone ---------- */
+
+/* The work area stays on a tablet (Task W2E, F14: the person's facts come first); a phone's
+   strip has no room for it. */
+@media (max-width: 760px) {
+  .strip .optional {
+    display: none;
+  }
+}
+
+/* Where the console leaves the world too narrow a span beside it (the rail's 96 px, the 32 px
+   margin, the console's 600 px and MIN_CLEAR's 240 px: below 968 px), the person's light stands
+   in a band above the console in every view, never shorter than MIN_BAND, so the You place never
+   falls back to a backdrop behind it; a long console starts below the band and scrolls with the
+   page (design review I2, as the app does). The band takes no more room than what the world
+   shows (Task W2E, the audit's F7; plan section 4: on a phone the decision comes first): the
+   start, whose skills light up as the person picks them, keeps a tall band; a view with a
+   decision waiting (a reply to review, a save, what we know, the suggestions) shows the person
+   and the target in a slim band, MIN_BAND and a margin, as the app does. */
+@media (max-width: 967px) {
+  .work:has(> .console) {
+    /* At least MIN_BAND and a margin; on a taller screen, room for the light's arc at full size
+       and the names around it. */
+    padding-top: max(300px, 34vh);
+  }
+
+  .work:has(> .console[data-band="slim"]) {
+    padding-top: 144px;
+  }
+
+  .console {
+    margin-top: auto;
+  }
+}
+
+/* Below a desktop's width the person's facts come first (Task W2E, the audit's F14): the
+   world's controls move into the account menu, beside calm mode (menus are not drawn here). */
+@media (max-width: 1179px) {
+  .strip .toggle:not(.account) {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
+  .rail {
+    display: none;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-12);
+    padding: var(--space-12) var(--space-16);
+    background: var(--surface-glass);
+    backdrop-filter: blur(var(--glass-blur));
+    border-bottom: 1px solid var(--line-space-hairline);
+  }
+
+  /* The phone's header is two rows: the top bar (chapter and the synthetic label) and the
+     strip (the saved state, live updates, the world's controls and the account menu); the
+     target is named in the world. */
+  .strip {
+    grid-column: 1;
+    padding: var(--space-8) var(--space-16);
+    min-height: 0;
+  }
+
+  .strip .synthetic-slot,
+  .strip .optional-phone {
+    display: none;
+  }
+
+  /* "Still while support is shown" moves to the top bar, beside the chapter, where it adds no
+     row; it wraps there if it must. */
+  .strip .world-status {
+    display: none;
+  }
+
+  .topbar .world-status {
+    min-width: 0;
+    line-height: 1.25;
+  }
+
+  .strip-end {
+    margin-left: 0;
+    gap: var(--space-8);
+  }
+
+  /* The world's controls become glyph buttons; on, a button is ringed in white. */
+  .strip .toggle .switch {
+    display: none;
+  }
+
+  .strip .toggle {
+    justify-content: center;
+    min-width: 40px;
+    padding: 0;
+  }
+
+  .strip .toggle[aria-pressed="true"] {
+    border-color: var(--text-on-space);
+    background: var(--surface-space-raised-2);
+  }
+
+  .toggle .label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .work {
+    grid-column: 1;
+    padding: 0;
+  }
+
+  /* On a phone the world is the backdrop; the place is a sheet over its lower half. */
+  .panel {
+    max-width: none;
+    margin-top: auto;
+    padding: var(--space-24) var(--space-16);
+    border-width: 1px 0 0;
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  }
+
+  .title {
+    font-size: var(--type-31);
+  }
+
+  /* The top bar already names the chapter "You": the console's own title is for assistive tech
+     only, and the world above it keeps the room (design review I2). */
+  .console > .title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .question {
+    font-size: var(--type-25);
+  }
+
+  /* The slate's view controls on one row, scrolled sideways, so its first choice is in the
+     first screen (Task W2E, F7: on a phone the decision comes first), as the app does. */
+  .segmented {
+    flex-wrap: nowrap;
+    min-width: 0;
+    overflow-x: auto;
+  }
+
+  .segmented .btn {
+    flex: none;
+  }
+
+  /* The console's headings and the open suggestion's title take less height on a phone, so a
+     long title still leaves its choice in the first screen (F7), as the app does. */
+  .console .sentence,
+  .suggestion h4 {
+    font-size: var(--type-20);
+  }
+
+  /* A phone names each light by its name alone; what its look means is in the key, and the
+     caption stays in the list for assistive tech. */
+  .world-label .caption {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@media (min-width: 761px) {
+  .topbar {
+    display: none;
+  }
+}

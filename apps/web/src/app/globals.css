@@ -1,0 +1,1905 @@
+/*
+ * Careerwright web styles. Colour, type, space, radius and motion come only from the design
+ * tokens (src/design/tokens/tokens.css, a byte-identical mirror of docs/design/tokens,
+ * imported beside this file so its font URLs resolve from its own folder). The Tailwind
+ * theme is reset and rebuilt from those semantic tokens, so no default palette, spacing or
+ * radius exists to drift from the design system. The shell is the living world's (plan
+ * section 4, docs/design/compositions/world.css): the world behind everything, words on dark
+ * glass over it, sea-glass only for selection and the one primary action.
+ */
+@import "tailwindcss";
+
+@theme inline {
+  --color-*: initial;
+  --spacing-*: initial;
+  --radius-*: initial;
+  --font-*: initial;
+  --text-*: initial;
+  --shadow-*: initial;
+
+  /* Context colours (.on-space / .on-reading set these per surface). */
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-bg: var(--bg);
+  --color-bg-raised: var(--bg-raised);
+  --color-line: var(--line);
+  --color-line-control: var(--line-control);
+  --color-action: var(--action);
+  --color-on-action: var(--on-action);
+  --color-selection: var(--selection);
+  --color-focus: var(--focus);
+  --color-status-error: var(--status-error);
+  --color-status-stale: var(--status-stale);
+  --color-status-unknown: var(--status-unknown);
+  /* Fixed surfaces. */
+  --color-space: var(--surface-space);
+  --color-space-raised: var(--surface-space-raised);
+  --color-space-raised-2: var(--surface-space-raised-2);
+  --color-reading: var(--surface-reading);
+  --color-glass: var(--surface-glass);
+  --color-card: var(--surface-card);
+  --color-band: var(--surface-band);
+
+  --spacing-0: 0;
+  --spacing-4: var(--space-4);
+  --spacing-8: var(--space-8);
+  --spacing-12: var(--space-12);
+  --spacing-16: var(--space-16);
+  --spacing-24: var(--space-24);
+  --spacing-32: var(--space-32);
+  --spacing-48: var(--space-48);
+
+  --radius-control: var(--radius-control);
+  --radius-card: var(--radius-card);
+  --radius-sheet: var(--radius-sheet);
+  --radius-full: 999px;
+
+  --font-body: var(--font-body);
+  --font-display: var(--font-display);
+
+  --text-12: var(--type-12);
+  --text-14: var(--type-14);
+  --text-16: var(--type-16);
+  --text-20: var(--type-20);
+  --text-25: var(--type-25);
+  --text-31: var(--type-31);
+  --text-39: var(--type-39);
+
+  --breakpoint-sm: 761px;
+  --breakpoint-lg: 1180px;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-body);
+    line-height: var(--leading-body);
+    font-optical-sizing: auto;
+    -webkit-text-size-adjust: 100%;
+    color-scheme: dark;
+  }
+
+  /* Outside a workspace (sign-in, the workspace list) the world's ground and horizon are
+     still there, drawn still; inside one, the world itself is drawn behind (World.tsx). */
+  body {
+    min-height: 100dvh;
+    background:
+      radial-gradient(120% 38% at 50% 64%, rgb(28 37 82 / 0.85), transparent 70%),
+      linear-gradient(180deg, #010309 0%, #050a1a 52%, var(--world-horizon) 64%, #050916 76%, var(--surface-space) 100%);
+    background-attachment: fixed;
+    color: var(--text-on-space);
+    font-size: var(--type-16);
+  }
+
+  /* Focus is white, never sea-glass (which means selection). Its dark halo keeps it visible
+     over any light in the world. */
+  :focus-visible {
+    outline: 2px solid var(--focus, var(--focus-ring-space));
+    outline-offset: 2px;
+    border-radius: 4px;
+    box-shadow: 0 0 0 6px var(--surface-space);
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+}
+
+@layer components {
+  .tnum {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  .display {
+    font-family: var(--font-display);
+    font-weight: var(--weight-display);
+    line-height: var(--leading-display);
+    letter-spacing: var(--tracking-display);
+  }
+
+  .page-title {
+    font-family: var(--font-display);
+    font-weight: var(--weight-display);
+    font-size: var(--type-39);
+    line-height: var(--leading-display);
+    letter-spacing: var(--tracking-display);
+  }
+
+  .measure {
+    max-width: var(--measure);
+  }
+
+  .glyph {
+    width: 16px;
+    height: 16px;
+    flex: none;
+  }
+
+  /* ---------- The world, behind everything ---------- */
+
+  .world {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    background: var(--world-ground);
+  }
+
+  .world-layer {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .world-layer svg,
+  .world-layer canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .world-words {
+    position: absolute;
+    inset: 0;
+  }
+
+  /* Each light's name sits beside it on a small dark label (measured over the brightest
+     light). A long name wraps rather than leaving the window. A name that cannot be placed
+     clear of the panels, or whose light is under one, is hidden from sight only: it stays in
+     the list for assistive tech. */
+  .world-label {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 6px;
+    width: max-content;
+    max-width: min(360px, calc(100vw - 32px));
+    padding: 2px var(--space-12);
+    border-radius: var(--radius-control);
+    background: var(--surface-label);
+    color: var(--text-on-space);
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: var(--type-14);
+    line-height: 1.5;
+    transition: opacity var(--motion-panel) var(--ease-settle);
+  }
+
+  .world-label[data-shown="false"] {
+    opacity: 0;
+  }
+
+  .world-label[data-kind="origin"] {
+    font-weight: 700;
+  }
+
+  .world-label[data-leader="above"]::after,
+  .world-label[data-leader="below"]::after {
+    content: "";
+    position: absolute;
+    left: var(--leader-x, 50%);
+    width: 1px;
+    height: var(--leader, 0);
+    background: rgb(242 246 255 / 0.45);
+  }
+
+  .world-label[data-leader="above"]::after {
+    top: 100%;
+  }
+
+  .world-label[data-leader="below"]::after {
+    bottom: 100%;
+  }
+
+  /* Orange means a destination: its name carries its light's shape, a small warm disc (the
+     diamond is a gate's), and stays white. The disc leads the name's own text, so a long name
+     wraps after it and never leaves it on a line of its own. */
+  .world-label[data-kind="destination"] .world-label-name::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: var(--light-destination);
+    vertical-align: middle;
+  }
+
+  /* While the calm support panel shows, the world is still and dims: nothing glows. */
+  .world[data-distress="true"] .world-layer {
+    filter: saturate(0.35) brightness(0.45);
+  }
+
+  /* The key to the lights: open on a wide screen, "What the lights mean" on a narrow one. It is
+     a control, so it sits over the shell, wherever the world leaves room (World.tsx places it,
+     and the names stay clear of it); with no room, or nothing it explains in view, it is
+     hidden. The menus open through a portal, over it. */
+  .world-key {
+    position: fixed;
+    right: var(--space-24);
+    bottom: var(--space-24);
+    z-index: 5;
+    max-width: calc(100vw - 32px);
+    border: 1px solid var(--line-reading-hairline);
+    border-radius: var(--radius-control);
+    background: var(--surface-reading);
+    backdrop-filter: blur(var(--glass-blur));
+    color: var(--text-on-reading-muted);
+    font-size: var(--type-14);
+  }
+
+  .world-key[data-placed="false"] {
+    visibility: hidden;
+  }
+
+  .world-key summary {
+    display: flex;
+    align-items: center;
+    min-height: 40px;
+    padding: 0 var(--space-12);
+    color: var(--text-on-reading);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+
+  .world-key ul {
+    display: grid;
+    gap: var(--space-4);
+    padding: 0 var(--space-12) var(--space-12);
+  }
+
+  .world-key li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-8);
+  }
+
+  /* Each mark drawn as the world draws it. */
+  .world-key-mark {
+    position: relative;
+    display: inline-block;
+    flex: none;
+    width: 18px;
+    height: 10px;
+  }
+
+  .world-key-mark::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    margin: auto;
+  }
+
+  .world-key-mark[data-key="destination"]::after {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--light-destination);
+  }
+
+  .world-key-mark[data-key="shadow"]::after {
+    width: 18px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--trail-shadow);
+  }
+
+  /* A skill you said you have: a bright disc in its journey glow; usual in your role: a ring. */
+  .world-key-mark[data-key="said"]::after {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--light-person);
+    box-shadow: 0 0 0 2px var(--trail-near);
+  }
+
+  .world-key-mark[data-key="usual"]::after {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 2px solid var(--trail-near);
+  }
+
+  .world-key-mark[data-key="opening"]::after {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--light-person);
+  }
+
+  /* ---------- App frame: over the world ---------- */
+
+  .app {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 100dvh;
+  }
+
+  /* The rail is the journey through the six places: a fine trail of light joins them. Solid
+     where its landmarks sit, thinner at its outer edge (both measured with their words). */
+  .rail {
+    position: relative;
+    grid-row: 1 / span 2;
+    grid-column: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-24);
+    padding: var(--space-24) 0;
+    background-image: linear-gradient(90deg, var(--surface-rail) 55%, var(--surface-rail-edge));
+  }
+
+  .rail-mark {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-4);
+    color: var(--text-on-space);
+    text-decoration: none;
+    font-family: var(--font-display);
+    font-size: var(--type-12);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  .rail-mark .glyph {
+    width: 30px;
+    height: 30px;
+  }
+
+  .rail-chapters {
+    position: relative;
+    display: grid;
+    gap: var(--space-8);
+  }
+
+  .rail-chapters::before {
+    content: "";
+    position: absolute;
+    top: 22px;
+    bottom: 40px;
+    left: 50%;
+    width: 1px;
+    background: linear-gradient(180deg, var(--trail-near), var(--trail-far));
+    opacity: 0.55;
+  }
+
+  .rail-chapter {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: var(--space-4);
+    width: 72px;
+    padding: var(--space-8) 0;
+    border-radius: var(--radius-control);
+    color: var(--text-on-space-muted);
+    text-decoration: none;
+    font-family: var(--font-display);
+    font-size: var(--type-14);
+    transition: color var(--motion-control) var(--ease-settle);
+  }
+
+  .rail-chapter:hover {
+    color: var(--text-on-space);
+  }
+
+  /* A chapter not built yet says so under its name, in sight before it is clicked (F2). */
+  .chapter-later {
+    font-family: var(--font-body);
+    font-size: var(--type-12);
+    font-weight: 400;
+    line-height: 1.2;
+    color: var(--text-on-space-muted);
+    text-align: center;
+  }
+
+  .landmark {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1.5px solid var(--line-space-control);
+    background: transparent;
+    box-shadow: 0 0 0 3px var(--surface-space);
+  }
+
+  /* V-09: a visited chapter has a brighter ring, never a fill. A filled landmark is kept for a
+     chapter whose decisions are recorded (spec section 15), which this build has none of, so
+     having opened a chapter cannot read as having finished it. */
+  .rail-chapter[data-progress="visited"] .landmark,
+  .menu-chapter[data-progress="visited"] .landmark {
+    border: 2px solid var(--text-on-space-muted);
+  }
+
+  .rail-chapter[aria-current="page"] {
+    color: var(--text-on-space);
+    font-weight: 600;
+  }
+
+  /* Where you are: the lock-on ring, in sea-glass (selection). */
+  .rail-chapter[aria-current="page"] .landmark,
+  .menu-chapter[aria-current="page"] .landmark {
+    border: 2px solid var(--selection-space);
+    box-shadow:
+      0 0 0 4px var(--surface-space),
+      0 0 0 5px var(--selection-space),
+      0 0 14px 4px var(--glow-selection);
+  }
+
+  .strip {
+    grid-column: 2 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-12) var(--space-24);
+    min-height: 60px;
+    padding: var(--space-12) var(--space-32);
+    background: var(--surface-glass);
+    backdrop-filter: blur(var(--glass-blur));
+    border-bottom: 1px solid var(--line-space-hairline);
+    font-size: var(--type-14);
+  }
+
+  .strip-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-8);
+    min-width: 0;
+    color: var(--text-on-space-muted);
+  }
+
+  .strip-item strong {
+    color: var(--text-on-space);
+    font-weight: 600;
+  }
+
+  .strip-end {
+    margin-left: auto;
+  }
+
+  .workarea {
+    grid-column: 2;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* A built chapter reads on a dark glass panel over the world, leaving the world in view
+     beside it; a place not built yet is a small card low in the world. */
+  .chapter {
+    display: grid;
+    gap: var(--space-24);
+    max-width: 1080px;
+    margin: var(--space-24) var(--space-32) var(--space-32);
+    padding: var(--space-32);
+    border: 1px solid var(--line-reading-hairline);
+    border-radius: var(--radius-card);
+    background: var(--surface-reading);
+    backdrop-filter: blur(var(--glass-blur));
+    box-shadow: var(--shadow-card-on-space);
+  }
+
+  .chapter-place {
+    max-width: 520px;
+    margin-top: auto;
+    gap: var(--space-16);
+    padding: var(--space-24);
+  }
+
+  .chapter-place .page-title {
+    font-size: var(--type-31);
+  }
+
+  /* What a place not built yet will hold, one step away. */
+  .place-more summary {
+    width: max-content;
+    color: var(--fg);
+    font-size: var(--type-14);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+
+  .place-kicker {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--status-unknown);
+    font-size: var(--type-14);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .place-where {
+    font-family: var(--font-display);
+    font-size: var(--type-20);
+    font-weight: 400;
+    line-height: 1.3;
+    color: var(--fg);
+  }
+
+  /* ---------- Evidence drawer: a column on wide screens, an overlay on tablets, a bottom
+     sheet on phones. Non-modal throughout, so the main task stays usable beside it. ---------- */
+
+  .drawer {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-16);
+    padding: var(--space-24);
+    background: var(--surface-glass-strong);
+    backdrop-filter: blur(var(--glass-blur));
+    color: var(--text-on-reading);
+    border-left: 1px solid var(--line-reading-hairline);
+    border-top-left-radius: var(--radius-sheet);
+    overflow-y: auto;
+    /* Tablet: a side sheet over the page, full height, so it never cuts across the strip. */
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(368px, 92vw);
+    z-index: 20;
+    box-shadow: var(--shadow-card-on-space);
+  }
+
+  .drawer-head {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-12);
+  }
+
+  .drawer-title {
+    margin-right: auto;
+    font-family: var(--font-display);
+    font-weight: var(--weight-display);
+    font-size: var(--type-25);
+    line-height: var(--leading-display);
+  }
+
+  .sheet-handle,
+  .btn.sheet-toggle {
+    display: none;
+  }
+
+  .topbar {
+    display: none;
+  }
+
+  /* ---------- Components ---------- */
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-8);
+    min-height: 40px;
+    padding: 0 var(--space-16);
+    border-radius: var(--radius-control);
+    border: 1px solid transparent;
+    font-weight: 600;
+    font-size: var(--type-14);
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+      background-color var(--motion-control) var(--ease-settle),
+      border-color var(--motion-control) var(--ease-settle);
+  }
+
+  .btn .glyph {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* The one primary action: bright and unmistakable ("Needs to be a bright colour"). */
+  .btn-primary {
+    background: var(--action);
+    color: var(--on-action);
+    box-shadow: 0 0 22px -6px var(--glow-action);
+  }
+
+  .btn-secondary {
+    background: transparent;
+    border-color: var(--line-control);
+    color: var(--fg);
+  }
+
+  /* A question's equal answers, together the view's bright action (how to start; a role or
+     suggestions): the action colour edges and letters them, so none is filled over the other
+     and nothing else in the view is bright (F17). */
+  .btn-choice {
+    background: transparent;
+    border-color: var(--action);
+    color: var(--action);
+    box-shadow: 0 0 22px -8px var(--glow-action);
+  }
+
+  /* Quiet and icon actions take the text colour, marked by an underline or their glyph: teal
+     stays with the one primary action, selection and the chosen path. */
+  .btn-quiet {
+    background: transparent;
+    color: var(--fg);
+    padding: 0 var(--space-8);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .btn-icon {
+    min-width: 40px;
+    padding: 0;
+    background: transparent;
+    color: var(--fg);
+  }
+
+  /* The two decisions on a proposed change, colour coded as well as worded (session 2, C3):
+     leaf green accepts a change or confirms a limit; orchid undoes the last save. Neither is
+     ever teal, and neither is the view's primary action: once chosen, Accept sits on a faint
+     leaf tint with a doubled edge, never a second bright fill beside the one primary. */
+  .btn-accept {
+    background: transparent;
+    border-color: var(--decision-accept);
+    color: var(--decision-accept);
+  }
+
+  .btn-accept[aria-pressed="true"] {
+    background: var(--surface-decision-chosen);
+    box-shadow: inset 0 0 0 1px var(--decision-accept);
+  }
+
+  .btn-undo {
+    background: transparent;
+    border-color: var(--decision-undo);
+    color: var(--decision-undo);
+  }
+
+  /* Disabled keeps full-contrast text and says why beside it; it is never the only cue. */
+  .btn[aria-disabled="true"],
+  .btn:disabled {
+    cursor: not-allowed;
+    background: transparent;
+    border: 1px solid var(--line-control);
+    color: var(--fg-muted);
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-8);
+    min-height: 28px;
+    padding: 2px var(--space-12);
+    border-radius: 999px;
+    border: 1px solid var(--line-control);
+    font-size: var(--type-14);
+    color: var(--fg);
+  }
+
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--type-14);
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--status-neutral);
+  }
+
+  .status[data-tone="error"] {
+    color: var(--status-error);
+  }
+
+  .status[data-tone="stale"] {
+    color: var(--status-stale);
+  }
+
+  .status[data-tone="unknown"] {
+    color: var(--status-unknown);
+  }
+
+  .synthetic-label {
+    display: inline-flex;
+    justify-self: start;
+    align-items: center;
+    gap: 6px;
+    padding: 2px var(--space-12) 2px var(--space-8);
+    border-radius: 999px;
+    border: 1px solid var(--line-control);
+    font-size: var(--type-14);
+    color: var(--fg);
+    white-space: nowrap;
+  }
+
+  .card {
+    background: var(--surface-card);
+    color: var(--text-on-reading);
+    border: 1px solid var(--line-reading-hairline);
+    border-radius: var(--radius-card);
+    padding: var(--space-24);
+  }
+
+  .card-on-space {
+    background: var(--surface-space-raised);
+    color: var(--text-on-space);
+    border: 1px solid var(--line-space-hairline);
+    border-radius: var(--radius-card);
+    padding: var(--space-24);
+  }
+
+  .card[data-selected="true"],
+  .card-on-space[data-selected="true"] {
+    border-color: var(--selection);
+    box-shadow: inset 4px 0 0 var(--selection);
+  }
+
+  .alert {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--space-12);
+    padding: var(--space-16) var(--space-24);
+    border-radius: var(--radius-card);
+    border: 1px solid var(--status-error);
+    background: var(--bg-raised);
+  }
+
+  .alert > .glyph {
+    width: 20px;
+    height: 20px;
+    margin-top: 2px;
+    color: var(--status-error);
+  }
+
+  .alert[data-tone="stale"] {
+    border-color: var(--status-stale);
+  }
+
+  .alert[data-tone="stale"] > .glyph {
+    color: var(--status-stale);
+  }
+
+  .alert[data-tone="unknown"],
+  .alert[data-tone="neutral"] {
+    border-color: var(--line-control);
+  }
+
+  .alert[data-tone="unknown"] > .glyph {
+    color: var(--status-unknown);
+  }
+
+  .alert[data-tone="neutral"] > .glyph {
+    color: var(--fg);
+  }
+
+  .alert-title {
+    font-weight: 600;
+    color: var(--fg);
+  }
+
+  .alert-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-8);
+    margin-top: var(--space-12);
+  }
+
+  /* Labels take their own width and values wrap in the rest: an `auto` value column would
+     grow to the longest value and squeeze the labels until they overprint it. */
+  .kv {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: var(--space-4) var(--space-16);
+    font-size: var(--type-14);
+  }
+
+  .kv dt {
+    color: var(--fg-muted);
+  }
+
+  .kv dd {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+
+  .section-title {
+    font-size: var(--type-16);
+    font-weight: 600;
+  }
+
+  .muted {
+    color: var(--fg-muted);
+  }
+
+  .small {
+    font-size: var(--type-14);
+  }
+
+  /* ---------- Form controls ---------- */
+
+  .field {
+    display: grid;
+    gap: var(--space-8);
+    padding: var(--space-16) 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .field-label {
+    font-weight: 600;
+  }
+
+  .field-hint {
+    font-size: var(--type-14);
+    color: var(--fg-muted);
+  }
+
+  .input,
+  .select {
+    min-height: 44px;
+    width: 100%;
+    padding: 0 var(--space-12);
+    border: 1px solid var(--line-control);
+    border-radius: var(--radius-control);
+    background: var(--surface-card);
+    color: var(--text-on-reading);
+  }
+
+  .input[aria-invalid="true"] {
+    border-color: var(--status-error);
+    border-width: 2px;
+  }
+
+  .input:disabled,
+  .select:disabled {
+    background: var(--surface-card-sunken);
+    color: var(--fg-muted);
+    cursor: not-allowed;
+  }
+
+  .field-error {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: var(--type-14);
+    font-weight: 600;
+    color: var(--status-error);
+  }
+
+  .field-error .glyph {
+    margin-top: 2px;
+  }
+
+  .empty {
+    display: grid;
+    gap: var(--space-12);
+    justify-items: start;
+    padding: var(--space-32);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    background: var(--bg-raised);
+  }
+
+  .skeleton {
+    display: block;
+    height: 14px;
+    border-radius: 7px;
+    background: var(--line);
+  }
+
+  .source-quote {
+    padding: var(--space-12) var(--space-16);
+    border-left: 3px solid var(--line-control);
+    border-radius: 0 var(--radius-control) var(--radius-control) 0;
+    background: var(--surface-card-sunken);
+    font-size: var(--type-14);
+    overflow-wrap: anywhere;
+  }
+
+  .layer-mark {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    flex: none;
+  }
+
+  .layer-mark[data-layer="1"] {
+    border: 2px solid var(--mark-front-1);
+  }
+
+  .layer-mark[data-layer="2"] {
+    background: var(--mark-front-later);
+  }
+
+  .layer-mark[data-layer="3"] {
+    border: 2px solid var(--mark-front-later);
+  }
+
+  .route-letter {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid var(--fg);
+    font-weight: 600;
+    font-size: var(--type-14);
+    flex: none;
+  }
+
+  .route-letter[data-layer="2"] {
+    border-color: var(--mark-front-later);
+    background: var(--mark-front-later);
+    color: var(--surface-space-raised);
+  }
+
+  .route-letter[data-layer="3"] {
+    border-color: var(--mark-front-later);
+    color: var(--fg-muted);
+  }
+
+  .route-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--space-4) var(--space-16);
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  /* A route's decision figures side by side, label above value (the Sprint 0 summary row). */
+  .figures {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-4) var(--space-12);
+    font-size: var(--type-14);
+  }
+
+  .figures dt {
+    color: var(--fg-muted);
+  }
+
+  .figures dd {
+    font-size: var(--type-16);
+    font-weight: 600;
+    line-height: 1.3;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ---------- Tablet and wide desktop ---------- */
+
+@media (min-width: 1180px) {
+  .app[data-drawer="open"] {
+    grid-template-columns: 96px minmax(0, 1fr) 368px;
+  }
+
+  .app[data-drawer="open"] .drawer {
+    position: static;
+    grid-column: 3;
+    grid-row: 2;
+    width: auto;
+    box-shadow: none;
+  }
+}
+
+/* ---------- Phone ---------- */
+
+@media (max-width: 760px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
+  .rail {
+    display: none;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-12);
+    grid-column: 1;
+    padding: var(--space-12) var(--space-16);
+    background: var(--surface-glass);
+    backdrop-filter: blur(var(--glass-blur));
+    border-bottom: 1px solid var(--line-space-hairline);
+  }
+
+  /* The phone's header is two rows: the top bar (the chapter and the synthetic label) and the
+     strip (the saved state, live updates, the world's controls as glyph buttons and the
+     account menu, which also leads to the workspaces). The target is named in the world; a
+     failure still shows in the strip, on a row of its own if it must. */
+  .strip {
+    grid-column: 1;
+    padding: var(--space-8) var(--space-16);
+    min-height: 0;
+    gap: var(--space-8) var(--space-12);
+  }
+
+  .strip .strip-optional {
+    display: none;
+  }
+
+  .strip-end {
+    margin-left: 0;
+    gap: var(--space-8);
+  }
+
+  /* "Still while support is shown" moves to the top bar, beside the chapter, where it adds no
+     row; it wraps there if it must. */
+  .strip .world-still-status {
+    display: none;
+  }
+
+  .topbar .world-still-status {
+    min-width: 0;
+    line-height: 1.25;
+  }
+
+  .workarea {
+    grid-column: 1;
+  }
+
+  /* On a phone the world is the backdrop: the chapter is a sheet over it, edge to edge. */
+  .chapter {
+    margin: var(--space-12) 0 0;
+    padding: var(--space-24) var(--space-16);
+    border-width: 1px 0 0;
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  }
+
+  .chapter-place {
+    max-width: none;
+    margin-top: auto;
+  }
+
+  .app[data-drawer="open"] .chapter {
+    padding-bottom: calc(var(--sheet-peek) + var(--space-16));
+  }
+
+  /* Whatever is scrolled or tabbed into view stops above the open sheet, never under it
+     (WCAG 2.4.11), the You chapter's reply field included. */
+  html:has(.app[data-drawer="open"]) {
+    scroll-padding-bottom: calc(var(--sheet-peek) + var(--space-16));
+  }
+
+  /* The bottom sheet opens at a peek so the main task stays in view; "More" (or dragging the
+     handle up) raises it to most of the screen, leaving a band of the page visible above. */
+  .drawer {
+    top: auto;
+    left: 0;
+    width: auto;
+    height: var(--sheet-peek);
+    /* Tighter than the side sheet, so a route's figures fit in the peek (V-04). */
+    gap: var(--space-12);
+    padding: var(--space-12) var(--space-16) var(--space-24);
+    border-left: 0;
+    border-top: 1px solid var(--line-reading-hairline);
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    box-shadow: 0 -18px 40px -20px rgb(3 8 15 / 0.7);
+    transition: height var(--motion-panel) var(--ease-settle);
+    touch-action: pan-y;
+  }
+
+  .drawer[data-expanded="true"] {
+    height: calc(100dvh - 72px);
+  }
+
+  .sheet-handle {
+    display: block;
+    align-self: center;
+    width: 48px;
+    height: 20px;
+    margin: -4px auto 0;
+    border: 0;
+    background: transparent;
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .sheet-handle::before {
+    content: "";
+    display: block;
+    width: 40px;
+    height: 4px;
+    margin: 8px auto;
+    border-radius: 2px;
+    background: var(--line-reading-control);
+  }
+
+  .btn.sheet-toggle {
+    display: inline-flex;
+  }
+
+  .drawer-title {
+    font-size: var(--type-20);
+  }
+
+  .page-title,
+  .chapter-place .page-title {
+    font-size: var(--type-31);
+  }
+}
+
+.strip-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: 40px;
+  padding: 0 var(--space-8);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-on-space-muted);
+  cursor: pointer;
+}
+
+.strip-switch strong {
+  color: var(--text-on-space);
+  font-weight: 600;
+}
+
+.strip-switch:hover {
+  border-color: var(--line-space-control);
+}
+
+/* The world's controls: pause motion, calm mode and sound, each a switch with its words. */
+.world-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.world-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: 40px;
+  padding: 0 var(--space-8);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-on-space-muted);
+  font-size: var(--type-14);
+  cursor: pointer;
+}
+
+.world-toggle:hover:not([aria-disabled="true"]) {
+  border-color: var(--line-space-control);
+  color: var(--text-on-space);
+}
+
+.world-toggle[aria-pressed="true"] {
+  color: var(--text-on-space);
+}
+
+/* Disabled keeps readable words and says why to assistive tech; the switch shows it is set. */
+.world-toggle[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.world-switch {
+  position: relative;
+  width: 26px;
+  height: 14px;
+  flex: none;
+  border: 1.5px solid var(--line-space-control);
+  border-radius: 999px;
+}
+
+.world-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-on-space-muted);
+  transition: transform var(--motion-control) var(--ease-settle);
+}
+
+.world-toggle[aria-pressed="true"] .world-switch::after {
+  transform: translateX(12px);
+  background: var(--text-on-space);
+  border-color: var(--text-on-space);
+}
+
+.chapter-menu-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: 44px;
+  padding: 0 var(--space-12);
+  border: 1px solid var(--line-space-control);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-on-space);
+  font-weight: 600;
+}
+
+.chapter-menu-button .glyph {
+  width: 20px;
+  height: 20px;
+}
+
+/* A menu longer than the room below its button scrolls inside the window, so its last items
+   ("All workspaces" with many workspaces) are never out of reach. */
+.popover {
+  z-index: 30;
+  min-width: 240px;
+  max-height: var(--radix-popover-content-available-height);
+  overflow-y: auto;
+  padding: var(--space-8);
+  border: 1px solid var(--line-space-control);
+  border-radius: var(--radius-card);
+  background: var(--surface-space-raised);
+  color: var(--text-on-space);
+  box-shadow: var(--shadow-card-on-space);
+}
+
+.menu-chapter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  min-height: 44px;
+  padding: 0 var(--space-12);
+  border-radius: var(--radius-control);
+  color: var(--text-on-space-muted);
+  text-decoration: none;
+}
+
+.menu-chapter[aria-current="page"] {
+  color: var(--text-on-space);
+  font-weight: 600;
+}
+
+/* ---------- You: the origin's console, a glass panel beside the person's light (Sprint W,
+   SW.4; docs/design/compositions/world.css's .panel). One view at a time: the conversation,
+   what we know, the suggestions. A dashed edge means provisional only (a proposal not yet a
+   fact, a reply not yet checked, the early sketch). ---------- */
+
+@layer components {
+  /* Narrow enough to leave the person's light and its world in view beside it. */
+  .chapter-you {
+    max-width: 600px;
+    gap: var(--space-16);
+  }
+
+  /* The views, as tabs. The one you're in is marked in sea-glass: a selection. */
+  .you-views {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4) var(--space-8);
+    border-bottom: 1px solid var(--line-reading-hairline);
+  }
+
+  .you-tab {
+    min-height: 40px;
+    padding: 0 var(--space-8);
+    border: 0;
+    border-bottom: 3px solid transparent;
+    background: transparent;
+    color: var(--fg-muted);
+    font-size: var(--type-14);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .you-tab:hover {
+    color: var(--fg);
+  }
+
+  .you-tab[aria-selected="true"] {
+    color: var(--fg);
+    border-bottom-color: var(--selection);
+  }
+
+  .you-view {
+    display: grid;
+    gap: var(--space-24);
+    min-width: 0;
+  }
+
+  .thread {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-24);
+    min-width: 0;
+  }
+
+  /* What the last decision on Careerwright's proposals did, with Undo while it can apply. */
+  .save-notice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-8) var(--space-16);
+    padding: var(--space-12) var(--space-16);
+    background: var(--surface-card);
+    border: 1px solid var(--line-reading-hairline);
+    border-radius: var(--radius-control);
+  }
+
+  .save-notice h3 {
+    font-weight: 600;
+  }
+
+  .save-notice > p,
+  .save-notice > [role="alert"] {
+    flex-basis: 100%;
+  }
+
+  /* A limit's meaning in plain words, under its name. */
+  .fact-explained {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--type-14);
+  }
+
+  .thread-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-8) var(--space-16);
+    color: var(--fg-muted);
+    font-size: var(--type-14);
+  }
+
+  .turn-careerwright {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: var(--space-12);
+  }
+
+  .turn-careerwright > .glyph {
+    width: 24px;
+    height: 24px;
+    color: var(--fg-muted);
+    margin-top: 2px;
+  }
+
+  .turn-you {
+    align-self: flex-end;
+    max-width: 88%;
+    padding: var(--space-16) var(--space-24);
+    background: var(--surface-card);
+    border: 1px solid var(--line-reading-hairline);
+    border-radius: var(--radius-card) var(--radius-card) 4px var(--radius-card);
+    overflow-wrap: anywhere;
+  }
+
+  .turn-you .when {
+    display: block;
+    margin-top: var(--space-8);
+    font-size: var(--type-14);
+    color: var(--fg-muted);
+  }
+
+  .turn-you[data-processed="false"] {
+    border-color: var(--status-error);
+  }
+
+  .reply-provisional {
+    padding: var(--space-12) var(--space-16);
+    border: 1px dashed var(--line-reading-control);
+    border-radius: var(--radius-control);
+  }
+
+  .question {
+    padding-top: var(--space-16);
+    border-top: 1px solid var(--line-reading-hairline);
+  }
+
+  /* Leading the view, right under the tabs' own rule: no second rule. */
+  .thread > .sr-only:first-child + .question {
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .question .display {
+    font-size: var(--type-31);
+    max-width: 26ch;
+  }
+
+  .choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-8);
+    margin-top: var(--space-16);
+  }
+
+  /* The first question's type-ahead (Task 6d slice B): the field, then the titles as a list,
+     the one in focus edged in the selection colour, as a tab is (no new colour pairing). */
+  .title-field {
+    display: grid;
+    gap: var(--space-8);
+    margin-top: var(--space-16);
+  }
+
+  .title-options {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .title-option {
+    display: grid;
+    gap: 2px;
+    min-height: 44px;
+    padding: var(--space-8) var(--space-12);
+    border-left: 3px solid transparent;
+    color: var(--fg);
+    cursor: pointer;
+  }
+
+  .title-option:hover {
+    border-left-color: var(--line-control);
+  }
+
+  .title-option[aria-selected="true"] {
+    border-left-color: var(--selection);
+  }
+
+  .title-option .mark {
+    font-size: var(--type-14);
+    color: var(--fg-muted);
+  }
+
+  /* "Which of these is closest?": each ISCO-08 group ONS codes the title to, with its
+     occupations. */
+  .closest-group {
+    display: grid;
+    gap: var(--space-8);
+    margin-top: var(--space-16);
+  }
+
+  /* A demo question's one-tap replies: quiet, and wrapping rather than crowding. */
+  .example-replies {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-8);
+    min-width: 0;
+    margin-inline: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  /* The reply field sits in the console's flow, right under the question, never floating over
+     what is above it: in the narrow console a floating field covered the tray's Save and the
+     start's choices (axe target-size, Task W2C). */
+  .composer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: var(--space-8);
+    padding: var(--space-8);
+    background: var(--surface-card);
+    border: 1px solid var(--line-reading-control);
+    border-radius: var(--radius-card);
+  }
+
+  .composer textarea {
+    min-height: 44px;
+    padding: var(--space-8) var(--space-12);
+    border: 0;
+    resize: vertical;
+    background: transparent;
+    color: var(--text-on-reading);
+    font: inherit;
+  }
+
+  .composer textarea::placeholder {
+    color: var(--text-on-reading-muted);
+  }
+
+  .known {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-16);
+    min-width: 0;
+  }
+
+  .known-group {
+    display: grid;
+    gap: var(--space-8);
+  }
+
+  .known-group > h3 {
+    font-size: var(--type-14);
+    font-weight: 600;
+    color: var(--fg-muted);
+  }
+
+  .proposal {
+    display: grid;
+    gap: var(--space-8);
+    padding: var(--space-12) var(--space-16);
+    background: var(--surface-card);
+    border: 1px solid var(--line-reading-hairline);
+    border-radius: var(--radius-control);
+  }
+
+  /* An inference is drawn with a dashed edge: Careerwright's reading, not a fact until accepted.
+     A chosen proposal is marked by its Accept or Confirm alone, never also by a teal edge
+     (teal is selection among alternatives and the one primary action). */
+  .proposal[data-basis="inferred"] {
+    border-style: dashed;
+    border-color: var(--line-reading-control);
+  }
+
+  .proposal-kind {
+    font-size: var(--type-14);
+    color: var(--fg-muted);
+  }
+
+  .proposal-value {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .proposal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4) var(--space-8);
+  }
+
+  .proposal-actions .btn {
+    min-height: 32px;
+    padding: 0 var(--space-12);
+  }
+
+  .fact-list {
+    display: grid;
+    gap: 2px;
+    background: var(--line-reading-hairline);
+    border: 1px solid var(--line-reading-hairline);
+    border-radius: var(--radius-control);
+    overflow: hidden;
+  }
+
+  .fact {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+    gap: var(--space-4) var(--space-12);
+    padding: var(--space-8) var(--space-16);
+    background: var(--surface-card);
+    font-size: var(--type-14);
+  }
+
+  .fact dt {
+    color: var(--fg-muted);
+  }
+
+  .fact dd {
+    text-align: right;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .fact dd[data-open="true"] {
+    font-weight: 400;
+    color: var(--status-unknown);
+  }
+
+  .sketch {
+    display: grid;
+    gap: var(--space-12);
+    padding: var(--space-16);
+    border: 1px dashed var(--line-reading-control);
+    border-radius: var(--radius-card);
+    background: var(--surface-card);
+  }
+
+  .plain-list {
+    display: grid;
+    gap: var(--space-8);
+    padding-left: var(--space-24);
+    list-style: disc;
+    font-size: var(--type-14);
+  }
+
+  .suggestions {
+    display: grid;
+    gap: var(--space-16);
+  }
+
+  .suggestion {
+    display: grid;
+    gap: var(--space-12);
+  }
+
+  /* One suggestion open at a time; the rest a list of titles to scan. The open one is the
+     selected one, edged in sea-glass, and holds the view's one bright action. */
+  .suggestion[data-open="false"] {
+    gap: var(--space-4);
+    padding: var(--space-12) var(--space-24);
+  }
+
+  .suggestion[data-open="true"] {
+    border-color: var(--selection);
+    box-shadow: inset 4px 0 0 var(--selection);
+  }
+
+  /* A suggestion that is one of the person's targets, where the choice was. */
+  .target-saved {
+    padding: var(--space-12) var(--space-16);
+    border: 1px solid var(--line-reading-hairline);
+    border-radius: var(--radius-control);
+    background: var(--surface-card);
+  }
+
+  .suggestion h4 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: var(--type-25);
+  }
+
+  .suggestion[data-open="false"] h4 {
+    font-size: var(--type-20);
+  }
+
+  .suggestion-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-12);
+    width: 100%;
+    min-height: 40px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--fg);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .suggestion-toggle .glyph {
+    width: 20px;
+    height: 20px;
+    color: var(--fg-muted);
+  }
+
+  /* The written "Why this could suit you": model prose, then its checked quotations. */
+  .written-why {
+    display: grid;
+    gap: var(--space-12);
+    padding-left: var(--space-12);
+    border-left: 2px solid var(--line-reading-hairline);
+  }
+
+  .quotations {
+    display: grid;
+    gap: var(--space-4);
+    font-size: var(--type-14);
+    overflow-wrap: anywhere;
+  }
+
+  .quote-source {
+    font-weight: 600;
+  }
+
+  .segmented {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+  }
+
+  .segmented .btn[aria-pressed="true"] {
+    border-color: var(--selection-reading);
+    box-shadow: inset 0 -3px 0 var(--selection-reading);
+  }
+
+  .details summary {
+    cursor: pointer;
+    font-weight: 600;
+  }
+}
+
+/* Where the console leaves the world too narrow a span beside it (the rail's 96 px, its 32 px
+   margin, the console's 600 px and geometry.ts's MIN_CLEAR of 240 px: below 968 px), the
+   person's light stands in a band above the console in every view. The band takes no more room
+   than what the world shows here, the person's light and the targets' names (the audit's F7,
+   plan section 4: on a phone the decision comes first): geometry.ts's MIN_BAND and a margin. A
+   short console sits low, under more of the world; a long one starts below the band and scrolls
+   with the page. Too short a window to hold both (a phone turned sideways) keeps no band, and
+   the world stands behind the console (re-review N3). */
+@media (max-width: 967px) {
+  .workarea:has(> .chapter-you) {
+    padding-top: 144px;
+  }
+
+  .chapter-you {
+    margin-top: auto;
+  }
+}
+
+@media (max-width: 967px) and (max-height: 560px) {
+  .workarea:has(> .chapter-you) {
+    padding-top: 0;
+  }
+}
+
+/* On a phone the top bar already names the chapter "You", and in a window too short for a band
+   the rail does, so the console's own title is for assistive tech only: the world above it
+   keeps the room on a phone (D-I2), and a short window keeps the start's entry choice, under the
+   line that says what Careerwright is for, in the first screen (re-review N3). */
+@media (max-width: 760px), (max-width: 967px) and (max-height: 560px) {
+  .chapter-you > .page-title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 760px) {
+
+  /* One row while updates connect or reconnect (A-M1): the state's words take the room left and
+     end in an ellipsis rather than pushing the account menu to a second row; assistive tech
+     reads them all. A stopped state, whose reason the person must read (re-review N2), and a
+     failed refresh, both rarer, take a row of their own. */
+  .strip-updates {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .strip-updates > .status {
+    min-width: 0;
+  }
+
+  .strip-updates:not([data-state="stopped"]) > .status > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .strip-updates[data-state="stopped"],
+  .strip-refresh-failed {
+    flex-basis: 100%;
+  }
+
+  /* Under the saved state and the account menu, not between them. */
+  .strip-updates[data-state="stopped"] {
+    order: 1;
+  }
+
+  .question .display {
+    font-size: var(--type-25);
+  }
+
+  /* The slate's view controls on one row, scrolled sideways, so its first choice is in the
+     first screen (F7: on a phone the decision comes first). */
+  .segmented {
+    flex-wrap: nowrap;
+    min-width: 0;
+    overflow-x: auto;
+  }
+
+  .segmented .btn {
+    flex: none;
+  }
+
+  /* The suggestions' heading and the open suggestion's title take less height on a phone, so a
+     long title (two lines) still leaves its choice in the first screen (F7). */
+  .directions h2,
+  .suggestion h4 {
+    font-size: var(--type-20);
+  }
+
+  .turn-you {
+    max-width: 100%;
+  }
+
+  /* S0-V02 holds through the shell's rules: with the sheet open, the chapter keeps room under
+     its end and scrolling stops above the sheet's peek, so the reply field is never under it. */
+}
+
+/* V-08: above a phone the strip's states sit on their own row, so a longer state (a failed
+   refresh, reconnecting) never wraps the strip and moves the work below it. A tablet's strip
+   is then two rows (Task W2C): the synthetic label and the target, then the states and
+   controls; the workspace switcher, work area and budget wait for a wide screen (the account
+   menu names the workspace, and "What we know" holds the answers). */
+@media (min-width: 761px) {
+  .strip-end {
+    flex-basis: 100%;
+    justify-content: flex-end;
+    margin-left: 0;
+  }
+}
+
+/* Below a desktop's width the person's facts come first (the audit's F14): the strip keeps the
+   target, work area and budget whole, never cut. Each takes the width its words need, not an
+   equal share; one that doesn't fit beside the others moves to the next row whole, and only a
+   value wider than the whole row (three long targets) wraps, by words, under its label, which
+   stays on one line (design review I1). The world's controls move into the account menu,
+   beside calm mode, with their words and switches. */
+@media (max-width: 1179px) {
+  .strip .strip-wide,
+  .strip .world-controls {
+    display: none;
+  }
+
+  .strip .strip-target,
+  .strip .strip-fact {
+    flex: 0 1 auto;
+    min-width: 0;
+    align-items: baseline;
+    white-space: nowrap;
+  }
+
+  .strip .strip-target strong,
+  .strip .strip-fact strong {
+    min-width: 0;
+    white-space: normal;
+  }
+}
+
+@media (min-width: 1180px) {
+  .menu-world {
+    display: none;
+  }
+}
+
+/* Calm mode (spec section 14) does what prefers-reduced-motion does: spatial motion goes,
+   information stays. */
+:root[data-calm="true"] {
+  --motion-control: 0ms;
+  --motion-panel: 0ms;
+  --motion-graph-reveal: 0ms;
+}
+
+:root[data-calm="true"] *,
+:root[data-calm="true"] *::before,
+:root[data-calm="true"] *::after {
+  transition-duration: 0ms !important;
+  animation-duration: 0ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

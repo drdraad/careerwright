@@ -1,0 +1,4 @@
+# pnpm settings for the world spike (a single throwaway package, not part of the product).
+# Same rule as apps/web: every resolved version, direct or transitive, must be at least 14 days
+# old (20160 minutes), with no exception.
+minimumReleaseAge: 20160

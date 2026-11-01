@@ -1,0 +1,1831 @@
+{
+ "DSC-01": {
+  "ambiguous_titles": [],
+  "beyond_pool_limit": 0,
+  "connection": null,
+  "not_included": [
+   [
+    "a1813f68-5ca1-5bcb-974c-bad29e8295d3",
+    "less_relevant"
+   ],
+   [
+    "3559f490-eb6a-5a62-99f5-bba82873a514",
+    "less_relevant"
+   ],
+   [
+    "c9f63576-dcff-548d-9a70-e236a743a005",
+    "less_relevant"
+   ],
+   [
+    "1fc48d7d-101c-5c44-8594-83e5976971dc",
+    "less_relevant"
+   ],
+   [
+    "213b83d4-285b-5459-854d-153a8bc9e578",
+    "less_relevant"
+   ],
+   [
+    "8a38bc80-9b24-5c75-bbee-24bb7bd186ed",
+    "less_relevant"
+   ]
+  ],
+  "pool_size": 12,
+  "queries": [
+   [
+    "q1",
+    "repairing physical objects",
+    0,
+    0,
+    false
+   ],
+   [
+    "q2",
+    "working outdoors",
+    12,
+    12,
+    false
+   ],
+   [
+    "q4",
+    "small team",
+    0,
+    0,
+    false
+   ]
+  ],
+  "suggestions": [
+   [
+    "d14d028f-9242-5edf-b3f0-c7a5bd26aecf",
+    "leaflet distributor",
+    "less_familiar",
+    [
+     "q2"
+    ]
+   ],
+   [
+    "64bb680b-d5d7-533f-8ef7-9b7f9fbbc262",
+    "deep-sea fishery worker",
+    "less_familiar",
+    [
+     "q2"
+    ]
+   ],
+   [
+    "055a8092-5b7e-5b5c-bc56-6768bb9cf6c3",
+    "pesticides sprayer",
+    "less_familiar",
+    [
+     "q2"
+    ]
+   ],
+   [
+    "708908e5-82c7-5c3c-b919-2f402f23d554",
+    "fisheries observer",
+    "less_familiar",
+    [
+     "q2"
+    ]
+   ],
+   [
+    "3608c374-70a3-525a-870e-1c98c8319a5d",
+    "fruit and vegetable picker",
+    "less_familiar",
+    [
+     "q2"
+    ]
+   ],
+   [
+    "d7593e9e-a5bc-5dc2-a26d-30d166a2c8aa",
+    "offshore renewable energy plant operator",
+    "less_familiar",
+    [
+     "q2"
+    ]
+   ]
+  ],
+  "unmatched_titles": []
+ },
+ "DSC-02": {
+  "ambiguous_titles": [],
+  "beyond_pool_limit": 0,
+  "connection": null,
+  "not_included": [
+   [
+    "b9c13954-c70a-51f1-850c-7d0c895e65db",
+    "less_relevant"
+   ],
+   [
+    "fd8f185b-93df-562b-a862-57b62a09a779",
+    "less_relevant"
+   ],
+   [
+    "18a72f12-d819-5a52-b7a0-af997806d61f",
+    "family_limit"
+   ],
+   [
+    "c3927663-3877-536b-8e71-658ad68d1bac",
+    "family_limit"
+   ],
+   [
+    "5efe9a7e-e8d5-5a2e-aac3-d6b180d7739e",
+    "less_relevant"
+   ],
+   [
+    "c249f880-0a5f-586b-80ce-272bcf5f64c6",
+    "below_relevance_floor"
+   ],
+   [
+    "e76c6547-7470-53ff-88d3-b2571eaec11e",
+    "below_relevance_floor"
+   ],
+   [
+    "6e1fedc3-b0a8-535c-92cd-15fe1f7469f3",
+    "below_relevance_floor"
+   ],
+   [
+    "03133ea7-02d0-5e38-8da4-d599efb734d7",
+    "below_relevance_floor"
+   ],
+   [
+    "aa98ffff-3b25-5023-864b-2be3e26c5aa9",
+    "below_relevance_floor"
+   ],
+   [
+    "cb1b97c2-96f7-58ac-86df-e82e4cbc0135",
+    "below_relevance_floor"
+   ],
+   [
+    "b80e6ace-d443-52a4-bf18-7a09c52f453c",
+    "below_relevance_floor"
+   ],
+   [
+    "93d08819-bfa0-5157-a375-dc117100932a",
+    "below_relevance_floor"
+   ]
+  ],
+  "pool_size": 19,
+  "queries": [
+   [
+    "q1",
+    "Data quality specialist",
+    18,
+    18,
+    false
+   ],
+   [
+    "t1",
+    "Data quality specialist",
+    1,
+    1,
+    false
+   ]
+  ],
+  "suggestions": [
+   [
+    "8a8272c7-bec5-5ace-bef5-e6b86d2c755f",
+    "data quality specialist",
+    "close_to_current",
+    [
+     "t1"
+    ]
+   ],
+   [
+    "79090504-686b-5fe6-a8e2-f52e8758d0df",
+    "data entry clerk",
+    "transferable",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "39f133cd-436c-5cc4-bfc3-6cbf5a12ced0",
+    "big data archive librarian",
+    "transferable",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "14a72342-a54e-5abd-93c9-e73a8f0182f7",
+    "data analyst",
+    "close_to_current",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "d1627430-75df-56e6-9e6a-6eff215d1a84",
+    "database designer",
+    "transferable",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "b353fa57-ef21-5219-8aa7-3ddf7e629bb7",
+    "chief data officer",
+    "transferable",
+    [
+     "q1"
+    ]
+   ]
+  ],
+  "unmatched_titles": []
+ },
+ "DSC-03": {
+  "ambiguous_titles": [],
+  "beyond_pool_limit": 70,
+  "connection": "fa6907fd-057b-5698-9593-7b9930b34d1e",
+  "not_included": [
+   [
+    "cd85237c-9b5e-5e4c-8c08-4629119abc5d",
+    "less_relevant"
+   ],
+   [
+    "2c66eb2b-8d47-5845-9571-0520f7d38961",
+    "family_limit"
+   ],
+   [
+    "ce3af88e-eafc-51dc-9099-ee9d22628e5e",
+    "less_relevant"
+   ],
+   [
+    "1dd2843b-be25-52c4-8cbd-2891d754b3bc",
+    "less_relevant"
+   ],
+   [
+    "cfaf8063-f06a-548d-ad34-32e08e93d23b",
+    "less_relevant"
+   ],
+   [
+    "bd2d3574-c3eb-526b-9e18-f001411748e9",
+    "family_limit"
+   ],
+   [
+    "3b550886-efb1-511e-9a2b-cce99c9be2a0",
+    "less_relevant"
+   ],
+   [
+    "4a3953d1-4be1-5666-ac63-919629187272",
+    "less_relevant"
+   ],
+   [
+    "3052434c-2817-5006-9db6-c27bb2826db0",
+    "less_relevant"
+   ],
+   [
+    "1c44a1da-9827-52fc-ab15-55663eadc40a",
+    "less_relevant"
+   ],
+   [
+    "4fc9a7e4-0eca-5e8e-a73b-f86e48825787",
+    "less_relevant"
+   ],
+   [
+    "5b46f6d3-eccd-5395-98e5-de95192157e0",
+    "less_relevant"
+   ],
+   [
+    "8d6e68bd-89f5-551c-b55d-83a9537f89ed",
+    "less_relevant"
+   ],
+   [
+    "4d389387-ec77-54e5-876e-3ca877cab6f2",
+    "family_limit"
+   ],
+   [
+    "baa58aed-1dfe-5d0b-b7fe-6121ee91824f",
+    "less_relevant"
+   ],
+   [
+    "ef882a40-851e-5d47-a1ae-b50058cb8960",
+    "less_relevant"
+   ],
+   [
+    "c8988ef0-6e06-52cb-bcc7-5640da82d59b",
+    "less_relevant"
+   ],
+   [
+    "92e93e47-4a84-5856-8f85-ecf05790725b",
+    "less_relevant"
+   ],
+   [
+    "e4fa0f39-45c5-561d-abad-7e0f0c470ce3",
+    "less_relevant"
+   ],
+   [
+    "b922ff1f-c3b9-5728-9e2a-f4fca2da1605",
+    "less_relevant"
+   ],
+   [
+    "359544a0-0d87-5aa8-a11b-88b7a8240b7b",
+    "less_relevant"
+   ],
+   [
+    "dd567837-68aa-5f32-b928-e2fb1cca6f6e",
+    "less_relevant"
+   ],
+   [
+    "21ce3be0-370c-52d4-b53e-d7f401c18b4a",
+    "less_relevant"
+   ],
+   [
+    "0d7f1981-fc97-5974-93f1-d10a10d01d24",
+    "less_relevant"
+   ],
+   [
+    "8d3219cf-ea57-520b-a456-deecb9300afe",
+    "less_relevant"
+   ],
+   [
+    "53432705-62af-59d5-af28-e561306eeeb7",
+    "less_relevant"
+   ],
+   [
+    "8419484e-300c-5e3f-b580-5d9e267155a2",
+    "less_relevant"
+   ],
+   [
+    "333e428f-222b-51fe-ba3e-888fa09eea61",
+    "less_relevant"
+   ],
+   [
+    "03eb17b3-6f9c-5183-a316-1057b7a05f05",
+    "less_relevant"
+   ],
+   [
+    "bd91bee9-dc55-5f61-9a55-1fb90211e928",
+    "less_relevant"
+   ],
+   [
+    "daed9a70-285d-5353-894f-413d039dfb39",
+    "less_relevant"
+   ],
+   [
+    "9a942b1b-2a64-5147-826d-59931f073967",
+    "less_relevant"
+   ],
+   [
+    "50fe576b-5a0b-5429-9d63-ba17da0e9c2a",
+    "less_relevant"
+   ],
+   [
+    "474a6ccd-bc93-5ac2-b350-c540de7a0ee5",
+    "less_relevant"
+   ],
+   [
+    "f6d6724c-4f4e-59b1-b2ee-490449518b6f",
+    "less_relevant"
+   ],
+   [
+    "977dcf91-c3ed-51be-a535-7c665f9e55e0",
+    "less_relevant"
+   ],
+   [
+    "bd48d290-bf53-5236-a53a-ed519a06c668",
+    "less_relevant"
+   ],
+   [
+    "fce5a1a1-16e7-5b3b-8564-7aa081b39203",
+    "less_relevant"
+   ],
+   [
+    "833e1d81-22de-53d5-b539-cac90975528d",
+    "less_relevant"
+   ],
+   [
+    "44f0efb2-7cc0-5e54-84b4-89fdfb27eb5b",
+    "less_relevant"
+   ],
+   [
+    "0cd837e0-8971-5ada-ad67-52e6fd273cfd",
+    "less_relevant"
+   ],
+   [
+    "3818fffd-045c-5a0a-8938-ff93953d9d91",
+    "less_relevant"
+   ]
+  ],
+  "pool_size": 48,
+  "queries": [
+   [
+    "q1",
+    "warehouse supervisor",
+    47,
+    117,
+    false
+   ],
+   [
+    "q2",
+    "training new starters",
+    0,
+    0,
+    false
+   ],
+   [
+    "q3",
+    "planning shift rotas",
+    0,
+    0,
+    false
+   ],
+   [
+    "r1",
+    "warehouse supervisor",
+    1,
+    1,
+    false
+   ],
+   [
+    "j1",
+    "warehouse supervisor",
+    47,
+    117,
+    false
+   ]
+  ],
+  "suggestions": [
+   [
+    "215da237-1f37-5143-abae-d4012d55ce0e",
+    "logistics and distribution manager",
+    "close_to_current",
+    [
+     "q1",
+     "j1"
+    ]
+   ],
+   [
+    "fa6907fd-057b-5698-9593-7b9930b34d1e",
+    "warehouse operators for clothing",
+    "transferable",
+    [
+     "q1",
+     "j1"
+    ]
+   ],
+   [
+    "b92ef37a-967d-59d6-8ad2-f4b4fe0fad85",
+    "warehouse order picker",
+    "transferable",
+    [
+     "q1",
+     "j1"
+    ]
+   ],
+   [
+    "ca6b778e-2363-593e-9a8e-53587d73932a",
+    "office manager",
+    "transferable",
+    [
+     "q1",
+     "j1"
+    ]
+   ],
+   [
+    "534f2e55-e435-5fff-8c60-4d87431f75e0",
+    "packaging production manager",
+    "transferable",
+    [
+     "q1",
+     "j1"
+    ]
+   ],
+   [
+    "7daeec21-fba6-55f7-817e-727b61420938",
+    "warehouse manager",
+    "close_to_current",
+    [
+     "r1"
+    ]
+   ]
+  ],
+  "unmatched_titles": []
+ },
+ "DSC-04": {
+  "ambiguous_titles": [],
+  "beyond_pool_limit": 0,
+  "connection": null,
+  "not_included": [
+   [
+    "a1813f68-5ca1-5bcb-974c-bad29e8295d3",
+    "less_relevant"
+   ],
+   [
+    "3559f490-eb6a-5a62-99f5-bba82873a514",
+    "less_relevant"
+   ],
+   [
+    "c9f63576-dcff-548d-9a70-e236a743a005",
+    "less_relevant"
+   ],
+   [
+    "1fc48d7d-101c-5c44-8594-83e5976971dc",
+    "less_relevant"
+   ],
+   [
+    "213b83d4-285b-5459-854d-153a8bc9e578",
+    "less_relevant"
+   ],
+   [
+    "8a38bc80-9b24-5c75-bbee-24bb7bd186ed",
+    "less_relevant"
+   ]
+  ],
+  "pool_size": 12,
+  "queries": [
+   [
+    "q1",
+    "repairing physical objects",
+    0,
+    0,
+    false
+   ],
+   [
+    "q2",
+    "working outdoors",
+    12,
+    12,
+    false
+   ]
+  ],
+  "suggestions": [
+   [
+    "d14d028f-9242-5edf-b3f0-c7a5bd26aecf",
+    "leaflet distributor",
+    "less_familiar",
+    [
+     "q2"
+    ]
+   ],
+   [
+    "64bb680b-d5d7-533f-8ef7-9b7f9fbbc262",
+    "deep-sea fishery worker",
+    "less_familiar",
+    [
+     "q2"
+    ]
+   ],
+   [
+    "055a8092-5b7e-5b5c-bc56-6768bb9cf6c3",
+    "pesticides sprayer",
+    "less_familiar",
+    [
+     "q2"
+    ]
+   ],
+   [
+    "708908e5-82c7-5c3c-b919-2f402f23d554",
+    "fisheries observer",
+    "less_familiar",
+    [
+     "q2"
+    ]
+   ],
+   [
+    "3608c374-70a3-525a-870e-1c98c8319a5d",
+    "fruit and vegetable picker",
+    "less_familiar",
+    [
+     "q2"
+    ]
+   ],
+   [
+    "d7593e9e-a5bc-5dc2-a26d-30d166a2c8aa",
+    "offshore renewable energy plant operator",
+    "less_familiar",
+    [
+     "q2"
+    ]
+   ]
+  ],
+  "unmatched_titles": []
+ },
+ "DSC-05": {
+  "ambiguous_titles": [],
+  "beyond_pool_limit": 0,
+  "connection": null,
+  "not_included": [
+   [
+    "a1813f68-5ca1-5bcb-974c-bad29e8295d3",
+    "less_relevant"
+   ],
+   [
+    "3559f490-eb6a-5a62-99f5-bba82873a514",
+    "less_relevant"
+   ],
+   [
+    "c9f63576-dcff-548d-9a70-e236a743a005",
+    "less_relevant"
+   ],
+   [
+    "1fc48d7d-101c-5c44-8594-83e5976971dc",
+    "less_relevant"
+   ],
+   [
+    "213b83d4-285b-5459-854d-153a8bc9e578",
+    "less_relevant"
+   ],
+   [
+    "8a38bc80-9b24-5c75-bbee-24bb7bd186ed",
+    "less_relevant"
+   ]
+  ],
+  "pool_size": 12,
+  "queries": [
+   [
+    "q1",
+    "repairing physical objects",
+    0,
+    0,
+    false
+   ],
+   [
+    "q2",
+    "working outdoors",
+    12,
+    12,
+    false
+   ]
+  ],
+  "suggestions": [
+   [
+    "d14d028f-9242-5edf-b3f0-c7a5bd26aecf",
+    "leaflet distributor",
+    "less_familiar",
+    [
+     "q2"
+    ]
+   ],
+   [
+    "64bb680b-d5d7-533f-8ef7-9b7f9fbbc262",
+    "deep-sea fishery worker",
+    "less_familiar",
+    [
+     "q2"
+    ]
+   ],
+   [
+    "055a8092-5b7e-5b5c-bc56-6768bb9cf6c3",
+    "pesticides sprayer",
+    "less_familiar",
+    [
+     "q2"
+    ]
+   ],
+   [
+    "708908e5-82c7-5c3c-b919-2f402f23d554",
+    "fisheries observer",
+    "less_familiar",
+    [
+     "q2"
+    ]
+   ],
+   [
+    "3608c374-70a3-525a-870e-1c98c8319a5d",
+    "fruit and vegetable picker",
+    "less_familiar",
+    [
+     "q2"
+    ]
+   ],
+   [
+    "d7593e9e-a5bc-5dc2-a26d-30d166a2c8aa",
+    "offshore renewable energy plant operator",
+    "less_familiar",
+    [
+     "q2"
+    ]
+   ]
+  ],
+  "unmatched_titles": []
+ },
+ "DSC-06": {
+  "ambiguous_titles": [],
+  "beyond_pool_limit": 0,
+  "connection": null,
+  "not_included": [],
+  "pool_size": 0,
+  "queries": [
+   [
+    "q1",
+    "origami",
+    0,
+    0,
+    false
+   ]
+  ],
+  "suggestions": [],
+  "unmatched_titles": []
+ },
+ "DSC-07": {
+  "ambiguous_titles": [],
+  "beyond_pool_limit": 0,
+  "connection": null,
+  "not_included": [
+   [
+    "3700776c-bb16-5ae9-b545-45eb6b3dd301",
+    "family_limit"
+   ],
+   [
+    "fbc748fe-c24c-5852-b1df-bb0b0453a2e6",
+    "family_limit"
+   ],
+   [
+    "bd752672-81bc-5ddc-a533-2a0852ea4796",
+    "family_limit"
+   ],
+   [
+    "108d5be3-96ef-5d06-91b8-1ffad868e5c5",
+    "family_limit"
+   ],
+   [
+    "1a0673fa-671f-53a5-874b-24034646b2fa",
+    "family_limit"
+   ],
+   [
+    "9ee3318e-98e2-5ad7-9159-8874089d16dd",
+    "family_limit"
+   ],
+   [
+    "8c1171f9-a83e-5539-ab88-97868fa80e50",
+    "family_limit"
+   ],
+   [
+    "170833c1-f5e4-518c-8922-d9750577da57",
+    "family_limit"
+   ]
+  ],
+  "pool_size": 13,
+  "queries": [
+   [
+    "q1",
+    "caring for animals",
+    13,
+    13,
+    false
+   ],
+   [
+    "q2",
+    "quiet concentration",
+    0,
+    0,
+    false
+   ]
+  ],
+  "suggestions": [
+   [
+    "0d643b05-b713-54f5-90dd-9b5e0cffaee6",
+    "animal shelter worker",
+    "less_familiar",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "8457868a-b1bc-54d8-9e7f-05389d70c12a",
+    "veterinary nurse",
+    "less_familiar",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "0186638a-c8d5-5456-8ca4-ab5882b40bfc",
+    "poultry breeder",
+    "less_familiar",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "faf0ed9f-759a-511a-ae09-dd72608a5cf4",
+    "kennel supervisor",
+    "less_familiar",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "5667cd91-7542-531c-ade6-8c61192b8b53",
+    "bee breeder",
+    "less_familiar",
+    [
+     "q1"
+    ]
+   ]
+  ],
+  "unmatched_titles": []
+ },
+ "DSC-08": {
+  "ambiguous_titles": [],
+  "beyond_pool_limit": 0,
+  "connection": null,
+  "not_included": [
+   [
+    "3700776c-bb16-5ae9-b545-45eb6b3dd301",
+    "family_limit"
+   ],
+   [
+    "fbc748fe-c24c-5852-b1df-bb0b0453a2e6",
+    "family_limit"
+   ],
+   [
+    "bd752672-81bc-5ddc-a533-2a0852ea4796",
+    "family_limit"
+   ],
+   [
+    "108d5be3-96ef-5d06-91b8-1ffad868e5c5",
+    "family_limit"
+   ],
+   [
+    "1a0673fa-671f-53a5-874b-24034646b2fa",
+    "family_limit"
+   ],
+   [
+    "9ee3318e-98e2-5ad7-9159-8874089d16dd",
+    "family_limit"
+   ],
+   [
+    "8c1171f9-a83e-5539-ab88-97868fa80e50",
+    "family_limit"
+   ],
+   [
+    "170833c1-f5e4-518c-8922-d9750577da57",
+    "family_limit"
+   ]
+  ],
+  "pool_size": 13,
+  "queries": [
+   [
+    "q1",
+    "caring for animals",
+    13,
+    13,
+    false
+   ]
+  ],
+  "suggestions": [
+   [
+    "0d643b05-b713-54f5-90dd-9b5e0cffaee6",
+    "animal shelter worker",
+    "less_familiar",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "8457868a-b1bc-54d8-9e7f-05389d70c12a",
+    "veterinary nurse",
+    "less_familiar",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "0186638a-c8d5-5456-8ca4-ab5882b40bfc",
+    "poultry breeder",
+    "less_familiar",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "faf0ed9f-759a-511a-ae09-dd72608a5cf4",
+    "kennel supervisor",
+    "less_familiar",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "5667cd91-7542-531c-ade6-8c61192b8b53",
+    "bee breeder",
+    "less_familiar",
+    [
+     "q1"
+    ]
+   ]
+  ],
+  "unmatched_titles": []
+ },
+ "DSC-09": {
+  "ambiguous_titles": [],
+  "beyond_pool_limit": 0,
+  "connection": null,
+  "not_included": [],
+  "pool_size": 1,
+  "queries": [
+   [
+    "q1",
+    "repairing bicycles",
+    1,
+    1,
+    false
+   ]
+  ],
+  "suggestions": [
+   [
+    "a671deff-32e2-5940-bf89-388ed8b55b74",
+    "bicycle mechanic",
+    "less_familiar",
+    [
+     "q1"
+    ]
+   ]
+  ],
+  "unmatched_titles": []
+ },
+ "DSC-10": {
+  "ambiguous_titles": [],
+  "beyond_pool_limit": 17,
+  "connection": "b353fa57-ef21-5219-8aa7-3ddf7e629bb7",
+  "not_included": [
+   [
+    "14a72342-a54e-5abd-93c9-e73a8f0182f7",
+    "family_limit"
+   ],
+   [
+    "cb1b97c2-96f7-58ac-86df-e82e4cbc0135",
+    "family_limit"
+   ],
+   [
+    "c3927663-3877-536b-8e71-658ad68d1bac",
+    "family_limit"
+   ],
+   [
+    "3c906428-0fdf-55d9-b1f1-3e31661b8c7c",
+    "less_relevant"
+   ],
+   [
+    "c249f880-0a5f-586b-80ce-272bcf5f64c6",
+    "family_limit"
+   ],
+   [
+    "fd8f185b-93df-562b-a862-57b62a09a779",
+    "less_relevant"
+   ],
+   [
+    "93d08819-bfa0-5157-a375-dc117100932a",
+    "less_relevant"
+   ],
+   [
+    "5efe9a7e-e8d5-5a2e-aac3-d6b180d7739e",
+    "less_relevant"
+   ],
+   [
+    "c096106d-20df-56d6-8b0f-972ddef438b5",
+    "below_relevance_floor"
+   ],
+   [
+    "31c4f637-096c-52c1-94cb-f5bfc027328b",
+    "below_relevance_floor"
+   ],
+   [
+    "b80e6ace-d443-52a4-bf18-7a09c52f453c",
+    "below_relevance_floor"
+   ],
+   [
+    "6e1fedc3-b0a8-535c-92cd-15fe1f7469f3",
+    "below_relevance_floor"
+   ],
+   [
+    "86c8f5b4-315d-5830-a5f8-38e81aaa0cab",
+    "below_relevance_floor"
+   ],
+   [
+    "53624419-f9f1-5d7f-9fdc-a6c0d0d992fe",
+    "below_relevance_floor"
+   ],
+   [
+    "03133ea7-02d0-5e38-8da4-d599efb734d7",
+    "below_relevance_floor"
+   ],
+   [
+    "5cabe07f-9bef-553a-9846-1119f29e1589",
+    "below_relevance_floor"
+   ],
+   [
+    "b9c13954-c70a-51f1-850c-7d0c895e65db",
+    "below_relevance_floor"
+   ],
+   [
+    "4001ae70-7a3b-5f98-b994-d41d89948ad6",
+    "below_relevance_floor"
+   ],
+   [
+    "fd032408-d6cf-5a89-913b-1f9b35a5cd4f",
+    "below_relevance_floor"
+   ],
+   [
+    "9318da77-81d2-51d2-9067-a6b217c282af",
+    "below_relevance_floor"
+   ],
+   [
+    "12ebde4d-02bd-53fb-a50a-d871ab08f59c",
+    "below_relevance_floor"
+   ],
+   [
+    "e8128f18-2116-5c83-8817-b4c130e37cba",
+    "below_relevance_floor"
+   ],
+   [
+    "e0271fa1-cbc6-5335-9a4e-53b203320ac4",
+    "below_relevance_floor"
+   ],
+   [
+    "62af651b-3e00-5c6a-97b8-cf170c99d7f5",
+    "below_relevance_floor"
+   ],
+   [
+    "37907adc-613f-514c-aa4f-8fb3b8aa378b",
+    "below_relevance_floor"
+   ]
+  ],
+  "pool_size": 31,
+  "queries": [
+   [
+    "q1",
+    "data analyst",
+    30,
+    47,
+    false
+   ],
+   [
+    "r1",
+    "data analyst",
+    1,
+    1,
+    false
+   ],
+   [
+    "j1",
+    "data analyst",
+    30,
+    47,
+    false
+   ]
+  ],
+  "suggestions": [
+   [
+    "18a72f12-d819-5a52-b7a0-af997806d61f",
+    "data scientist",
+    "close_to_current",
+    [
+     "q1",
+     "j1"
+    ]
+   ],
+   [
+    "b353fa57-ef21-5219-8aa7-3ddf7e629bb7",
+    "chief data officer",
+    "transferable",
+    [
+     "q1",
+     "j1"
+    ]
+   ],
+   [
+    "39f133cd-436c-5cc4-bfc3-6cbf5a12ced0",
+    "big data archive librarian",
+    "transferable",
+    [
+     "q1",
+     "j1"
+    ]
+   ],
+   [
+    "8a8272c7-bec5-5ace-bef5-e6b86d2c755f",
+    "data quality specialist",
+    "close_to_current",
+    [
+     "q1",
+     "j1"
+    ]
+   ],
+   [
+    "79090504-686b-5fe6-a8e2-f52e8758d0df",
+    "data entry clerk",
+    "transferable",
+    [
+     "q1",
+     "j1"
+    ]
+   ],
+   [
+    "aa98ffff-3b25-5023-864b-2be3e26c5aa9",
+    "knowledge engineer",
+    "transferable",
+    [
+     "q1",
+     "j1"
+    ]
+   ]
+  ],
+  "unmatched_titles": []
+ },
+ "DSC-11": {
+  "ambiguous_titles": [],
+  "beyond_pool_limit": 0,
+  "connection": null,
+  "not_included": [],
+  "pool_size": 0,
+  "queries": [
+   [
+    "t1",
+    "Registered nurse",
+    0,
+    0,
+    false
+   ]
+  ],
+  "suggestions": [],
+  "unmatched_titles": [
+   "Registered nurse"
+  ]
+ },
+ "DSC-12": {
+  "ambiguous_titles": [],
+  "beyond_pool_limit": 0,
+  "connection": null,
+  "not_included": [],
+  "pool_size": 0,
+  "queries": [
+   [
+    "q2",
+    "finding inconsistencies",
+    0,
+    0,
+    false
+   ],
+   [
+    "q3",
+    "explaining evidence",
+    0,
+    0,
+    false
+   ],
+   [
+    "t1",
+    "Data quality analyst",
+    0,
+    0,
+    false
+   ]
+  ],
+  "suggestions": [],
+  "unmatched_titles": [
+   "Data quality analyst"
+  ]
+ },
+ "DSC-13": {
+  "ambiguous_titles": [],
+  "beyond_pool_limit": 79,
+  "connection": null,
+  "not_included": [
+   [
+    "9673701d-725d-5022-8731-c3bf44a8f55c",
+    "less_relevant"
+   ],
+   [
+    "bd4aba98-2b25-5351-9a4d-850a1ee4be39",
+    "less_relevant"
+   ],
+   [
+    "d3b85ee5-aa31-5704-aa6d-126c071838b8",
+    "less_relevant"
+   ],
+   [
+    "ec8cca4f-49f4-5aab-9abc-5f991d8655b5",
+    "less_relevant"
+   ],
+   [
+    "41b3e1e2-5acc-5479-8afa-2e0e562a4712",
+    "less_relevant"
+   ],
+   [
+    "7ba66eeb-6943-54f8-8e1a-488a8158046d",
+    "less_relevant"
+   ],
+   [
+    "b4bdcd3e-bfd6-5903-8fbc-2b232fb439dd",
+    "less_relevant"
+   ],
+   [
+    "832afd76-e291-5e24-8c0a-100444b493b4",
+    "less_relevant"
+   ],
+   [
+    "00823d40-3a93-581d-925d-06c7c878a5ab",
+    "less_relevant"
+   ],
+   [
+    "3e27082e-b19d-5988-9a5d-3f385fcade80",
+    "less_relevant"
+   ],
+   [
+    "302da8de-e680-5092-bb24-9e6f9acf0bf7",
+    "less_relevant"
+   ],
+   [
+    "135c28e2-a3df-56c9-86eb-0071f1a0eb3e",
+    "less_relevant"
+   ],
+   [
+    "a18ecce1-fde4-517b-8a70-28d957c5e6d4",
+    "less_relevant"
+   ],
+   [
+    "0845cfa1-032e-50c7-bae2-ccee7fd4a58c",
+    "less_relevant"
+   ],
+   [
+    "99fb745c-f07e-5101-bcd1-d630390c5eeb",
+    "less_relevant"
+   ],
+   [
+    "11b7c7fd-7ae3-573d-84dc-2b79b2db8761",
+    "less_relevant"
+   ],
+   [
+    "ca9b3ecd-f5f2-5f6e-bfac-37b85d1403e5",
+    "less_relevant"
+   ],
+   [
+    "f1fb1403-ca1c-5684-b17f-5bef87132ebd",
+    "less_relevant"
+   ],
+   [
+    "066a9c37-dfcd-5d18-948e-0bdd2eb55942",
+    "less_relevant"
+   ],
+   [
+    "58b1e1fb-a7b4-517a-8e5f-917b0ea7eaea",
+    "less_relevant"
+   ],
+   [
+    "fe7a8838-77b1-53b1-8cda-4ad6548e7a87",
+    "less_relevant"
+   ],
+   [
+    "71bec4e2-7b9e-5b74-9801-b303d163a219",
+    "less_relevant"
+   ],
+   [
+    "f25c63f3-795e-59aa-830b-4b389b5d8eef",
+    "less_relevant"
+   ],
+   [
+    "e59147d5-9ddd-54f7-ad5f-2a4756d24b91",
+    "less_relevant"
+   ],
+   [
+    "e245fb99-8a42-534e-9d94-bc8874db9f6b",
+    "less_relevant"
+   ]
+  ],
+  "pool_size": 31,
+  "queries": [
+   [
+    "q1",
+    "IT support technician",
+    30,
+    109,
+    false
+   ],
+   [
+    "t1",
+    "IT support technician",
+    1,
+    1,
+    false
+   ]
+  ],
+  "suggestions": [
+   [
+    "89664727-f652-556f-9087-c9759ed989de",
+    "ICT help desk agent",
+    "close_to_current",
+    [
+     "t1"
+    ]
+   ],
+   [
+    "4f0557a9-662d-57ef-b326-a198dd9a1bc5",
+    "after-sales service technician",
+    "transferable",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "4da38326-6cd8-5cc2-83b8-26c22223419c",
+    "call centre agent",
+    "transferable",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "26b37058-43b3-52b7-91e7-c36b2d8ee193",
+    "ICT help desk manager",
+    "close_to_current",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "15fca907-b1c6-5578-9a5e-a825dae49101",
+    "customer service representative",
+    "transferable",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "44988e2d-e87b-51ca-89ab-dd31643ece18",
+    "specialised seller",
+    "transferable",
+    [
+     "q1"
+    ]
+   ]
+  ],
+  "unmatched_titles": []
+ },
+ "DSC-14": {
+  "ambiguous_titles": [],
+  "beyond_pool_limit": 0,
+  "connection": null,
+  "not_included": [],
+  "pool_size": 0,
+  "queries": [
+   [
+    "t1",
+    "Bookkeeping assistant",
+    0,
+    0,
+    false
+   ]
+  ],
+  "suggestions": [],
+  "unmatched_titles": [
+   "Bookkeeping assistant"
+  ]
+ },
+ "DSC-15": {
+  "ambiguous_titles": [],
+  "beyond_pool_limit": 17,
+  "connection": "b353fa57-ef21-5219-8aa7-3ddf7e629bb7",
+  "not_included": [
+   [
+    "14a72342-a54e-5abd-93c9-e73a8f0182f7",
+    "family_limit"
+   ],
+   [
+    "cb1b97c2-96f7-58ac-86df-e82e4cbc0135",
+    "family_limit"
+   ],
+   [
+    "c3927663-3877-536b-8e71-658ad68d1bac",
+    "family_limit"
+   ],
+   [
+    "3c906428-0fdf-55d9-b1f1-3e31661b8c7c",
+    "less_relevant"
+   ],
+   [
+    "c249f880-0a5f-586b-80ce-272bcf5f64c6",
+    "family_limit"
+   ],
+   [
+    "fd8f185b-93df-562b-a862-57b62a09a779",
+    "less_relevant"
+   ],
+   [
+    "93d08819-bfa0-5157-a375-dc117100932a",
+    "less_relevant"
+   ],
+   [
+    "5efe9a7e-e8d5-5a2e-aac3-d6b180d7739e",
+    "less_relevant"
+   ],
+   [
+    "c096106d-20df-56d6-8b0f-972ddef438b5",
+    "below_relevance_floor"
+   ],
+   [
+    "31c4f637-096c-52c1-94cb-f5bfc027328b",
+    "below_relevance_floor"
+   ],
+   [
+    "b80e6ace-d443-52a4-bf18-7a09c52f453c",
+    "below_relevance_floor"
+   ],
+   [
+    "6e1fedc3-b0a8-535c-92cd-15fe1f7469f3",
+    "below_relevance_floor"
+   ],
+   [
+    "86c8f5b4-315d-5830-a5f8-38e81aaa0cab",
+    "below_relevance_floor"
+   ],
+   [
+    "53624419-f9f1-5d7f-9fdc-a6c0d0d992fe",
+    "below_relevance_floor"
+   ],
+   [
+    "03133ea7-02d0-5e38-8da4-d599efb734d7",
+    "below_relevance_floor"
+   ],
+   [
+    "5cabe07f-9bef-553a-9846-1119f29e1589",
+    "below_relevance_floor"
+   ],
+   [
+    "b9c13954-c70a-51f1-850c-7d0c895e65db",
+    "below_relevance_floor"
+   ],
+   [
+    "4001ae70-7a3b-5f98-b994-d41d89948ad6",
+    "below_relevance_floor"
+   ],
+   [
+    "fd032408-d6cf-5a89-913b-1f9b35a5cd4f",
+    "below_relevance_floor"
+   ],
+   [
+    "9318da77-81d2-51d2-9067-a6b217c282af",
+    "below_relevance_floor"
+   ],
+   [
+    "12ebde4d-02bd-53fb-a50a-d871ab08f59c",
+    "below_relevance_floor"
+   ],
+   [
+    "e8128f18-2116-5c83-8817-b4c130e37cba",
+    "below_relevance_floor"
+   ],
+   [
+    "e0271fa1-cbc6-5335-9a4e-53b203320ac4",
+    "below_relevance_floor"
+   ],
+   [
+    "62af651b-3e00-5c6a-97b8-cf170c99d7f5",
+    "below_relevance_floor"
+   ],
+   [
+    "37907adc-613f-514c-aa4f-8fb3b8aa378b",
+    "below_relevance_floor"
+   ]
+  ],
+  "pool_size": 31,
+  "queries": [
+   [
+    "q1",
+    "data analyst",
+    30,
+    47,
+    false
+   ],
+   [
+    "r1",
+    "data analyst",
+    1,
+    1,
+    false
+   ],
+   [
+    "j1",
+    "data analyst",
+    30,
+    47,
+    false
+   ]
+  ],
+  "suggestions": [
+   [
+    "18a72f12-d819-5a52-b7a0-af997806d61f",
+    "data scientist",
+    "close_to_current",
+    [
+     "q1",
+     "j1"
+    ]
+   ],
+   [
+    "b353fa57-ef21-5219-8aa7-3ddf7e629bb7",
+    "chief data officer",
+    "transferable",
+    [
+     "q1",
+     "j1"
+    ]
+   ],
+   [
+    "39f133cd-436c-5cc4-bfc3-6cbf5a12ced0",
+    "big data archive librarian",
+    "transferable",
+    [
+     "q1",
+     "j1"
+    ]
+   ],
+   [
+    "8a8272c7-bec5-5ace-bef5-e6b86d2c755f",
+    "data quality specialist",
+    "close_to_current",
+    [
+     "q1",
+     "j1"
+    ]
+   ],
+   [
+    "79090504-686b-5fe6-a8e2-f52e8758d0df",
+    "data entry clerk",
+    "transferable",
+    [
+     "q1",
+     "j1"
+    ]
+   ],
+   [
+    "aa98ffff-3b25-5023-864b-2be3e26c5aa9",
+    "knowledge engineer",
+    "transferable",
+    [
+     "q1",
+     "j1"
+    ]
+   ]
+  ],
+  "unmatched_titles": []
+ },
+ "DSC-16": {
+  "ambiguous_titles": [
+   "bus operator"
+  ],
+  "beyond_pool_limit": 0,
+  "connection": null,
+  "not_included": [],
+  "pool_size": 2,
+  "queries": [
+   [
+    "r1",
+    "bus operator",
+    2,
+    2,
+    false
+   ]
+  ],
+  "suggestions": [
+   [
+    "31610269-1177-5d1f-a960-6ce6aa348dab",
+    "bus driver",
+    "close_to_current",
+    [
+     "r1"
+    ]
+   ],
+   [
+    "b954515a-815f-5c86-9902-7353ecf75f79",
+    "trolley bus driver",
+    "close_to_current",
+    [
+     "r1"
+    ]
+   ]
+  ],
+  "unmatched_titles": []
+ },
+ "DSC-17": {
+  "ambiguous_titles": [],
+  "beyond_pool_limit": 0,
+  "connection": null,
+  "not_included": [
+   [
+    "d7a16ebd-8e52-5f4d-b065-3b33a02cdf6b",
+    "family_limit"
+   ],
+   [
+    "9ed7221c-7c3d-5b10-b4e8-07af06b8a1c4",
+    "duplicate"
+   ]
+  ],
+  "pool_size": 5,
+  "queries": [
+   [
+    "q1",
+    "mixing recordings",
+    4,
+    4,
+    false
+   ],
+   [
+    "q2",
+    "attending recording sessions",
+    2,
+    2,
+    false
+   ]
+  ],
+  "suggestions": [
+   [
+    "893bad0b-cda2-5c1c-a32e-db5e18e2cc32",
+    "sound editor",
+    "less_familiar",
+    [
+     "q2",
+     "q1"
+    ]
+   ],
+   [
+    "a0c0e10b-c600-57ad-9a64-4a88c2598e0c",
+    "music director",
+    "less_familiar",
+    [
+     "q2"
+    ]
+   ],
+   [
+    "bc4c2657-bdfb-5b9f-9a49-645293f8e382",
+    "disc jockey",
+    "less_familiar",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "a19e2e9c-1dae-56f0-8334-d327ce54e220",
+    "sound operator",
+    "less_familiar",
+    [
+     "q1"
+    ]
+   ]
+  ],
+  "unmatched_titles": []
+ },
+ "DSC-18": {
+  "ambiguous_titles": [],
+  "beyond_pool_limit": 0,
+  "connection": null,
+  "not_included": [
+   [
+    "668c2159-812d-5fd3-aafa-52883e5285f0",
+    "family_limit"
+   ]
+  ],
+  "pool_size": 3,
+  "queries": [
+   [
+    "q1",
+    "caring for patients",
+    3,
+    3,
+    false
+   ],
+   [
+    "q2",
+    "giving injections",
+    0,
+    0,
+    false
+   ]
+  ],
+  "suggestions": [
+   [
+    "ca68a2ec-ad0b-5d6b-bb49-e7dc022eaaa2",
+    "advanced nurse practitioner",
+    "less_familiar",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "eb9a963c-5485-5617-aa83-72dc22b23a4a",
+    "specialist nurse",
+    "less_familiar",
+    [
+     "q1"
+    ]
+   ]
+  ],
+  "unmatched_titles": []
+ },
+ "DSC-19": {
+  "ambiguous_titles": [],
+  "beyond_pool_limit": 0,
+  "connection": null,
+  "not_included": [
+   [
+    "d223ff48-88e6-57fb-b0fb-4c235ba289c7",
+    "family_limit"
+   ],
+   [
+    "c92d1cd7-a24b-5538-8816-15fe5e65f530",
+    "less_relevant"
+   ],
+   [
+    "2cba53c4-c383-5757-8ab2-d7bef7fe1377",
+    "less_relevant"
+   ],
+   [
+    "1aa6237f-1d96-5c44-8ff3-b9f6a96ab8bb",
+    "less_relevant"
+   ],
+   [
+    "0973ebb2-7087-5266-813c-dd88c19c7165",
+    "less_relevant"
+   ],
+   [
+    "e556732f-a83a-5053-8238-908e49c3d55b",
+    "less_relevant"
+   ],
+   [
+    "ba63d96e-b695-52de-a3f0-d79ee5031c0b",
+    "less_relevant"
+   ],
+   [
+    "04ecb9b7-a91e-5820-ab42-83559c9921fd",
+    "less_relevant"
+   ],
+   [
+    "b38fed6b-1ddb-505d-a83e-d1431b103f38",
+    "family_limit"
+   ],
+   [
+    "2a9930ad-efc1-5a48-8033-7c6f892dce1a",
+    "family_limit"
+   ]
+  ],
+  "pool_size": 16,
+  "queries": [
+   [
+    "q1",
+    "caring for children",
+    16,
+    16,
+    false
+   ],
+   [
+    "q2",
+    "writing reports",
+    1,
+    217,
+    true
+   ]
+  ],
+  "suggestions": [
+   [
+    "a6ad784a-3911-5db6-bca3-dba07b099bf2",
+    "nursery school head teacher",
+    "less_familiar",
+    [
+     "q1",
+     "q2"
+    ]
+   ],
+   [
+    "2c14c8b0-00d2-5cde-8a38-d59045b9eb45",
+    "primary school teaching assistant",
+    "less_familiar",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "8a4b93e2-0e2b-5433-aa2b-95d18d37f623",
+    "Steiner school teacher",
+    "less_familiar",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "47c35ce5-240a-50cf-b757-3eabecb63a6c",
+    "special educational needs teacher",
+    "less_familiar",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "09a03c6c-10a8-59bb-97cf-cf8307a032d3",
+    "child care coordinator",
+    "less_familiar",
+    [
+     "q1"
+    ]
+   ],
+   [
+    "c6d21b56-7bab-56c8-8986-aff2ecaa8d5c",
+    "early years teaching assistant",
+    "less_familiar",
+    [
+     "q1"
+    ]
+   ]
+  ],
+  "unmatched_titles": []
+ }
+}

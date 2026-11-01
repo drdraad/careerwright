@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.2",
+  "synthetic": true,
+  "jurisdiction": "GB-ENG",
+  "ui_language": "en-GB",
+  "currency": "GBP",
+  "taxonomy_ids_are_fixture_ids": true,
+  "data_as_of": "2027-01-01",
+  "id": "P02",
+  "description": "Unsure, unemployed; discover across occupational families",
+  "entry_mode": "unsure",
+  "cities": [
+    "Leeds",
+    "Manchester"
+  ],
+  "target_titles": [],
+  "personality_optional": {
+    "enjoyed_tasks": [
+      "repairing physical objects",
+      "working outdoors"
+    ],
+    "preferred_environment": [
+      "practical",
+      "small team"
+    ]
+  },
+  "current_net_income_minor": 0,
+  "income_baseline_status": "unconfirmed",
+  "weekly_study_hours": 12,
+  "expected": {
+    "allow_skip_personality": true,
+    "initial_slate_max": 6,
+    "active_targets_max": 3,
+    "minimum_families_when_qualified_pool_supports": 3,
+    "include_less_familiar_grounded_role": true,
+    "no_exact_llm_wording_assertion": true,
+    "economic_solve_blocked_until_baseline_confirmed": true
+  }
+}

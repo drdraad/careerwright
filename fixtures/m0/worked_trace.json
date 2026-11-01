@@ -1,0 +1,722 @@
+{
+  "schema_version": "1.2",
+  "synthetic": true,
+  "jurisdiction": "GB-ENG",
+  "ui_language": "en-GB",
+  "currency": "GBP",
+  "taxonomy_ids_are_fixture_ids": true,
+  "data_as_of": "2027-01-01",
+  "id": "TRACE-01",
+  "profile_id": "P01",
+  "purpose": "Synthetic arithmetic and domain-contract trace; not real providers, prices, admissions or employment advice",
+  "planning_start": "2027-01-01",
+  "comparison_horizon_months": 6,
+  "baseline_income_by_month_minor": [
+    200000,
+    200000,
+    200000,
+    200000,
+    200000,
+    200000
+  ],
+  "opening_cash_minor": 600000,
+  "living_outgoings_by_month_minor": [
+    100000,
+    100000,
+    100000,
+    100000,
+    100000,
+    100000
+  ],
+  "minimum_reserve_minor": 50000,
+  "application_gates": {
+    "accepted_admission_in_fixture": true,
+    "completed_on": "2026-12-15"
+  },
+  "target": {
+    "id": "fixture:occupation:data-quality-analyst",
+    "title": "Data quality analyst",
+    "matrix_version": "fixture-matrix-1",
+    "skills": [
+      {
+        "skill_id": "fixture:query-data",
+        "required_level": 2,
+        "current_evidence_level": 1,
+        "essential": true
+      },
+      {
+        "skill_id": "fixture:validate-data",
+        "required_level": 2,
+        "current_evidence_level": 1,
+        "essential": true
+      },
+      {
+        "skill_id": "fixture:explain-results",
+        "required_level": 2,
+        "current_evidence_level": 2,
+        "essential": true
+      }
+    ],
+    "other_gates_confirmed": true
+  },
+  "course_outcomes": [
+    {
+      "skill_id": "fixture:query-data",
+      "level_on_completion": 2,
+      "evidence_kind": "assessed_work_sample",
+      "confidence": "provisional",
+      "source_span": {
+        "source_id": "fixture:syllabus:shared",
+        "start": 0,
+        "end": 138,
+        "source_hash": "96a224360892048f143ea26229d1128ad25f3d26e17e55ae0a4599e08bc783fb"
+      },
+      "rubric_version": "fixture-rubric-1",
+      "claim_state": "planned_conditional",
+      "review_state": "accepted_assumption"
+    },
+    {
+      "skill_id": "fixture:validate-data",
+      "level_on_completion": 2,
+      "evidence_kind": "assessed_work_sample",
+      "confidence": "provisional",
+      "source_span": {
+        "source_id": "fixture:syllabus:shared",
+        "start": 0,
+        "end": 138,
+        "source_hash": "96a224360892048f143ea26229d1128ad25f3d26e17e55ae0a4599e08bc783fb"
+      },
+      "rubric_version": "fixture-rubric-1",
+      "claim_state": "planned_conditional",
+      "review_state": "accepted_assumption"
+    }
+  ],
+  "syllabus_text": "Learners independently query two related tables, validate keys and missing values, and submit an assessed report with reproducible checks.",
+  "routes": [
+    {
+      "id": "A",
+      "family_id": "fixture:family:A",
+      "action_ids": [
+        "fixture:course:A"
+      ],
+      "time_months": 2,
+      "direct_spend_minor": 120000,
+      "income_by_month_minor": [
+        0,
+        0,
+        200000,
+        200000,
+        200000,
+        200000
+      ],
+      "payments_by_month_minor": [
+        120000,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "economic_cost_minor": 520000,
+      "readiness_status": "conditional_on_assessed_completion",
+      "actual_start_date": "2027-01-01",
+      "actual_finish_date": "2027-02-28"
+    },
+    {
+      "id": "B",
+      "family_id": "fixture:family:B",
+      "action_ids": [
+        "fixture:course:B"
+      ],
+      "time_months": 4,
+      "direct_spend_minor": 60000,
+      "income_by_month_minor": [
+        200000,
+        200000,
+        200000,
+        200000,
+        200000,
+        200000
+      ],
+      "payments_by_month_minor": [
+        15000,
+        15000,
+        15000,
+        15000,
+        0,
+        0
+      ],
+      "economic_cost_minor": 60000,
+      "readiness_status": "conditional_on_assessed_completion",
+      "actual_start_date": "2027-01-01",
+      "actual_finish_date": "2027-04-30"
+    },
+    {
+      "id": "C",
+      "family_id": "fixture:family:C",
+      "action_ids": [
+        "fixture:course:C"
+      ],
+      "time_months": 3,
+      "direct_spend_minor": 70000,
+      "income_by_month_minor": [
+        150000,
+        150000,
+        150000,
+        200000,
+        200000,
+        200000
+      ],
+      "payments_by_month_minor": [
+        30000,
+        20000,
+        20000,
+        0,
+        0,
+        0
+      ],
+      "economic_cost_minor": 220000,
+      "readiness_status": "conditional_on_assessed_completion",
+      "actual_start_date": "2027-01-01",
+      "actual_finish_date": "2027-03-31"
+    },
+    {
+      "id": "D",
+      "family_id": "fixture:family:D",
+      "action_ids": [
+        "fixture:course:D"
+      ],
+      "time_months": 4,
+      "direct_spend_minor": 110000,
+      "income_by_month_minor": [
+        200000,
+        200000,
+        200000,
+        200000,
+        200000,
+        200000
+      ],
+      "payments_by_month_minor": [
+        27500,
+        27500,
+        27500,
+        27500,
+        0,
+        0
+      ],
+      "economic_cost_minor": 110000,
+      "readiness_status": "conditional_on_assessed_completion",
+      "actual_start_date": "2027-01-01",
+      "actual_finish_date": "2027-04-30"
+    },
+    {
+      "id": "E",
+      "family_id": "fixture:family:E",
+      "action_ids": [
+        "fixture:course:E"
+      ],
+      "time_months": 5,
+      "direct_spend_minor": 130000,
+      "income_by_month_minor": [
+        200000,
+        200000,
+        200000,
+        200000,
+        200000,
+        200000
+      ],
+      "payments_by_month_minor": [
+        26000,
+        26000,
+        26000,
+        26000,
+        26000,
+        0
+      ],
+      "economic_cost_minor": 130000,
+      "readiness_status": "conditional_on_assessed_completion",
+      "actual_start_date": "2027-01-01",
+      "actual_finish_date": "2027-05-31"
+    }
+  ],
+  "expected": {
+    "fronts": [
+      [
+        "A",
+        "B",
+        "C"
+      ],
+      [
+        "D"
+      ],
+      [
+        "E"
+      ]
+    ],
+    "selected_route": "B",
+    "print_snapshot": {
+      "plan_id": "fixture-plan-01",
+      "target_title": "Data quality analyst",
+      "region": "Manchester, England",
+      "time_months": 4,
+      "direct_spend_minor": 60000,
+      "economic_cost_minor": 60000,
+      "cost_currency": "GBP",
+      "comparison_horizon_months": 6,
+      "peak_monthly_payment_minor": 15000,
+      "minimum_prefunded_cash_minor": 485000,
+      "readiness_status": "conditional_on_assessed_completion",
+      "next_actions": [
+        "verify_provider_and_intake",
+        "verify_assessment_rubric",
+        "confirm_payment_dates"
+      ]
+    },
+    "completed_course_does_not_automatically_update_skill_evidence": true,
+    "score_record": {
+      "range": [
+        5,
+        8
+      ],
+      "synthetic": true,
+      "minimum_filter": 6,
+      "lower_bound_filter_passes": false
+    },
+    "feasible_nonempty_action_sets": [
+      [
+        "fixture:course:A"
+      ],
+      [
+        "fixture:course:B"
+      ],
+      [
+        "fixture:course:C"
+      ],
+      [
+        "fixture:course:D"
+      ],
+      [
+        "fixture:course:E"
+      ]
+    ]
+  },
+  "catalogue": {
+    "id": "fixture-catalogue-01",
+    "synthetic": true,
+    "reviewed_for_fixture": true,
+    "exclusive_groups": {
+      "fixture:core-training": "at_most_one"
+    },
+    "actions": [
+      {
+        "id": "fixture:course:A",
+        "kind": "learning",
+        "provider_id": "fixture:provider:A",
+        "exclusive_group": "fixture:core-training",
+        "intakes": [
+          {
+            "id": "fixture:intake:A",
+            "start_date": "2027-01-01",
+            "finish_date": "2027-02-28",
+            "active_months": [
+              1,
+              2
+            ]
+          }
+        ],
+        "prerequisites": [
+          "fixture:admission-accepted"
+        ],
+        "outcomes": [
+          {
+            "skill_id": "fixture:query-data",
+            "level_on_completion": 2,
+            "evidence_kind": "assessed_work_sample",
+            "confidence": "provisional",
+            "source_span": {
+              "source_id": "fixture:syllabus:shared",
+              "start": 0,
+              "end": 138,
+              "source_hash": "96a224360892048f143ea26229d1128ad25f3d26e17e55ae0a4599e08bc783fb"
+            },
+            "rubric_version": "fixture-rubric-1",
+            "claim_state": "planned_conditional",
+            "review_state": "accepted_assumption"
+          },
+          {
+            "skill_id": "fixture:validate-data",
+            "level_on_completion": 2,
+            "evidence_kind": "assessed_work_sample",
+            "confidence": "provisional",
+            "source_span": {
+              "source_id": "fixture:syllabus:shared",
+              "start": 0,
+              "end": 138,
+              "source_hash": "96a224360892048f143ea26229d1128ad25f3d26e17e55ae0a4599e08bc783fb"
+            },
+            "rubric_version": "fixture-rubric-1",
+            "claim_state": "planned_conditional",
+            "review_state": "accepted_assumption"
+          }
+        ],
+        "fees_by_month_minor": [
+          120000,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "scenario_net_income_by_month_minor": [
+          0,
+          0,
+          200000,
+          200000,
+          200000,
+          200000
+        ],
+        "weekly_study_envelope": 40,
+        "weekly_work_envelope_while_active": 0,
+        "weekly_work_after_completion": 30,
+        "source_id": "fixture:syllabus:shared",
+        "review_state": "accepted_assumption",
+        "conditions": [
+          "assessed_completion",
+          "confirmed_work_pattern_in_fixture",
+          "income_continuation_scenario"
+        ]
+      },
+      {
+        "id": "fixture:course:B",
+        "kind": "learning",
+        "provider_id": "fixture:provider:B",
+        "exclusive_group": "fixture:core-training",
+        "intakes": [
+          {
+            "id": "fixture:intake:B",
+            "start_date": "2027-01-01",
+            "finish_date": "2027-04-30",
+            "active_months": [
+              1,
+              2,
+              3,
+              4
+            ]
+          }
+        ],
+        "prerequisites": [
+          "fixture:admission-accepted"
+        ],
+        "outcomes": [
+          {
+            "skill_id": "fixture:query-data",
+            "level_on_completion": 2,
+            "evidence_kind": "assessed_work_sample",
+            "confidence": "provisional",
+            "source_span": {
+              "source_id": "fixture:syllabus:shared",
+              "start": 0,
+              "end": 138,
+              "source_hash": "96a224360892048f143ea26229d1128ad25f3d26e17e55ae0a4599e08bc783fb"
+            },
+            "rubric_version": "fixture-rubric-1",
+            "claim_state": "planned_conditional",
+            "review_state": "accepted_assumption"
+          },
+          {
+            "skill_id": "fixture:validate-data",
+            "level_on_completion": 2,
+            "evidence_kind": "assessed_work_sample",
+            "confidence": "provisional",
+            "source_span": {
+              "source_id": "fixture:syllabus:shared",
+              "start": 0,
+              "end": 138,
+              "source_hash": "96a224360892048f143ea26229d1128ad25f3d26e17e55ae0a4599e08bc783fb"
+            },
+            "rubric_version": "fixture-rubric-1",
+            "claim_state": "planned_conditional",
+            "review_state": "accepted_assumption"
+          }
+        ],
+        "fees_by_month_minor": [
+          15000,
+          15000,
+          15000,
+          15000,
+          0,
+          0
+        ],
+        "scenario_net_income_by_month_minor": [
+          200000,
+          200000,
+          200000,
+          200000,
+          200000,
+          200000
+        ],
+        "weekly_study_envelope": 6,
+        "weekly_work_envelope_while_active": 30,
+        "weekly_work_after_completion": 30,
+        "source_id": "fixture:syllabus:shared",
+        "review_state": "accepted_assumption",
+        "conditions": [
+          "assessed_completion",
+          "confirmed_work_pattern_in_fixture",
+          "income_continuation_scenario"
+        ]
+      },
+      {
+        "id": "fixture:course:C",
+        "kind": "learning",
+        "provider_id": "fixture:provider:C",
+        "exclusive_group": "fixture:core-training",
+        "intakes": [
+          {
+            "id": "fixture:intake:C",
+            "start_date": "2027-01-01",
+            "finish_date": "2027-03-31",
+            "active_months": [
+              1,
+              2,
+              3
+            ]
+          }
+        ],
+        "prerequisites": [
+          "fixture:admission-accepted"
+        ],
+        "outcomes": [
+          {
+            "skill_id": "fixture:query-data",
+            "level_on_completion": 2,
+            "evidence_kind": "assessed_work_sample",
+            "confidence": "provisional",
+            "source_span": {
+              "source_id": "fixture:syllabus:shared",
+              "start": 0,
+              "end": 138,
+              "source_hash": "96a224360892048f143ea26229d1128ad25f3d26e17e55ae0a4599e08bc783fb"
+            },
+            "rubric_version": "fixture-rubric-1",
+            "claim_state": "planned_conditional",
+            "review_state": "accepted_assumption"
+          },
+          {
+            "skill_id": "fixture:validate-data",
+            "level_on_completion": 2,
+            "evidence_kind": "assessed_work_sample",
+            "confidence": "provisional",
+            "source_span": {
+              "source_id": "fixture:syllabus:shared",
+              "start": 0,
+              "end": 138,
+              "source_hash": "96a224360892048f143ea26229d1128ad25f3d26e17e55ae0a4599e08bc783fb"
+            },
+            "rubric_version": "fixture-rubric-1",
+            "claim_state": "planned_conditional",
+            "review_state": "accepted_assumption"
+          }
+        ],
+        "fees_by_month_minor": [
+          30000,
+          20000,
+          20000,
+          0,
+          0,
+          0
+        ],
+        "scenario_net_income_by_month_minor": [
+          150000,
+          150000,
+          150000,
+          200000,
+          200000,
+          200000
+        ],
+        "weekly_study_envelope": 16,
+        "weekly_work_envelope_while_active": 20,
+        "weekly_work_after_completion": 30,
+        "source_id": "fixture:syllabus:shared",
+        "review_state": "accepted_assumption",
+        "conditions": [
+          "assessed_completion",
+          "confirmed_work_pattern_in_fixture",
+          "income_continuation_scenario"
+        ]
+      },
+      {
+        "id": "fixture:course:D",
+        "kind": "learning",
+        "provider_id": "fixture:provider:D",
+        "exclusive_group": "fixture:core-training",
+        "intakes": [
+          {
+            "id": "fixture:intake:D",
+            "start_date": "2027-01-01",
+            "finish_date": "2027-04-30",
+            "active_months": [
+              1,
+              2,
+              3,
+              4
+            ]
+          }
+        ],
+        "prerequisites": [
+          "fixture:admission-accepted"
+        ],
+        "outcomes": [
+          {
+            "skill_id": "fixture:query-data",
+            "level_on_completion": 2,
+            "evidence_kind": "assessed_work_sample",
+            "confidence": "provisional",
+            "source_span": {
+              "source_id": "fixture:syllabus:shared",
+              "start": 0,
+              "end": 138,
+              "source_hash": "96a224360892048f143ea26229d1128ad25f3d26e17e55ae0a4599e08bc783fb"
+            },
+            "rubric_version": "fixture-rubric-1",
+            "claim_state": "planned_conditional",
+            "review_state": "accepted_assumption"
+          },
+          {
+            "skill_id": "fixture:validate-data",
+            "level_on_completion": 2,
+            "evidence_kind": "assessed_work_sample",
+            "confidence": "provisional",
+            "source_span": {
+              "source_id": "fixture:syllabus:shared",
+              "start": 0,
+              "end": 138,
+              "source_hash": "96a224360892048f143ea26229d1128ad25f3d26e17e55ae0a4599e08bc783fb"
+            },
+            "rubric_version": "fixture-rubric-1",
+            "claim_state": "planned_conditional",
+            "review_state": "accepted_assumption"
+          }
+        ],
+        "fees_by_month_minor": [
+          27500,
+          27500,
+          27500,
+          27500,
+          0,
+          0
+        ],
+        "scenario_net_income_by_month_minor": [
+          200000,
+          200000,
+          200000,
+          200000,
+          200000,
+          200000
+        ],
+        "weekly_study_envelope": 6,
+        "weekly_work_envelope_while_active": 30,
+        "weekly_work_after_completion": 30,
+        "source_id": "fixture:syllabus:shared",
+        "review_state": "accepted_assumption",
+        "conditions": [
+          "assessed_completion",
+          "confirmed_work_pattern_in_fixture",
+          "income_continuation_scenario"
+        ]
+      },
+      {
+        "id": "fixture:course:E",
+        "kind": "learning",
+        "provider_id": "fixture:provider:E",
+        "exclusive_group": "fixture:core-training",
+        "intakes": [
+          {
+            "id": "fixture:intake:E",
+            "start_date": "2027-01-01",
+            "finish_date": "2027-05-31",
+            "active_months": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          }
+        ],
+        "prerequisites": [
+          "fixture:admission-accepted"
+        ],
+        "outcomes": [
+          {
+            "skill_id": "fixture:query-data",
+            "level_on_completion": 2,
+            "evidence_kind": "assessed_work_sample",
+            "confidence": "provisional",
+            "source_span": {
+              "source_id": "fixture:syllabus:shared",
+              "start": 0,
+              "end": 138,
+              "source_hash": "96a224360892048f143ea26229d1128ad25f3d26e17e55ae0a4599e08bc783fb"
+            },
+            "rubric_version": "fixture-rubric-1",
+            "claim_state": "planned_conditional",
+            "review_state": "accepted_assumption"
+          },
+          {
+            "skill_id": "fixture:validate-data",
+            "level_on_completion": 2,
+            "evidence_kind": "assessed_work_sample",
+            "confidence": "provisional",
+            "source_span": {
+              "source_id": "fixture:syllabus:shared",
+              "start": 0,
+              "end": 138,
+              "source_hash": "96a224360892048f143ea26229d1128ad25f3d26e17e55ae0a4599e08bc783fb"
+            },
+            "rubric_version": "fixture-rubric-1",
+            "claim_state": "planned_conditional",
+            "review_state": "accepted_assumption"
+          }
+        ],
+        "fees_by_month_minor": [
+          26000,
+          26000,
+          26000,
+          26000,
+          26000,
+          0
+        ],
+        "scenario_net_income_by_month_minor": [
+          200000,
+          200000,
+          200000,
+          200000,
+          200000,
+          200000
+        ],
+        "weekly_study_envelope": 4,
+        "weekly_work_envelope_while_active": 30,
+        "weekly_work_after_completion": 30,
+        "source_id": "fixture:syllabus:shared",
+        "review_state": "accepted_assumption",
+        "conditions": [
+          "assessed_completion",
+          "confirmed_work_pattern_in_fixture",
+          "income_continuation_scenario"
+        ]
+      }
+    ]
+  },
+  "available_weekly_hours_envelope": 40,
+  "role_card": {
+    "occupation_id": "fixture:occupation:data-quality-analyst",
+    "salary_benchmark": null,
+    "trend": null,
+    "coverage_state": "synthetic_fixture",
+    "score_not_real": true
+  },
+  "initial_completed_gates": [
+    "fixture:admission-accepted"
+  ]
+}

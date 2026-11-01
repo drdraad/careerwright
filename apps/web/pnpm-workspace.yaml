@@ -1,0 +1,17 @@
+# pnpm settings for apps/web (a single package, not a workspace of several).
+# Every resolved version, direct or transitive, must be at least 14 days old (20160 minutes),
+# with no exception.
+minimumReleaseAge: 20160
+# Next.js lists sharp (image optimisation) as optional; the app serves no optimised images,
+# so its native libvips binaries are never installed.
+ignoredOptionalDependencies:
+  - sharp
+# Install scripts stay off. Neither is needed: esbuild ships its binary as an optional
+# platform package, and @firebase/util's script only probes the environment for defaults.
+ignoredBuiltDependencies:
+  - "@firebase/util"
+  - esbuild
+# The client generator's YAML parser (dev only; it reads our own OpenAPI JSON): 4.3.2 fixes
+# three CPU-exhaustion advisories in 4.2.0 and is old enough.
+overrides:
+  js-yaml@>=4.0.0 <4.3.2: 4.3.2

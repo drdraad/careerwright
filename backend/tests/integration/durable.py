@@ -1,0 +1,218 @@
+"""A durable-run scenario: a synthetic workspace with a stored key, real worker processes and
+a leak scan of both databases and every worker log (shared by the durable test modules)."""
+
+import json
+import secrets
+import uuid
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import httpx2 as httpx
+
+from tests.support.client import ApiClient, profile_with
+from tests.support.infra import Infra, create_emulator_user, sign_in
+from tests.support.workers import Worker, start_worker, wait_for
+from tools.leak_scan import Finding, Needle, scan
+
+RUN_TIMEOUT_S = 60.0
+TERMINAL = frozenset({"complete", "failed", "provider_unavailable", "cancelled"})
+
+
+@dataclass
+class Scenario:
+    infra: Infra
+    api: ApiClient
+    token: str
+    workspace_id: str
+    api_key: str
+    profile_sentinel: str
+    output_sentinel: str
+    log_dir: Path
+    logs: list[Path] = field(default_factory=list)
+    workers: list[Worker] = field(default_factory=list)
+    retired_keys: list[str] = field(default_factory=list)  # replaced keys, still scanned for
+
+    def submit(self) -> str:
+        response = self.api.write(
+            "POST",
+            f"/v1/workspaces/{self.workspace_id}/runs",
+            self.token,
+            {"kind": "connection_check"},
+        )
+        assert response.status_code == 202, response.text
+        return str(response.json()["run_id"])
+
+    def submit_turn(self, message: str, expected_profile_version: int = 1) -> dict[str, Any]:
+        response = self.api.write(
+            "POST",
+            f"/v1/workspaces/{self.workspace_id}/interview/turns",
+            self.token,
+            {"expected_profile_version": expected_profile_version, "message": message},
+        )
+        assert response.status_code == 202, response.text
+        body: dict[str, Any] = response.json()
+        return body
+
+    def turn(self, turn_id: str) -> dict[str, Any]:
+        response = self.api.get(
+            f"/v1/workspaces/{self.workspace_id}/interview/turns/{turn_id}", self.token
+        )
+        assert response.status_code == 200, response.text
+        body: dict[str, Any] = response.json()
+        return body
+
+    def decide(
+        self, turn_id: str, body: dict[str, Any], *, key: uuid.UUID | None = None
+    ) -> httpx.Response:
+        return self.api.write(
+            "POST",
+            f"/v1/workspaces/{self.workspace_id}/interview/turns/{turn_id}/decision",
+            self.token,
+            body,
+            key=key,
+        )
+
+    def profile(self) -> dict[str, Any]:
+        body: dict[str, Any] = self.api.get(
+            f"/v1/workspaces/{self.workspace_id}/profile", self.token
+        ).json()
+        return body
+
+    def worker(self, name: str, **settings: str) -> Worker:
+        log = self.log_dir / f"{name}.log"
+        self.logs.append(log)
+        started = start_worker(self.infra, log, output_sentinel=self.output_sentinel, **settings)
+        self.workers.append(started)
+        return started
+
+    def run(self, run_id: str) -> dict[str, Any]:
+        return self.infra.query("SELECT * FROM careerwright.runs WHERE run_id = %s", (run_id,))[0]
+
+    def api_run(self, run_id: str) -> dict[str, Any]:
+        response = self.api.get(f"/v1/workspaces/{self.workspace_id}/runs/{run_id}", self.token)
+        body: dict[str, Any] = response.json()
+        return body
+
+    def attempts(self, run_id: str) -> list[dict[str, Any]]:
+        return self.infra.query(
+            "SELECT * FROM careerwright.model_attempts WHERE run_id = %s ORDER BY attempt_id",
+            (run_id,),
+        )
+
+    def outputs(self, run_id: str) -> list[dict[str, Any]]:
+        return self.infra.query(
+            "SELECT * FROM careerwright.run_outputs WHERE run_id = %s", (run_id,)
+        )
+
+    def wait_terminal(self, run_id: str, timeout_s: float = RUN_TIMEOUT_S) -> dict[str, Any]:
+        wait_for(lambda: self.run(run_id)["status"] in TERMINAL, timeout_s=timeout_s, what="run")
+        return self.run(run_id)
+
+    def journal(self, run_id: str) -> dict[str, list[dict[str, Any]]]:
+        workflow = f"careerwright-run-{run_id}"
+        db = "careerwright_dbos"
+        q = self.infra.query
+        return {
+            "status": q(
+                "SELECT * FROM dbos.workflow_status WHERE workflow_uuid = %s",
+                (workflow,),
+                database=db,
+            ),
+            "inputs": q(
+                "SELECT inputs FROM dbos.workflow_input WHERE workflow_uuid = %s",
+                (workflow,),
+                database=db,
+            ),
+            "output": q(
+                "SELECT output, error FROM dbos.workflow_output WHERE workflow_uuid = %s",
+                (workflow,),
+                database=db,
+            ),
+            "steps": q(
+                "SELECT function_name, output, error FROM dbos.operation_outputs "
+                "WHERE workflow_uuid = %s ORDER BY function_id",
+                (workflow,),
+                database=db,
+            ),
+        }
+
+    def assert_identifier_only_journal(self, run_id: str) -> dict[str, Any]:
+        journal = self.journal(run_id)
+        assert json.loads(journal["inputs"][0]["inputs"]) == {
+            "positionalArgs": [run_id],
+            "namedArgs": {},
+        }
+        output: dict[str, Any] = json.loads(journal["output"][0]["output"])
+        assert set(output) in ({"status", "output_id"}, {"status", "failure_class"})
+        assert {s["function_name"] for s in journal["steps"]} <= {
+            "careerwright.bounded_model_activity",
+            "careerwright.publish_outcome",
+        }
+        return output
+
+    def leaks(self, *private: str) -> list[Finding]:
+        """The key nowhere; the profile's private text (and any other `private` text, such
+        as a message) never outside the application tables that own it; the model's output
+        only sealed."""
+        logs = [(log.name, log.read_text(encoding="utf-8")) for log in self.logs if log.exists()]
+        dbos = self.infra.database_cells("careerwright_dbos")
+        app = self.infra.database_cells("careerwright_app")
+        keys = [
+            Needle("credential", key, fragment_length=12)
+            for key in (self.api_key, *self.retired_keys)
+        ]
+        output = Needle("model output", self.output_sentinel)
+        owned = [Needle("private text", text) for text in (self.profile_sentinel, *private)]
+        return [
+            *scan([*app, *dbos, *logs], [*keys, output]),
+            *scan([*dbos, *logs], owned),
+        ]
+
+
+def fresh_actor(api: ApiClient, infra: Infra) -> tuple[str, str]:
+    """A new invited person (email, ID token), whose access a test may revoke."""
+    uid = f"actor-{uuid.uuid4().hex[:8]}"
+    email = f"{uid}@careerwright.test"
+    create_emulator_user(uid, email, "password-123456")
+    infra.query(
+        "INSERT INTO careerwright.actors (actor_id, email, display_name, access) "
+        "VALUES (%s, %s, 'Fresh', 'active')",
+        (uuid.uuid4(), email),
+    )
+    return email, sign_in(email, "password-123456")
+
+
+def make_scenario(
+    infra: Infra, api: ApiClient, token: str, log_dir: Path, *, synthetic: bool = True
+) -> Scenario:
+    """`synthetic=False` makes a personal-data workspace, whose runs use the Standard model."""
+    name = "Durable run (synthetic)" if synthetic else "Durable run (personal)"
+    workspace_id = api.create_workspace(token, name, synthetic=synthetic)["workspace_id"]
+    # No fixed prefix: every 12-character window must be secret material, or the fragment
+    # scan matches public strings (a Sprint 0 false positive).
+    api_key = secrets.token_urlsafe(32)
+    stored = api.write(
+        "POST",
+        f"/v1/workspaces/{workspace_id}/credentials",
+        token,
+        {"api_key": api_key, "consent_to_encrypted_storage": True},
+    )
+    assert stored.status_code == 201, stored.text
+    profile_sentinel = f"PRIVATE-PROFILE-{secrets.token_hex(6)}"
+    api.write(
+        "PUT",
+        f"/v1/workspaces/{workspace_id}/profile",
+        token,
+        {"expected_version": 0, "profile": profile_with(current_role=profile_sentinel)},
+    )
+    return Scenario(
+        infra=infra,
+        api=api,
+        token=token,
+        workspace_id=workspace_id,
+        api_key=api_key,
+        profile_sentinel=profile_sentinel,
+        output_sentinel=f"OUTPUT-SENTINEL-{uuid.uuid4().hex[:12]}",
+        log_dir=log_dir,
+    )

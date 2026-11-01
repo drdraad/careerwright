@@ -1,0 +1,68 @@
+{
+  "kind": "identitytoolkit#DownloadAccountResponse",
+  "users": [
+    {
+      "localId": "careerwright-demo-ada",
+      "displayName": "Ada Demo",
+      "email": "ada@careerwright.test",
+      "emailVerified": true,
+      "salt": "fakeSaltCareerwrightDemoAda",
+      "passwordHash": "fakeHash:salt=fakeSaltCareerwrightDemoAda:password=careerwright-demo-ada",
+      "passwordUpdatedAt": 1767225600000,
+      "validSince": "1767225600",
+      "createdAt": "1767225600000",
+      "lastLoginAt": "1767225600000",
+      "providerUserInfo": [
+        {
+          "providerId": "password",
+          "email": "ada@careerwright.test",
+          "federatedId": "ada@careerwright.test",
+          "rawId": "ada@careerwright.test",
+          "displayName": "Ada Demo"
+        }
+      ]
+    },
+    {
+      "localId": "careerwright-demo-ben",
+      "displayName": "Ben Demo",
+      "email": "ben@careerwright.test",
+      "emailVerified": true,
+      "salt": "fakeSaltCareerwrightDemoBen",
+      "passwordHash": "fakeHash:salt=fakeSaltCareerwrightDemoBen:password=careerwright-demo-ben",
+      "passwordUpdatedAt": 1767225600000,
+      "validSince": "1767225600",
+      "createdAt": "1767225600000",
+      "lastLoginAt": "1767225600000",
+      "providerUserInfo": [
+        {
+          "providerId": "password",
+          "email": "ben@careerwright.test",
+          "federatedId": "ben@careerwright.test",
+          "rawId": "ben@careerwright.test",
+          "displayName": "Ben Demo"
+        }
+      ]
+    },
+    {
+      "localId": "careerwright-demo-uninvited",
+      "displayName": "Uninvited Demo",
+      "email": "uninvited@careerwright.test",
+      "emailVerified": true,
+      "salt": "fakeSaltCareerwrightDemoUninvited",
+      "passwordHash": "fakeHash:salt=fakeSaltCareerwrightDemoUninvited:password=careerwright-demo-uninvited",
+      "passwordUpdatedAt": 1767225600000,
+      "validSince": "1767225600",
+      "createdAt": "1767225600000",
+      "lastLoginAt": "1767225600000",
+      "providerUserInfo": [
+        {
+          "providerId": "password",
+          "email": "uninvited@careerwright.test",
+          "federatedId": "uninvited@careerwright.test",
+          "rawId": "uninvited@careerwright.test",
+          "displayName": "Uninvited Demo"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,157 @@
+"""URL and address checks before any retrieval (spec section 6, "Retrieval pipeline and
+security boundary"; ACQ-01). Pure: no network. The fetcher applies the same address check to
+every address a name resolves to, after every redirect (`test_fetcher.py`)."""
+
+import ipaddress
+
+import pytest
+
+from careerwright.evidence.addresses import CheckedUrl, UrlRefusal, address_refusal, check_url
+
+# Full stops IDNA folds to "." (re-review A M-3), written as code points so none is mistaken
+# for an ASCII dot.
+IDEOGRAPHIC, FULLWIDTH, HALFWIDTH = chr(0x3002), chr(0xFF0E), chr(0xFF61)
+LEADER, SMALL_STOP = chr(0x2024), chr(0xFE52)  # their NFKC forms hold "."
+
+
+@pytest.mark.req("ACQ-01")
+def test_a_public_https_url_is_normalised_and_its_fragment_dropped() -> None:
+    checked = check_url("HTTPS://Careers.Example.org/jobs/42?ref=a#apply")
+
+    assert checked == CheckedUrl(
+        url="https://careers.example.org/jobs/42?ref=a",
+        scheme="https",
+        host="careers.example.org",
+        port=443,
+        ip_literal=None,
+    )
+
+
+@pytest.mark.req("ACQ-01")
+@pytest.mark.parametrize(
+    ("raw", "refusal"),
+    [
+        ("ftp://example.org/x", UrlRefusal.SCHEME_NOT_ALLOWED),
+        ("file:///etc/passwd", UrlRefusal.SCHEME_NOT_ALLOWED),
+        ("gopher://example.org:70/", UrlRefusal.SCHEME_NOT_ALLOWED),
+        ("javascript:alert(1)", UrlRefusal.SCHEME_NOT_ALLOWED),
+        ("https://user:pass@example.org/", UrlRefusal.CREDENTIALS_IN_URL),
+        ("https://example.org@127.0.0.1/", UrlRefusal.CREDENTIALS_IN_URL),
+        ("https:///no-host", UrlRefusal.HOST_NOT_ALLOWED),
+        ("https://example.org:8080/", UrlRefusal.PORT_NOT_ALLOWED),
+        ("https://example.org:22/", UrlRefusal.PORT_NOT_ALLOWED),
+        ("https://localhost/", UrlRefusal.HOST_NOT_ALLOWED),
+        ("https://api.localhost/", UrlRefusal.HOST_NOT_ALLOWED),
+        ("http://postgres:5432/", UrlRefusal.PORT_NOT_ALLOWED),
+        ("http://postgres/", UrlRefusal.HOST_NOT_ALLOWED),  # a single-label (Compose) name
+        ("http://printer.local/", UrlRefusal.HOST_NOT_ALLOWED),
+        ("http://metadata.google.internal/", UrlRefusal.HOST_NOT_ALLOWED),
+        ("https://exa mple.org/", UrlRefusal.MALFORMED),
+        ("https://example.org\\@127.0.0.1/", UrlRefusal.MALFORMED),
+        ("https://" + "a" * 64 + ".org/", UrlRefusal.HOST_NOT_ALLOWED),
+        ("https://example.org/" + "a" * 2100, UrlRefusal.URL_TOO_LONG),
+        ("not a url", UrlRefusal.MALFORMED),
+        ("example.org/jobs", UrlRefusal.SCHEME_NOT_ALLOWED),
+    ],
+)
+def test_unsafe_or_unsupported_urls_are_refused_before_any_lookup(
+    raw: str, refusal: UrlRefusal
+) -> None:
+    assert check_url(raw) is refusal
+
+
+@pytest.mark.req("ACQ-01")
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "http://127.0.0.1/",
+        "http://10.0.0.5/",
+        "http://172.16.3.4/",
+        "http://192.168.1.1/",
+        "http://169.254.169.254/latest/meta-data/",  # cloud metadata
+        "http://100.64.0.1/",  # shared address space
+        "http://0.0.0.0/",
+        "http://[::1]/",
+        "http://[fe80::1]/",
+        "http://[fc00::1]/",
+        "http://[fd00:ec2::254]/",  # cloud metadata over IPv6
+        "http://[::ffff:127.0.0.1]/",  # IPv4-mapped loopback
+        "http://[::ffff:7f00:1]/",  # the same, written in hex
+        "http://[64:ff9b::a00:1]/",  # NAT64 of 10.0.0.1
+        "http://[2002:7f00:1::]/",  # 6to4 of 127.0.0.1
+        "http://[ff02::1]/",  # multicast
+        "http://224.0.0.1/",
+    ],
+)
+def test_private_loopback_link_local_and_metadata_literals_are_refused(raw: str) -> None:
+    assert check_url(raw) is UrlRefusal.ADDRESS_NOT_ALLOWED
+
+
+@pytest.mark.req("ACQ-01")
+@pytest.mark.parametrize(
+    ("raw", "refusal"),
+    [
+        ("http://2130706433/", UrlRefusal.HOST_NOT_ALLOWED),  # 127.0.0.1 as one decimal
+        ("http://0x7f000001/", UrlRefusal.HOST_NOT_ALLOWED),  # as one hex number
+        ("http://0177.0.0.1/", UrlRefusal.HOST_NOT_ALLOWED),  # octal first octet
+        ("http://0x7f.0.0.1/", UrlRefusal.HOST_NOT_ALLOWED),  # hex first octet
+        ("http://127.1/", UrlRefusal.HOST_NOT_ALLOWED),  # short form
+        ("http://%31%32%37.0.0.1/", UrlRefusal.HOST_NOT_ALLOWED),  # percent-encoded
+        ("http://①②⑦.0.0.1/", UrlRefusal.HOST_NOT_ALLOWED),  # Unicode digits, never decoded
+        ("http://٩٣.١٨٤.٢١٥.١٤/", UrlRefusal.HOST_NOT_ALLOWED),  # a public one, the same
+        (f"http://93{FULLWIDTH}184{FULLWIDTH}215{FULLWIDTH}14/", UrlRefusal.HOST_NOT_ALLOWED),
+        (f"http://127{IDEOGRAPHIC}0{IDEOGRAPHIC}0{IDEOGRAPHIC}1/", UrlRefusal.HOST_NOT_ALLOWED),
+        (f"http://jobs{HALFWIDTH}example{HALFWIDTH}org/", UrlRefusal.HOST_NOT_ALLOWED),  # a name
+        # Folded to "." by nameprep (re-review A N-2): one dot leader, small full stop.
+        (f"http://93{LEADER}184{LEADER}215{LEADER}14/", UrlRefusal.HOST_NOT_ALLOWED),
+        (f"http://127{SMALL_STOP}0{SMALL_STOP}0{SMALL_STOP}1/", UrlRefusal.HOST_NOT_ALLOWED),
+        (f"http://jobs{SMALL_STOP}example.org/", UrlRefusal.HOST_NOT_ALLOWED),
+        ("http://[2606:4700::1111%25eth0]/", UrlRefusal.HOST_NOT_ALLOWED),  # a zone ID
+        ("http://[fe80::1%25eth0]/", UrlRefusal.HOST_NOT_ALLOWED),
+        # A trailing dot is the same name: it is removed, and the address then checked.
+        ("http://127.0.0.1./", UrlRefusal.ADDRESS_NOT_ALLOWED),
+        ("http://[::127.0.0.1]/", UrlRefusal.ADDRESS_NOT_ALLOWED),  # IPv4-compatible loopback
+        ("http://[fec0::1]/", UrlRefusal.ADDRESS_NOT_ALLOWED),  # deprecated site-local
+    ],
+)
+def test_encoded_address_forms_are_refused(raw: str, refusal: UrlRefusal) -> None:
+    assert check_url(raw) is refusal
+
+
+@pytest.mark.req("ACQ-01")
+def test_an_internationalised_name_is_checked_in_its_ascii_form() -> None:
+    checked = check_url("https://bücher.example/stellen")
+
+    assert isinstance(checked, CheckedUrl)
+    assert checked.host == "xn--bcher-kva.example"
+    assert checked.url == "https://xn--bcher-kva.example/stellen"
+
+
+@pytest.mark.req("ACQ-01")
+def test_a_public_ip_literal_is_allowed_and_kept_as_an_address() -> None:
+    checked = check_url("http://[2606:4700::1111]/x")
+
+    assert isinstance(checked, CheckedUrl)
+    assert checked.ip_literal == ipaddress.ip_address("2606:4700::1111")
+    assert checked.port == 80
+
+
+@pytest.mark.req("ACQ-01")
+@pytest.mark.parametrize(
+    ("address", "refused"),
+    [
+        ("93.184.215.14", False),
+        ("2606:2800:21f:cb07:6820:80da:af6b:8b2c", False),
+        ("127.0.0.53", True),
+        ("::", True),
+        ("::ffff:10.1.2.3", True),
+        ("::ffff:93.184.215.14", True),  # every embedded-IPv4 form is refused, public or not
+        ("2001:db8::1", True),  # documentation
+        ("fec0::1", True),  # deprecated site-local, which `is_global` passes
+        ("198.18.0.1", True),  # benchmarking
+        ("240.0.0.1", True),  # reserved
+        ("255.255.255.255", True),
+    ],
+)
+def test_the_address_check_refuses_every_non_public_address(address: str, refused: bool) -> None:
+    assert (address_refusal(ipaddress.ip_address(address)) is not None) is refused

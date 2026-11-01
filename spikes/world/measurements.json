@@ -1,0 +1,1069 @@
+{
+  "date": "2026-10-30T16:32:22.064Z",
+  "device": {
+    "cpu": "Apple M4",
+    "memoryGB": 16,
+    "model": "Mac16,1",
+    "os": "27.0"
+  },
+  "browser": "Google Chrome 156.0.8078.76",
+  "scene": "busiest: 100 made-up openings with their trails, all destinations, the kept path, ambient particles; revelation (and its travel) replayed every 4 s; 1440x900 window",
+  "method": "3 s warm-up then 12 s; frame interval = rAF deltas; script = time inside the frame callback; GPU = WebGL draw (timer queries); headed system Chrome",
+  "vsync": {
+    "growth": {
+      "direction": "growth",
+      "mode": "moving",
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+      "firstFrame": 409.69999980926514,
+      "inputToFrame": [
+        10.6,
+        7.5,
+        4.6,
+        4.2,
+        7.3
+      ],
+      "stats": {
+        "frames": {
+          "frames": 1440,
+          "seconds": 12,
+          "p50": 8.3,
+          "p95": 9.9,
+          "p99": 10.3,
+          "max": 10.4,
+          "over8": 1002,
+          "over16": 0
+        },
+        "script": {
+          "frames": 1440,
+          "seconds": 0.21,
+          "p50": 0.1,
+          "p95": 0.2,
+          "p99": 0.3,
+          "max": 4.3,
+          "over8": 0,
+          "over16": 0
+        },
+        "gpu": {
+          "frames": 1440,
+          "seconds": 1.94,
+          "p50": 1.32,
+          "p95": 1.73,
+          "p99": 2.16,
+          "max": 2.56,
+          "over8": 0,
+          "over16": 0
+        }
+      },
+      "layout": {
+        "lights": [
+          {
+            "id": "origin",
+            "x": 561.6,
+            "y": 720.01
+          },
+          {
+            "id": "skill:hygiene",
+            "x": 343.51423316400576,
+            "y": 616.475840055514
+          },
+          {
+            "id": "skill:deadlines",
+            "x": 544.855945801587,
+            "y": 420.45740693048015
+          },
+          {
+            "id": "skill:calm",
+            "x": 633.2258934662418,
+            "y": 508.95275234993835
+          },
+          {
+            "id": "skill:lead",
+            "x": 761.7472534172073,
+            "y": 479.1354854400903
+          },
+          {
+            "id": "skill:stock",
+            "x": 335.5859637247328,
+            "y": 498.1255084267049
+          },
+          {
+            "id": "skill:safety",
+            "x": 767.0563355136247,
+            "y": 597.6025297526886
+          },
+          {
+            "id": "skill:equipment",
+            "x": 887.5383199617621,
+            "y": 647.4514728873859
+          },
+          {
+            "id": "skill:quality",
+            "x": 466.79377415225446,
+            "y": 516.3690753429636
+          },
+          {
+            "id": "dest:barista",
+            "x": 100.41788283850155,
+            "y": 615.6583738964796
+          },
+          {
+            "id": "dest:carpenter",
+            "x": 139.65169353319698,
+            "y": 496.06171128805966
+          },
+          {
+            "id": "dest:delivery-driver",
+            "x": 205.76560262675036,
+            "y": 390.73161153716
+          },
+          {
+            "id": "dest:shop-supervisor",
+            "x": 294.54784210224796,
+            "y": 306.37809907633124
+          },
+          {
+            "id": "dest:warehouse-supervisor",
+            "x": 400.34256432006845,
+            "y": 248.37489073411774
+          },
+          {
+            "id": "revealed:firefighter",
+            "x": 775.8086067816952,
+            "y": 249.9975714741504
+          },
+          {
+            "id": "unknown:firstaid",
+            "x": 661.7396067816951,
+            "y": 135.92857147415043
+          },
+          {
+            "id": "unknown:emergency",
+            "x": 775.8086067816952,
+            "y": 135.92857147415043
+          },
+          {
+            "id": "unknown:risks",
+            "x": 889.8776067816951,
+            "y": 135.92857147415043
+          }
+        ],
+        "leaders": []
+      },
+      "pointing": null,
+      "dpr": 2,
+      "css": [
+        1440,
+        809
+      ],
+      "canvas": [
+        2880,
+        1618
+      ]
+    },
+    "horizon": {
+      "direction": "horizon",
+      "mode": "moving",
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+      "firstFrame": 112.2999997138977,
+      "inputToFrame": [
+        11,
+        4.3,
+        5.9,
+        7.6,
+        2.6
+      ],
+      "stats": {
+        "frames": {
+          "frames": 1439,
+          "seconds": 11.99,
+          "p50": 8.3,
+          "p95": 10,
+          "p99": 10.3,
+          "max": 10.4,
+          "over8": 1035,
+          "over16": 0
+        },
+        "script": {
+          "frames": 1439,
+          "seconds": 0.23,
+          "p50": 0.2,
+          "p95": 0.3,
+          "p99": 0.3,
+          "max": 4.4,
+          "over8": 0,
+          "over16": 0
+        },
+        "gpu": {
+          "frames": 1439,
+          "seconds": 1.68,
+          "p50": 1.1,
+          "p95": 1.73,
+          "p99": 2.1,
+          "max": 2.61,
+          "over8": 0,
+          "over16": 0
+        }
+      },
+      "layout": {
+        "lights": [
+          {
+            "id": "origin",
+            "x": 361.452,
+            "y": 604.1612
+          },
+          {
+            "id": "skill:hygiene",
+            "x": 180.71520195866077,
+            "y": 457.5993214553651
+          },
+          {
+            "id": "skill:deadlines",
+            "x": 493.06213926395515,
+            "y": 422.23767123829134
+          },
+          {
+            "id": "skill:calm",
+            "x": 576.2707094820403,
+            "y": 422.23767123829134
+          },
+          {
+            "id": "skill:lead",
+            "x": 656.7034717513162,
+            "y": 427.37136295267646
+          },
+          {
+            "id": "skill:stock",
+            "x": 301.61820691312613,
+            "y": 438.48342003967855
+          },
+          {
+            "id": "skill:safety",
+            "x": 737.8755113813417,
+            "y": 438.48342003967855
+          },
+          {
+            "id": "skill:equipment",
+            "x": 823.6676770008726,
+            "y": 457.5993214553651
+          },
+          {
+            "id": "skill:quality",
+            "x": 403.2001473151964,
+            "y": 427.37136295267646
+          },
+          {
+            "id": "dest:barista",
+            "x": 210.08232142857145,
+            "y": 305.54196428571424
+          },
+          {
+            "id": "dest:carpenter",
+            "x": 359.3620833333333,
+            "y": 305.54196428571424
+          },
+          {
+            "id": "dest:delivery-driver",
+            "x": 508.64184523809524,
+            "y": 305.54196428571424
+          },
+          {
+            "id": "dest:shop-supervisor",
+            "x": 807.201369047619,
+            "y": 305.54196428571424
+          },
+          {
+            "id": "dest:warehouse-supervisor",
+            "x": 941.5531547619047,
+            "y": 305.54196428571424
+          },
+          {
+            "id": "revealed:firefighter",
+            "x": 657.9216071428572,
+            "y": 305.54196428571424
+          },
+          {
+            "id": "unknown:firstaid",
+            "x": 681.6071115973741,
+            "y": 354.85654996353026
+          },
+          {
+            "id": "unknown:emergency",
+            "x": 584.285081967213,
+            "y": 336.8711366120218
+          },
+          {
+            "id": "unknown:risks",
+            "x": 683.7648099606815,
+            "y": 326.09874617737
+          }
+        ],
+        "leaders": [
+          "skill:quality"
+        ]
+      },
+      "pointing": null,
+      "dpr": 2,
+      "css": [
+        1440,
+        809
+      ],
+      "canvas": [
+        2880,
+        1618
+      ]
+    },
+    "circuit": {
+      "direction": "circuit",
+      "mode": "moving",
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+      "firstFrame": 80.90000009536743,
+      "inputToFrame": [
+        17.1,
+        3.4,
+        3.6,
+        4.4,
+        3
+      ],
+      "stats": {
+        "frames": {
+          "frames": 1440,
+          "seconds": 12,
+          "p50": 8.3,
+          "p95": 10,
+          "p99": 10.3,
+          "max": 10.4,
+          "over8": 1036,
+          "over16": 0
+        },
+        "script": {
+          "frames": 1440,
+          "seconds": 0.23,
+          "p50": 0.2,
+          "p95": 0.3,
+          "p99": 0.3,
+          "max": 3.4,
+          "over8": 0,
+          "over16": 0
+        },
+        "gpu": {
+          "frames": 1440,
+          "seconds": 1.46,
+          "p50": 0.94,
+          "p95": 1.48,
+          "p99": 1.9,
+          "max": 2.33,
+          "over8": 0,
+          "over16": 0
+        }
+      },
+      "layout": {
+        "lights": [
+          {
+            "id": "origin",
+            "x": 388.8,
+            "y": 453.04
+          },
+          {
+            "id": "skill:hygiene",
+            "x": 378.87626666666665,
+            "y": 621.7434666666667
+          },
+          {
+            "id": "skill:deadlines",
+            "x": 279.63893333333334,
+            "y": 324.0314666666667
+          },
+          {
+            "id": "skill:calm",
+            "x": 398.72373333333337,
+            "y": 284.33653333333336
+          },
+          {
+            "id": "skill:lead",
+            "x": 517.8085333333333,
+            "y": 343.87893333333335
+          },
+          {
+            "id": "skill:stock",
+            "x": 259.7914666666667,
+            "y": 562.2010666666667
+          },
+          {
+            "id": "skill:safety",
+            "x": 557.5034666666667,
+            "y": 462.9637333333334
+          },
+          {
+            "id": "skill:equipment",
+            "x": 497.9610666666667,
+            "y": 582.0485333333334
+          },
+          {
+            "id": "skill:quality",
+            "x": 220.09653333333333,
+            "y": 443.11626666666666
+          },
+          {
+            "id": "dest:barista",
+            "x": 567.4272000000001,
+            "y": 105.70933333333335
+          },
+          {
+            "id": "dest:carpenter",
+            "x": 755.9781333333333,
+            "y": 333.9552
+          },
+          {
+            "id": "dest:delivery-driver",
+            "x": 775.8256,
+            "y": 482.81120000000004
+          },
+          {
+            "id": "dest:shop-supervisor",
+            "x": 736.1306666666667,
+            "y": 621.7434666666667
+          },
+          {
+            "id": "dest:warehouse-supervisor",
+            "x": 646.8170666666667,
+            "y": 740.8282666666667
+          },
+          {
+            "id": "revealed:firefighter",
+            "x": 686.512,
+            "y": 204.9466666666667
+          },
+          {
+            "id": "unknown:firstaid",
+            "x": 557.5034666666667,
+            "y": 254.56533333333334
+          },
+          {
+            "id": "unknown:emergency",
+            "x": 587.2746666666667,
+            "y": 284.33653333333336
+          },
+          {
+            "id": "unknown:risks",
+            "x": 617.0458666666667,
+            "y": 314.1077333333334
+          }
+        ],
+        "leaders": []
+      },
+      "pointing": null,
+      "dpr": 2,
+      "css": [
+        1440,
+        809
+      ],
+      "canvas": [
+        2880,
+        1618
+      ]
+    }
+  },
+  "unthrottled": {
+    "growth": {
+      "direction": "growth",
+      "mode": "moving",
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+      "firstFrame": 135.90000009536743,
+      "inputToFrame": [
+        12.9,
+        4.9,
+        4.4,
+        1.4,
+        1.6
+      ],
+      "stats": {
+        "frames": {
+          "frames": 9524,
+          "seconds": 11.32,
+          "p50": 0.2,
+          "p95": 2.8,
+          "p99": 3.7,
+          "max": 16.8,
+          "over8": 5,
+          "over16": 1
+        },
+        "script": {
+          "frames": 9524,
+          "seconds": 8.5,
+          "p50": 0.1,
+          "p95": 2.6,
+          "p99": 2.7,
+          "max": 4,
+          "over8": 0,
+          "over16": 0
+        },
+        "gpu": {
+          "frames": 7801,
+          "seconds": 9.59,
+          "p50": 1.21,
+          "p95": 2.09,
+          "p99": 2.45,
+          "max": 3.21,
+          "over8": 0,
+          "over16": 0
+        }
+      },
+      "layout": {
+        "lights": [
+          {
+            "id": "origin",
+            "x": 561.6,
+            "y": 720.01
+          },
+          {
+            "id": "skill:hygiene",
+            "x": 343.51423316400576,
+            "y": 616.475840055514
+          },
+          {
+            "id": "skill:deadlines",
+            "x": 544.855945801587,
+            "y": 420.45740693048015
+          },
+          {
+            "id": "skill:calm",
+            "x": 633.2258934662418,
+            "y": 508.95275234993835
+          },
+          {
+            "id": "skill:lead",
+            "x": 761.7472534172073,
+            "y": 479.1354854400903
+          },
+          {
+            "id": "skill:stock",
+            "x": 335.5859637247328,
+            "y": 498.1255084267049
+          },
+          {
+            "id": "skill:safety",
+            "x": 767.0563355136247,
+            "y": 597.6025297526886
+          },
+          {
+            "id": "skill:equipment",
+            "x": 887.5383199617621,
+            "y": 647.4514728873859
+          },
+          {
+            "id": "skill:quality",
+            "x": 466.79377415225446,
+            "y": 516.3690753429636
+          },
+          {
+            "id": "dest:barista",
+            "x": 100.41788283850155,
+            "y": 615.6583738964796
+          },
+          {
+            "id": "dest:carpenter",
+            "x": 139.65169353319698,
+            "y": 496.06171128805966
+          },
+          {
+            "id": "dest:delivery-driver",
+            "x": 205.76560262675036,
+            "y": 390.73161153716
+          },
+          {
+            "id": "dest:shop-supervisor",
+            "x": 294.54784210224796,
+            "y": 306.37809907633124
+          },
+          {
+            "id": "dest:warehouse-supervisor",
+            "x": 400.34256432006845,
+            "y": 248.37489073411774
+          },
+          {
+            "id": "revealed:firefighter",
+            "x": 775.8086067816952,
+            "y": 249.9975714741504
+          },
+          {
+            "id": "unknown:firstaid",
+            "x": 661.7396067816951,
+            "y": 135.92857147415043
+          },
+          {
+            "id": "unknown:emergency",
+            "x": 775.8086067816952,
+            "y": 135.92857147415043
+          },
+          {
+            "id": "unknown:risks",
+            "x": 889.8776067816951,
+            "y": 135.92857147415043
+          }
+        ],
+        "leaders": []
+      },
+      "pointing": null,
+      "dpr": 2,
+      "css": [
+        1440,
+        809
+      ],
+      "canvas": [
+        2880,
+        1618
+      ]
+    },
+    "horizon": {
+      "direction": "horizon",
+      "mode": "moving",
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+      "firstFrame": 104.7000002861023,
+      "inputToFrame": [
+        15.3,
+        2.3,
+        1.4,
+        1.9,
+        1.9
+      ],
+      "stats": {
+        "frames": {
+          "frames": 10152,
+          "seconds": 11.6,
+          "p50": 0.2,
+          "p95": 2.7,
+          "p99": 2.9,
+          "max": 18.9,
+          "over8": 6,
+          "over16": 2
+        },
+        "script": {
+          "frames": 10152,
+          "seconds": 8.62,
+          "p50": 0,
+          "p95": 2.6,
+          "p99": 2.7,
+          "max": 7.2,
+          "over8": 0,
+          "over16": 0
+        },
+        "gpu": {
+          "frames": 8423,
+          "seconds": 8.81,
+          "p50": 1,
+          "p95": 1.72,
+          "p99": 2.19,
+          "max": 2.87,
+          "over8": 0,
+          "over16": 0
+        }
+      },
+      "layout": {
+        "lights": [
+          {
+            "id": "origin",
+            "x": 361.452,
+            "y": 604.1612
+          },
+          {
+            "id": "skill:hygiene",
+            "x": 180.71520195866077,
+            "y": 457.5993214553651
+          },
+          {
+            "id": "skill:deadlines",
+            "x": 493.06213926395515,
+            "y": 422.23767123829134
+          },
+          {
+            "id": "skill:calm",
+            "x": 576.2707094820403,
+            "y": 422.23767123829134
+          },
+          {
+            "id": "skill:lead",
+            "x": 656.7034717513162,
+            "y": 427.37136295267646
+          },
+          {
+            "id": "skill:stock",
+            "x": 301.61820691312613,
+            "y": 438.48342003967855
+          },
+          {
+            "id": "skill:safety",
+            "x": 737.8755113813417,
+            "y": 438.48342003967855
+          },
+          {
+            "id": "skill:equipment",
+            "x": 823.6676770008726,
+            "y": 457.5993214553651
+          },
+          {
+            "id": "skill:quality",
+            "x": 403.2001473151964,
+            "y": 427.37136295267646
+          },
+          {
+            "id": "dest:barista",
+            "x": 210.08232142857145,
+            "y": 305.54196428571424
+          },
+          {
+            "id": "dest:carpenter",
+            "x": 359.3620833333333,
+            "y": 305.54196428571424
+          },
+          {
+            "id": "dest:delivery-driver",
+            "x": 508.64184523809524,
+            "y": 305.54196428571424
+          },
+          {
+            "id": "dest:shop-supervisor",
+            "x": 807.201369047619,
+            "y": 305.54196428571424
+          },
+          {
+            "id": "dest:warehouse-supervisor",
+            "x": 941.5531547619047,
+            "y": 305.54196428571424
+          },
+          {
+            "id": "revealed:firefighter",
+            "x": 657.9216071428572,
+            "y": 305.54196428571424
+          },
+          {
+            "id": "unknown:firstaid",
+            "x": 681.6071115973741,
+            "y": 354.85654996353026
+          },
+          {
+            "id": "unknown:emergency",
+            "x": 584.285081967213,
+            "y": 336.8711366120218
+          },
+          {
+            "id": "unknown:risks",
+            "x": 683.7648099606815,
+            "y": 326.09874617737
+          }
+        ],
+        "leaders": [
+          "skill:quality"
+        ]
+      },
+      "pointing": null,
+      "dpr": 2,
+      "css": [
+        1440,
+        809
+      ],
+      "canvas": [
+        2880,
+        1618
+      ]
+    },
+    "circuit": {
+      "direction": "circuit",
+      "mode": "moving",
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+      "firstFrame": 105,
+      "inputToFrame": [
+        14.6,
+        1.8,
+        1.5,
+        3.2,
+        1.1
+      ],
+      "stats": {
+        "frames": {
+          "frames": 10062,
+          "seconds": 11.48,
+          "p50": 0.2,
+          "p95": 2.7,
+          "p99": 3.2,
+          "max": 27.2,
+          "over8": 5,
+          "over16": 5
+        },
+        "script": {
+          "frames": 10062,
+          "seconds": 8.44,
+          "p50": 0,
+          "p95": 2.6,
+          "p99": 2.7,
+          "max": 7.3,
+          "over8": 0,
+          "over16": 0
+        },
+        "gpu": {
+          "frames": 8336,
+          "seconds": 8.19,
+          "p50": 0.9,
+          "p95": 1.75,
+          "p99": 2.19,
+          "max": 2.97,
+          "over8": 0,
+          "over16": 0
+        }
+      },
+      "layout": {
+        "lights": [
+          {
+            "id": "origin",
+            "x": 388.8,
+            "y": 453.04
+          },
+          {
+            "id": "skill:hygiene",
+            "x": 378.87626666666665,
+            "y": 621.7434666666667
+          },
+          {
+            "id": "skill:deadlines",
+            "x": 279.63893333333334,
+            "y": 324.0314666666667
+          },
+          {
+            "id": "skill:calm",
+            "x": 398.72373333333337,
+            "y": 284.33653333333336
+          },
+          {
+            "id": "skill:lead",
+            "x": 517.8085333333333,
+            "y": 343.87893333333335
+          },
+          {
+            "id": "skill:stock",
+            "x": 259.7914666666667,
+            "y": 562.2010666666667
+          },
+          {
+            "id": "skill:safety",
+            "x": 557.5034666666667,
+            "y": 462.9637333333334
+          },
+          {
+            "id": "skill:equipment",
+            "x": 497.9610666666667,
+            "y": 582.0485333333334
+          },
+          {
+            "id": "skill:quality",
+            "x": 220.09653333333333,
+            "y": 443.11626666666666
+          },
+          {
+            "id": "dest:barista",
+            "x": 567.4272000000001,
+            "y": 105.70933333333335
+          },
+          {
+            "id": "dest:carpenter",
+            "x": 755.9781333333333,
+            "y": 333.9552
+          },
+          {
+            "id": "dest:delivery-driver",
+            "x": 775.8256,
+            "y": 482.81120000000004
+          },
+          {
+            "id": "dest:shop-supervisor",
+            "x": 736.1306666666667,
+            "y": 621.7434666666667
+          },
+          {
+            "id": "dest:warehouse-supervisor",
+            "x": 646.8170666666667,
+            "y": 740.8282666666667
+          },
+          {
+            "id": "revealed:firefighter",
+            "x": 686.512,
+            "y": 204.9466666666667
+          },
+          {
+            "id": "unknown:firstaid",
+            "x": 557.5034666666667,
+            "y": 254.56533333333334
+          },
+          {
+            "id": "unknown:emergency",
+            "x": 587.2746666666667,
+            "y": 284.33653333333336
+          },
+          {
+            "id": "unknown:risks",
+            "x": 617.0458666666667,
+            "y": 314.1077333333334
+          }
+        ],
+        "leaders": []
+      },
+      "pointing": null,
+      "dpr": 2,
+      "css": [
+        1440,
+        809
+      ],
+      "canvas": [
+        2880,
+        1618
+      ]
+    }
+  },
+  "first": {
+    "growth": {
+      "firstFrameMs": 73,
+      "firstFrameRuns": [
+        111,
+        73,
+        69
+      ],
+      "keystrokeToFrameMs": {
+        "median": 4.2,
+        "p95": 8.1,
+        "max": 9,
+        "count": 33,
+        "samples": [
+          1.3,
+          4.9,
+          6.3,
+          5.9,
+          0.3,
+          0.5,
+          5.1,
+          4.8,
+          8.1,
+          1.2,
+          1.7,
+          0.7,
+          5.8,
+          7,
+          9,
+          1.3,
+          2.9,
+          3.7,
+          4.2,
+          7.3,
+          0.7,
+          6.9,
+          0.6,
+          7.2,
+          0.4,
+          1.7,
+          4.3,
+          6.2,
+          7,
+          6.8,
+          2.5,
+          3.4,
+          3.3
+        ]
+      }
+    },
+    "horizon": {
+      "firstFrameMs": 67,
+      "firstFrameRuns": [
+        71,
+        64,
+        67
+      ],
+      "keystrokeToFrameMs": {
+        "median": 4.8,
+        "p95": 7.1,
+        "max": 7.7,
+        "count": 33,
+        "samples": [
+          3.8,
+          5.3,
+          5.7,
+          6.7,
+          7.7,
+          2.5,
+          5.4,
+          0.5,
+          2,
+          3.8,
+          5.1,
+          3.4,
+          5.1,
+          6,
+          6.8,
+          7.1,
+          6.4,
+          7.1,
+          0.4,
+          0.3,
+          3,
+          3.7,
+          0.8,
+          6.4,
+          2.4,
+          4.7,
+          4.8,
+          5.6,
+          6.5,
+          6,
+          1,
+          3,
+          4.7
+        ]
+      }
+    },
+    "circuit": {
+      "firstFrameMs": 72,
+      "firstFrameRuns": [
+        76,
+        72,
+        72
+      ],
+      "keystrokeToFrameMs": {
+        "median": 3.3,
+        "p95": 8.4,
+        "max": 8.9,
+        "count": 33,
+        "samples": [
+          1.5,
+          8.4,
+          2.5,
+          4.2,
+          0.7,
+          0.6,
+          0.5,
+          0.7,
+          2.6,
+          5.3,
+          4.6,
+          0.6,
+          7.3,
+          7.7,
+          0.6,
+          1.7,
+          3.3,
+          3.1,
+          4.7,
+          7.6,
+          8.9,
+          3,
+          0.7,
+          3.3,
+          5.8,
+          6.4,
+          8.3,
+          0.5,
+          3.7,
+          5.6,
+          6.9,
+          0.3,
+          1.6
+        ]
+      }
+    }
+  }
+}

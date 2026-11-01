@@ -1,0 +1,6 @@
+# Vendored upstream files are kept byte-for-byte (their SHA-256 is recorded); no EOL
+# normalisation.
+docs/design/fonts/** -text
+fixtures/m0/** -text
+fixtures/esco-sample/*.zip binary
+apps/web/src/design/fonts/** -text

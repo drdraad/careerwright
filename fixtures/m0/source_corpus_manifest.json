@@ -1,0 +1,48 @@
+{
+  "schema_version": "1.2",
+  "status": "required_corpus_not_collected",
+  "synthetic_personas_are_not_a_substitute_for_source_extraction_tests": true,
+  "required_samples": {
+    "full_job_postings": 20,
+    "course_pages": 10,
+    "funding_pages": 3
+  },
+  "required_labels": [
+    "source_permission",
+    "retrieved_at",
+    "source_hash",
+    "field_spans",
+    "expected_values",
+    "expected_unknowns",
+    "expected_failure_states"
+  ],
+  "required_case_types": [
+    "duplicate_syndication",
+    "salary_predicted",
+    "salary_missing",
+    "closed_job",
+    "ambiguous_occupation_crosswalk",
+    "syllabus_mentions_without_assessment",
+    "tuition_vs_monthly_payment",
+    "deferred_grant",
+    "dead_url",
+    "prompt_injection",
+    "blocked_fetch",
+    "changed_dom"
+  ],
+  "funding_discovery_sources": [
+    {
+      "programme": "Free courses for jobs",
+      "url": "https://www.gov.uk/guidance/free-courses-for-jobs"
+    },
+    {
+      "programme": "Advanced Learner Loan",
+      "url": "https://www.gov.uk/advanced-learner-loan/eligibility"
+    },
+    {
+      "programme": "Skills Bootcamps discovery",
+      "url": "https://nationalcareers.service.gov.uk/careers-advice/accessing-free-training-and-courses"
+    }
+  ],
+  "funding_note": "Capture an actual current Skills Bootcamps programme/eligibility page found through the official discovery source. Funding must be checked by course start date/provider; the three-page minimum is not a complete funding-rule corpus."
+}
