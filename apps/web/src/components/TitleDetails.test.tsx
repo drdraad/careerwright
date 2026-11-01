@@ -133,6 +133,79 @@ describe("[PROF-11][MAP1-09] seniority and industry beside each title, and ESCO'
     });
   });
 
+  it("keeps seniority or industry typed but not saved when the person marks a skill", async () => {
+    // The stored details: a mark saves a new version, and the list is read again.
+    let stored: TitleDetailsListOut["titles"][number] = { ...role, version: 1 };
+    const { user, sent } = renderDetails([
+      { method: "GET", path: /\/profile\/titles$/, answer: () => list(stored) },
+      originRoute(origin([usual("k1", "keep records")])),
+      {
+        method: "PUT",
+        path: /\/profile\/titles$/,
+        status: 201,
+        answer: () => {
+          stored = { ...role, version: 2, not_part_of_job: ["k1"] };
+          return { ...stored, support_note: null };
+        },
+      },
+    ]);
+
+    const section = await screen.findByRole("region", { name: "Seniority and industry" });
+    await user.click(
+      within(section).getByRole("button", { name: "Add seniority or industry for bookkeeper" }),
+    );
+    await user.type(within(section).getByLabelText("Seniority (optional)"), "Band 6");
+    await user.click(
+      await within(section).findByText("The skill ESCO lists for this kind of work"),
+    );
+    await user.click(
+      within(section).getByRole("button", { name: "Not part of my job: keep records" }),
+    );
+
+    await waitFor(() =>
+      expect(
+        within(section).getByRole("button", { name: "Not part of my job: keep records" }),
+      ).toHaveAttribute("aria-pressed", "true"),
+    );
+    // Only the mark was saved; the open form and its typed words are still there.
+    expect(sent.find((s) => s.method === "PUT")?.body).toMatchObject({
+      seniority: null,
+      not_part_of_job: ["k1"],
+    });
+    expect(within(section).getByLabelText("Seniority (optional)")).toHaveValue("Band 6");
+  });
+
+  it("says so when ESCO's list for the role couldn't be loaded, never an empty list", async () => {
+    const { user, sent } = renderDetails([
+      get(list(role)),
+      {
+        method: "GET",
+        path: /\/origin$/,
+        status: 503,
+        answer: {
+          error: {
+            code: "TAXONOMY_UNAVAILABLE",
+            message: "",
+            retryable: false,
+            stage: "request",
+            correlation_id: "c1",
+            details: {},
+          },
+        },
+      },
+    ]);
+
+    const section = await screen.findByRole("region", { name: "Seniority and industry" });
+    expect(
+      await within(section).findByText("The occupation list isn't loaded", {}, { timeout: 8000 }),
+    ).toBeVisible();
+    const before = sent.filter((s) => s.path.endsWith("/origin")).length;
+    await user.click(within(section).getByRole("button", { name: "Try again" }));
+    await waitFor(() =>
+      expect(sent.filter((s) => s.path.endsWith("/origin")).length).toBeGreaterThan(before),
+    );
+  }, 15000);
+
   it("shows a marked skill as the person's own display choice", async () => {
     renderDetails([
       get(list({ ...role, not_part_of_job: ["k1"], version: 1 })),
