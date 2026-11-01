@@ -30,6 +30,15 @@ from pydantic import BaseModel, ConfigDict, Field
 from careerwright.api.discovery_schemas import SlateOut, WrittenExplanationOut
 from careerwright.api.interview_schemas import ProposalOut
 from careerwright.capability.commands import committed_data, pack_targets
+from careerwright.capability.strength import (
+    DestinationKind,
+    DestinationRecord,
+    SkillRecord,
+    StrengthInput,
+    StrengthOutput,
+    check_strength,
+    quotable_answers,
+)
 from careerwright.catalogue import taxonomy_store
 from careerwright.catalogue.ai_resilience import committed_packs
 from careerwright.catalogue.pay import committed_reviews
@@ -79,6 +88,10 @@ from careerwright.profile.targets import resolve_target, role_record, target_tit
 from careerwright.vocabulary import DataMode, WorkState
 
 CASES_PATH = Path(__file__).with_name("evaluation_cases.json")
+# The synthetic school leaver (Task 6e; plan v1.6), kept apart from the supplied pack.
+SCHOOL_LEAVER = (
+    Path(__file__).resolve().parents[2] / "fixtures" / "synthetic" / "school-leaver.json"
+)
 _LETTERS = re.compile(r"[^\W\d_]+")
 # The answers searched as skills; the person's own titles give their own reasons.
 _SEARCHED_FIELDS = frozenset({"enjoyed_tasks", "confident_tasks", "evidenced_tasks", "work_style"})
@@ -127,6 +140,8 @@ class CaseKind(StrEnum):
     EXPLANATION = "explanation"  # a slate's first view and its written explanation
     SUPPORT = "support"  # the support screen: whether the message triggers the support flow
     GUARD = "guard"  # a canned model output against the deterministic output checks
+    # A canned overlooked-strength proposal against the deterministic strength check (Task 6e).
+    STRENGTH = "strength"
 
 
 class FailureType(StrEnum):
@@ -187,6 +202,11 @@ class Case(BaseModel):
     discovery_output: Json | None = None
     expect: list[Expectation]
     note: str | None = None
+    # The synthetic persona whose case this is, by the card's ID (the school leaver: Task 6e).
+    persona: str | None = None
+    # A strength case: one destination with its essential skills (each an ESCO label and URI)
+    # and a model's canned answer, checked against the case's answers.
+    strength: Json | None = None
 
 
 def profile_input_of(profile: Json) -> Json:
@@ -319,6 +339,19 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
     if e.check == "includes_direction":
         found = {s["direction"] for s in suggestions}
         return None if e.direction in found else Failure(FailureType.DIVERSITY, f"{found}")
+    if e.check == "nothing_close_to_now":
+        # Someone who has never had a job (Task 6e): no suggestion is close to what they do
+        # now, and none is joined to a current role by shared skills.
+        close = [
+            s.get("title")
+            for s in suggestions
+            if s["direction"] == "close_to_current"
+            or any(
+                r.get("reason") == "joined_by_shared_skills" and r.get("field") == "current_role"
+                for r in s["reasons"]
+            )
+        ]
+        return Failure(FailureType.GROUNDING, f"close to now: {close}") if close else None
     if e.check == "grounded":
         bad = [
             s["title"]
@@ -598,6 +631,8 @@ def evaluate(case: Case, observed: Json, others: Mapping[str, Json]) -> list[Fai
             failure = _discovery(observed, e, answers_of(case))
         elif case.kind is CaseKind.EXPLANATION:
             failure = _explanation(observed, e, [text for _, text in answers_of(case)])
+        elif case.kind is CaseKind.STRENGTH:
+            failure = _strength(observed, e, [text for _, text in answers_of(case)])
         elif case.kind is CaseKind.SUPPORT:
             # `support_shown`: the support flow (the panel beside the sent message).
             shown = bool(observed[e.check])
@@ -615,6 +650,24 @@ def evaluate(case: Case, observed: Json, others: Mapping[str, Json]) -> list[Fai
         if failure is not None:
             failures.append(failure)
     return failures
+
+
+def _strength(observed: Json, e: Expectation, answers: list[str]) -> Failure | None:
+    """`strength_accepted`: the check accepted one strength whose quotation is the person's
+    own words (an independent check: a run of their words in one answer, case aside);
+    `strength_refused`: the check refused the answer and kept nothing."""
+    problems: list[str] = observed["problems"]
+    shown = observed["strength"]
+    if e.check == "strength_accepted":
+        if problems or shown is None:
+            return Failure(FailureType.GUARD, f"refused: {problems}")
+        quoted = " ".join(str(shown["quotation"]).casefold().split())
+        theirs = any(quoted in " ".join(answer.casefold().split()) for answer in answers)
+        return None if theirs else Failure(FailureType.GROUNDING, f"not quoted: {quoted}")
+    if e.check == "strength_refused":
+        refused = bool(problems) and shown is None
+        return None if refused else Failure(FailureType.GUARD, f"accepted: {shown}")
+    raise ValueError(f"unknown strength check {e.check!r}")
 
 
 def _guard(observed: Json, e: Expectation) -> Failure | None:
@@ -687,6 +740,49 @@ def observe_interview_demo(case: Case) -> Json:
         return {"proposal": None, "run": {"status": f"failed: {problems}"}}
     observed = ProposalOut.of(proposal).model_dump(mode="json")
     return {"proposal": observed, "run": {"status": "complete"}}
+
+
+def observe_strength(case: Case) -> Json:
+    """A strength case's canned answer through the product's own check (`check_strength`),
+    over the case's answers and its one destination, as the run's input would carry them."""
+    if case.strength is None:
+        raise ValueError(f"{case.id}: a strength case names its destination and answer")
+    destination = case.strength["destination"]
+    skills = [
+        SkillRecord(
+            ref=f"s{n}", skill_id=uuid.uuid5(uuid.NAMESPACE_URL, s["uri"]), label=s["label"]
+        )
+        for n, s in enumerate(destination["skills"], start=1)
+    ]
+    context = StrengthInput(
+        turn_id=_SOURCE,
+        profile_version=1,
+        release="esco-v1.2.1",
+        answers=quotable_answers(evidence_of(document_of(case))),
+        destinations=[
+            DestinationRecord(
+                ref="d1",
+                concept_id=uuid.uuid5(uuid.NAMESPACE_URL, destination["uri"]),
+                title=destination["title"],
+                kind=DestinationKind.TARGET,
+                skills=[s.ref for s in skills],
+            )
+        ],
+        skills=skills,
+    )
+    output = StrengthOutput.model_validate(case.strength["output"])
+    proposal, problems = check_strength(output, context, ProposalOrigin.MODEL)
+    strength = proposal.strength if proposal is not None else None
+    return {
+        "problems": problems,
+        "strength": None
+        if strength is None
+        else {
+            "destination": strength.destination.title,
+            "skill": strength.skill.label,
+            "quotation": strength.quotation.text,
+        },
+    }
 
 
 def observe_discovery_offline(tx: Tx, case: Case, *, release: str | None = None) -> Json:

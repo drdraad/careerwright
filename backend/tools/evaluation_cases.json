@@ -706,6 +706,132 @@
       "profile": {"enjoyed_tasks": ["repairing physical objects", "working outdoors"], "work_style": ["practical", "small team"], "cities": ["Leeds", "Manchester"], "weekly_study_hours": 12},
       "expect": [{"check": "written_for_each"}, {"check": "both_sources"}, {"check": "quotations_are_spans"}, {"check": "provenance_kept"}, {"check": "no_percentage"}],
       "note": "Task 6b. Not in the default live run: run it with CASES=EXP-01 under its own budget scope (a discovery, then its slate's explanation: two runs, at most four requests)."
+    },
+    {
+      "id": "INT-16",
+      "kind": "interview",
+      "persona": "SL01",
+      "title": "The synthetic school leaver's first answer: no job yet, in education, what she has done; no job title, no income, one question about what she enjoys",
+      "requirements": ["TEST1-16", "STATE-11", "PROF-13", "PROF-14"],
+      "synthetic": true,
+      "demo": true,
+      "entry_mode": "unsure",
+      "message": "Synthetic persona: I'm in Year 13 doing biology, chemistry and psychology. I've never had a job but I help run a Brownies group.",
+      "expect": [
+        {"check": "state_is", "field": "current_role", "state": "no_job_yet"},
+        {"check": "proposes", "field": "work_status", "value": "in_education_or_training"},
+        {"check": "proposes", "field": "evidenced_tasks", "words": ["Brownies"]},
+        {"check": "values_avoid", "words": ["achieved"], "whole_words": true},
+        {"check": "no_value_for", "fields": ["direct_spend_cap", "monthly_payment_cap", "minimum_salary", "target_titles"]},
+        {"check": "missing_excludes", "fields": ["current_role"]},
+        {"check": "one_question"},
+        {"check": "question_mentions_any", "words": ["enjoy", "like doing", "interest"]},
+        {"check": "question_avoids", "words": ["job title", "do you do now", "most recently", "age"], "whole_words": true}
+      ],
+      "note": "Task 6e (plan v1.6; TEST1-16): the card's own words. Her subjects may be proposed as expected qualifications (never achieved); the demo interviewer reads them only with the word A-levels, so the case does not require them. Live: CASES=INT-16 on interview prompt version 5."
+    },
+    {
+      "id": "INT-17",
+      "kind": "interview",
+      "persona": "SL01",
+      "title": "The synthetic school leaver says what she enjoys: recorded in her words; no job title, no income, never asked for a job",
+      "requirements": ["TEST1-16", "PROF-14"],
+      "synthetic": true,
+      "demo": true,
+      "entry_mode": "unsure",
+      "profile": {
+        "current_role": {"state": "no_job_yet"},
+        "work_status": "in_education_or_training",
+        "evidenced_tasks": ["help run a Brownies group"]
+      },
+      "message": "Synthetic persona: I enjoy doing practicals in the chemistry lab and helping the younger girls with crafts.",
+      "expect": [
+        {"check": "proposes", "field": "enjoyed_tasks", "words": ["practicals", "crafts"]},
+        {"check": "no_value_for", "fields": ["direct_spend_cap", "monthly_payment_cap", "minimum_salary", "target_titles"]},
+        {"check": "missing_excludes", "fields": ["current_role", "enjoyed_tasks"]},
+        {"check": "one_question"},
+        {"check": "question_avoids", "words": ["job title", "do you do now", "most recently", "age"], "whole_words": true}
+      ],
+      "note": "Task 6e. Her current role is already answered (no job yet), so it is never missing and never asked again."
+    },
+    {
+      "id": "DSC-21",
+      "kind": "discovery",
+      "persona": "SL01",
+      "title": "The synthetic school leaver's suggestions from her school subjects and volunteering: grounded in her answers and ESCO, nothing called close to what she does now",
+      "requirements": ["TEST1-16", "REC1-05", "REC1-06"],
+      "synthetic": true,
+      "profile": {
+        "current_role": {"state": "no_job_yet"},
+        "work_status": "in_education_or_training",
+        "qualifications": [
+          {"name": "A-level biology", "status": "expected"},
+          {"name": "A-level chemistry", "status": "expected"},
+          {"name": "A-level psychology", "status": "expected"}
+        ],
+        "enjoyed_tasks": ["doing practicals in the chemistry lab", "helping the younger girls with crafts"],
+        "evidenced_tasks": ["help run a Brownies group"],
+        "cities": ["Leeds"]
+      },
+      "expect": [
+        {"check": "grounded"},
+        {"check": "distinct"},
+        {"check": "no_percentage"},
+        {"check": "unsupported_not_suggested"},
+        {"check": "nothing_close_to_now"}
+      ],
+      "note": "Task 6e (plan v1.6; TEST1-16). Offline on the full ESCO release in the integration run; live: CASES=DSC-21."
+    },
+    {
+      "id": "STR-01",
+      "kind": "strength",
+      "persona": "SL01",
+      "title": "A strength from the synthetic school leaver's own words, for a target chosen from her slate: accepted only as a quotation of her answer",
+      "requirements": ["TEST1-16", "TEST1-10"],
+      "synthetic": true,
+      "profile": {
+        "current_role": {"state": "no_job_yet"},
+        "enjoyed_tasks": ["doing practicals in the chemistry lab", "helping the younger girls with crafts"],
+        "evidenced_tasks": ["help run a Brownies group"]
+      },
+      "strength": {
+        "destination": {
+          "title": "chemistry technician",
+          "uri": "http://data.europa.eu/esco/occupation/87775d69-ae88-449e-ad71-6f9875711816",
+          "skills": [
+            {"label": "laboratory techniques", "uri": "http://data.europa.eu/esco/skill/8259c2c0-2749-41e2-a4a8-4a64a76eab37"},
+            {"label": "chemical processes", "uri": "http://data.europa.eu/esco/skill/74aa00bc-db99-4984-8817-7df2ca954ea1"}
+          ]
+        },
+        "output": {"strengths": [{"destination": "d1", "skill": "s1", "quotation": "doing practicals in the chemistry lab"}]}
+      },
+      "expect": [{"check": "strength_accepted"}],
+      "note": "Task 6e. The destination stands for a target she chose from her slate; chemistry technician and these two essential skills are as ESCO v1.2.1 lists them (checked in the labelled sample, fixtures/esco-sample). Whether her live slate offers it is DSC-21's live run, not this case: this case checks that a strength rests on her own words."
+    },
+    {
+      "id": "STR-02",
+      "kind": "strength",
+      "persona": "SL01",
+      "title": "A strength in words the synthetic school leaver never used is refused",
+      "requirements": ["TEST1-16", "TEST1-10"],
+      "synthetic": true,
+      "profile": {
+        "current_role": {"state": "no_job_yet"},
+        "enjoyed_tasks": ["doing practicals in the chemistry lab", "helping the younger girls with crafts"],
+        "evidenced_tasks": ["help run a Brownies group"]
+      },
+      "strength": {
+        "destination": {
+          "title": "chemistry technician",
+          "uri": "http://data.europa.eu/esco/occupation/87775d69-ae88-449e-ad71-6f9875711816",
+          "skills": [
+            {"label": "laboratory techniques", "uri": "http://data.europa.eu/esco/skill/8259c2c0-2749-41e2-a4a8-4a64a76eab37"}
+          ]
+        },
+        "output": {"strengths": [{"destination": "d1", "skill": "s1", "quotation": "strong laboratory skills"}]}
+      },
+      "expect": [{"check": "strength_refused"}],
+      "note": "Task 6e: a paraphrase is not her words, so the check refuses it and nothing is proposed."
     }
   ]
 }
