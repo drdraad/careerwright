@@ -208,3 +208,64 @@ Branch `wt-12c` rebased onto `claude/confident-ramanujan-ux3saw` at 6a3fef8. Hea
 
 ### Not done (listed for later)
 Minors 2, 3 and 4, as the fix round says.
+
+## Follow-up: the Advanced Learner Loan
+
+You said "I think so" (1 November 2026). An Advanced Learner Loan paid straight to the college
+is now a loan to repay, just like a tuition fee loan. This is recorded as your provisional
+yes; session W2 asks it again.
+
+Branch `wt-12c`, rebased onto `claude/confident-ramanujan-ux3saw` at 5480e16. Head: ecbdbc1.
+- 0434949: the change.
+- 3104d0c: the migration renumbered to 0044. Task 6e's fix round took 0043 while I worked.
+- ecbdbc1: the register, last.
+
+### What changed
+- **Ruling: one statement with a kind, not a second rule.**
+  - `TuitionFeeLoan` and `TuitionFeeLoanInput` gained `kind`: `FeeLoanKind`, either
+    `tuition_fee_loan` (the default) or `advanced_learner_loan`.
+  - The default means every stored document and stored result keeps its meaning.
+  - Everything else is shared, not copied: what it pays, its statuses, an unknown amount,
+    the economic cost, the search.
+  - The field keeps its name `tuition_fee_loan` (the smallest change). Tasks 12b and 14 read
+    `kind` to word it.
+- `LoanToRepay` carries the kind, defaulting to a tuition fee loan for older results.
+- A family's financing says `advanced_learner_loan:<application>`.
+- **The oracle:**
+  - It reads both loans its own way (a set of the two loans paid to the provider) and
+    refuses any other kind.
+  - Its generated instances draw either kind in every state.
+  - The fixed `loan_statuses` instance gained an Advanced Learner Loan, applied for.
+- **Pruning:** rules unchanged, so the version stays `sound-pruning-5`.
+- **Migration 0044:** a CHECK that a fee loan is one of the two kinds. It is forward-only; a
+  missing kind passes, because it means a tuition fee loan.
+- **Other loans:** maintenance loans and every other loan are still refused as support, and a
+  fee loan of any other kind is refused.
+- **Docs:** one paragraph in ADR 0013's Task 12c amendment (it replaces the old known limit
+  that said the Advanced Learner Loan was refused). The CLAUDE.md proposal now names both
+  loans.
+- **Client:** regenerated.
+
+### Tests and checks
+- RED: with the new tests and generator in place, collection failed, because `kind` was not
+  yet a field.
+- GREEN:
+  - `test_planning_tuition_loan.py::test_an_advanced_learner_loan_paid_to_the_college_is_a_loan_to_repay_too`
+    (on neither side, conditional beside the self-paid route, unknown amount, family);
+  - `::test_the_person_states_which_fee_loan_and_any_other_kind_is_refused`;
+  - the oracle's `test_the_oracle_reads_a_tuition_fee_loan_in_every_state` (the new
+    Advanced Learner Loan case);
+  - all three oracle properties, with both kinds.
+- `env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY make check` after the rebase: passed.
+  Backend 1,851 passed, 8 skipped (the same skips as before); Vitest 466.
+- Not run, as the dispatch says (the controller runs them): integration and acceptance.
+  - In `integration/test_planning_inputs.py`, the round trip now uses an Advanced Learner Loan
+    for its not-yet-approved loan.
+  - The database-rules test gained a case: a `maintenance_loan` kind is refused.
+
+### Changed test inputs (disclosed)
+- `everything()` in the integration test: the loan on its second option is now
+  `kind: advanced_learner_loan`. The stored document now carries `kind`, so the round trip
+  needs it named, and this way it covers the new kind.
+- The oracle generator now also draws the kind, so it explores different instances.
+- `loan_statuses` gained one option, which grows the combinations the oracle checks.
