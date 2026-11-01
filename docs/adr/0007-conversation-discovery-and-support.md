@@ -1041,3 +1041,22 @@ space; this ADR changes as follows.
   - Nothing about the panel is stored or used for suitability. The screen's words and windows
     are unchanged; both uses and their lines are not yet reviewed as built (`REVIEW_STATUS`;
     session W2).
+- **Amendment line, Task 6d slice C (2026-11-01): decision 14 is a plain line, and every place
+  a person types is screened** (`support-policy-10`).
+  - *Decision 14* (the product owner's answer, 1 November 2026: "Always a plain line"). The
+    skills the person's role shares with a suggestion are a plain fact about the two roles,
+    never a discovery moment: every suggestion the role's join found already says it
+    ("ESCO lists N of the same essential skills for both", the skills named). The rule that
+    singled one out as "the unexpected connection" is removed, with `SlateOut.connection`,
+    `OriginOut.connection`, the web's mark and the evaluation checks `connection` and
+    `no_connection` (DSC-10, DSC-15 and DSC-16 keep their other checks); the slate itself is
+    unchanged for every evaluation case recorded before Task 6d. The connection is no longer the
+    Roles chapter's moment; Task M chooses that again (ADR 0015, amendment line).
+  - *Decision 7* (the product owner's "every place a person types", 31 October 2026). The
+    answers a person types in the conversation's review step (a decision's `edits`, saved as
+    direct entries) and the seniority and industry they give beside a title go through the same
+    screen as What we know's direct entries: the words the entry adds against the version it
+    was made against; saved as usual, with the same calm panel beside the answer
+    (`DecisionSavedOut`, `TitleDetailsSavedOut`) or beside its refusal; derived from the request
+    every time and never stored, not even in the receipt. The panel's words, lists and windows
+    are unchanged; both new uses are not yet reviewed as built (`REVIEW_STATUS`; session W2).

@@ -413,3 +413,11 @@ its rules on protected gates, unknown and readiness (decisions 4, 5 and 7) are u
   - Importance edits made against P03's rows for a target 0036 decided again (one whose
     qualifier names another nursing field) stay stored but no longer apply: that target no
     longer has P03's rows. 0036 doesn't move or remove them.
+- **Amendment line, Task 6d slice C (2026-11-01): "not part of my job", seniority and
+  industry** (ADR 0015, amendment line). The skills ESCO lists for the role's kind of work are
+  ESCO's list ("ESCO lists these for this kind of work"), and the person can mark any of them
+  "not part of my job" (`careerwright.profile.title_details`, migration 0039): the origin's
+  usual skills carry it as `not_part_of_job`, a display state that is never evidence, never a
+  level, never a demotion of a protected gate, and is read by no matrix, question or readiness
+  result. Seniority and industry beside the role or a target are kept the same way; matching
+  and readiness ignore them. The Skills chapter (Task 10) offers the marks on a target's list.

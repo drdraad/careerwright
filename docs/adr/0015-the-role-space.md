@@ -312,3 +312,60 @@ words; a real phone's keyboard stays a human check.
   another answer too. A title it answers is kept only by the person's choice in the panel
   (ADR 0007, amendment line, fix round 2). While fixing a title, the way back to the closest
   question is named for what it does ("Back to “Which of these is closest?”").
+
+## Amendment line, Task 6d slice C (2026-11-01): ESCO under the real role, seniority and industry, and the CV deferred
+
+Decision 4 is settled and decision 3's optional fields are built. Session W2 judges the words.
+- **The unexpected connection: "Always a plain line"** (the product owner's answer, 1 November
+  2026). The skills the person's role shares with a suggestion are a plain fact about the two
+  roles, on every suggestion the role's join found ("Your current role: “…”. ESCO lists 12 of
+  the same essential skills for both, so Careerwright joined them by those skills.", the skills
+  named under it), never a discovery moment or a revelation. A plain line needs no rule that
+  singles one suggestion out, so that rule (ADR 0007 decision 14) is gone with its API fields
+  (`SlateOut.connection`, `OriginOut.connection`), the web's "An unexpected connection" mark and
+  the evaluation checks `connection` and `no_connection`. The Roles chapter's moment is Task M's
+  to choose again.
+- **ESCO's list is ESCO's.** The essential skills ESCO lists for a role or a target are "ESCO
+  lists these for this kind of work", never the person's skills and never what the work
+  "usually" needs without that source (the sketch, a chosen target, the world's key: "ESCO lists
+  it, not confirmed yet"). ESCO is named in plain words where a view first shows its list ("ESCO,
+  the European Union's public list of occupations and skills": the suggestions, the sketch, the
+  role's list). The API code `usual_in_role` keeps its name; its description says whose list it
+  is.
+- **"Not part of my job."** Beside the person's own role, its ESCO list is one step away in What
+  we know, and they may mark any of its skills "not part of my job": a display state kept per
+  role (by the title as a concept), shown on the origin's skills (`not_part_of_job`), never
+  evidence, never a level, never used for suitability or readiness. Only a skill ESCO lists as
+  essential for the title's one occupation can be marked. The record can hold marks for a
+  target's list too; the Skills chapter (Task 10) offers them there.
+- **No revelation rests on ESCO's essential skills alone.** Checked: the connection is now a
+  plain line; the overlooked strength rests on the person's own words, verified as a span of
+  their answers, and their confirmation (ADR 0014 decision 3); the slate's suggestions are
+  suggestions, not revelations (ADR 0007 decision 5, unchanged, R11); no other revelation is
+  built yet (routes, Task 14; the moments, Task M).
+- **Seniority and industry** (decision 3; migration 0039, `title_details`;
+  `GET`/`PUT .../profile/titles`). Beside the role or a target, by the title as a concept, each
+  optional, in the person's words: not given is null and is said as "not given", never a
+  default. Each save is the next version of that title's details, with an expected version and
+  an Idempotency-Key. Matching ignores them: nothing in the slate, the sketch, the records or
+  Skills reads them. Display keeps them (What we know); search keeps them beside the title for
+  the job search that takes a target title (Task 8), and today's source search still sends a
+  target title and a city only (ADR 0009 decision 12). The interviewer doesn't propose them yet:
+  the interview contract names only the profile's fields, and a prompt change needs a live
+  qualification. A person who gave no job title meets none of this.
+- **Every place a person types** (the product owner, 31 October 2026): a title's seniority and
+  industry, and the answers typed in the conversation's review step, go through the support
+  screen as What we know's direct entries do (`support-policy-10`; ADR 0007, amendment line).
+- **Pasted CV text is an L0 deferral** (plan section 1), so PROF-12 is deferred. It isn't small:
+  a CV doesn't fit a message (2,000 characters) or a turn's prompt (8,500 bytes, with five
+  earlier messages kept), so the same proposal path would need larger bounds and spend
+  reservations for every turn and a prompt change that can't be qualified without live calls; a
+  CV's referees' emails, phone numbers and contact fields would need removing before the text is
+  sealed, which a message never does, so it would need its own input; and the demo's
+  interviewer reads only a few fixed sentence shapes, so in the demo it would find almost
+  nothing. The product owner's direction of 1 November 2026 weighs the same way: many people
+  using Careerwright will be final-year school students who have never had a job and often have
+  no CV.
+- **Known limits (L0, recorded):** a role and a target with the same title as a concept keep
+  their details apart (by use), but two spellings of one title share them, as their records do;
+  the workspace export (format 4) doesn't carry title details yet.
