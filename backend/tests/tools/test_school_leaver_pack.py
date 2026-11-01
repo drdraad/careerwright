@@ -39,9 +39,12 @@ NEW_SOURCES = {s["source_id"] for s in LABELS["sources"]}
 EVIDENCE = REPO_ROOT / "var" / "evidence" / "corpus"
 MANIFEST = REPO_ROOT / "corpus" / "manifest.json"
 NEW_RECORDS = {
+    "funding:F04",
     "funding:F05",
     "funding:F05.maintenance",
     "funding:F10",
+    "funding:F12",
+    "funding:F12.maintenance",
     "option:C11",
     "offering:C11",
 }
@@ -112,17 +115,38 @@ def test_a_loan_or_bursary_amount_is_a_cap_for_the_year_its_page_names() -> None
     assert "F05.rules_change" in funds["funding:F05.maintenance"].facts
 
 
+@pytest.mark.req("OPTN-14")
+def test_a_course_starting_from_january_2027_has_its_own_loans_never_the_earlier_caps() -> None:
+    funds = {f.record_id: f for f in PACK.funding_instruments}
+
+    for record_id in ("funding:F12", "funding:F12.maintenance"):
+        fund = funds[record_id]
+        assert "F12.rule_start" in fund.rules  # courses starting on or after 1 January 2027
+        assert "F12.rule_course" in fund.rules  # 'most undergraduate': no course is named
+        assert "£25,000 a year" in str(PACK.value(fund.repayment))
+        assert "F13.plan_5.lifelong" in fund.facts
+    per_credits: Any = PACK.value("F12.loan_maximum.tuition")
+    assert (per_credits["maximum_minor_units"], per_credits["period"]) == (979000, None)
+    assert "120 credits" in per_credits["applies_to"]
+    assert "F12.loan_maximum.tuition" not in funds["funding:F05"].facts
+    assert "F13.plan_5.undergraduate" in funds["funding:F05"].facts
+    assert "F13.plan_5.learner_loan" in funds["funding:F02"].facts
+
+
 @pytest.mark.req("OPTN-14", "OPT1-16")
 def test_nothing_is_guessed_for_the_pages_that_did_not_state_their_value() -> None:
     offerings = {o.record_id: o for o in PACK.offerings}
     before = {o.record_id: o for o in BEFORE.offerings}
 
-    # F04 does not state the apprentice's training fee; C12 answered 404.
+    # F04 names who else pays, not what the apprentice pays; C12's excerpts hold no date.
     assert isinstance(offerings["offering:C09"].fee_total, Unknown)
     assert isinstance(offerings["offering:C08"].application_deadline, Unknown)
     assert offerings["offering:C09"] == before["offering:C09"]
     assert offerings["offering:C08"] == before["offering:C08"]
-    assert not {"F04", "C12"} & {s.source_id for s in PACK.sources}
+    assert "C12" not in {s.source_id for s in PACK.sources}
+    apprenticeship = next(f for f in PACK.funding_instruments if f.record_id == "funding:F04")
+    assert apprenticeship.instrument_kind == "programme"  # never read as a fee of £0
+    assert "does not say what the apprentice pays" in str(PACK.claim("F04.instrument_kind").note)
     t_level = offerings["offering:C11"]
     assert isinstance(t_level.fee_total, Unknown)  # never 0
     assert "never 0" in t_level.fee_total.unknown
@@ -157,13 +181,16 @@ def test_the_pages_are_govuk_kept_privately_and_fetched_through_the_proxy() -> N
         assert source.rights_class.value == "govuk"
         assert source.retention.value == "body"  # never in git: var/evidence/corpus only
         assert "via_proxy true, address_checked false" in slots[source.source_id]["fetch_route"]
-    assert pending["C12"]["attempt"] == {"status": "failed", "reason": "http_error"}
-    assert pending["C12"]["http_status"] == 404
-    assert pending["F04"]["status"].startswith("fetched, not used")
+    assert set(pending) == {"C12"}
+    assert pending["C12"]["attempt"] == {"status": "succeeded", "reason": None}
+    assert pending["C12"]["rights_status"] == "pending human rights review"
+    assert pending["C12"]["retention"] == "excerpts"
+    assert pending["C12"]["earlier_attempt"]["http_status"] == 404
+    assert pending["C12"]["status"].startswith("fetched, not used")
     assert manifest["collected_samples"] == {
         "full_job_postings": 20,
         "course_pages": 11,
-        "funding_pages": 10,
+        "funding_pages": 13,
     }
 
 

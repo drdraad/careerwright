@@ -301,11 +301,11 @@ reviewed.
 
 ## Amendment, 2026-11-01 (Task 7f: the school-leaver pages, version 0.3.0)
 
-- **Version 0.3.0 adds to 0.2.0, it does not re-review it.** It is 0.2.0 with eight
+- **Version 0.3.0 adds to 0.2.0, it does not re-review it.** It is 0.2.0 with eleven
   school-leaver pages and their records (plan v1.6), built by `tools.school_leaver_pack`
-  from `backend/tools/school_leaver_labels.json` and pinned like every version. Its five
+  from `backend/tools/school_leaver_labels.json` and pinned like every version. Its eight
   new records are `proposed`, with no review. The Advanced Learner Loan (`funding:F02`)
-  gains how it is paid and repaid from two more pages of its guide; it was and stays
+  gains how it is paid and repaid, and its plan, from three more pages; it was and stays
   `proposed`, and keeps session 2's review record as given. Every other record, and
   versions 0.1.0 and 0.2.0, are unchanged.
 - **A cap is its own shape (`limit`).** A page that states "Up to £9,790" states the most a
@@ -321,5 +321,11 @@ reviewed.
   HTTPS proxy, which chooses the address, so each slot in `corpus/manifest.json` records
   `via_proxy` true and `address_checked` false (ADR 0009, amendment of 2026-11-01).
 - **A page that does not state its value adds nothing.** The apprentice's training fee
-  (F04's page does not state it) and the nursing degree's UCAS deadline (C12 answered 404)
-  keep 0.2.0's unknowns until a page states them (`pending_slots`, OI-14).
+  (F04 names the government and the employer as payers, not what the apprentice pays) and
+  the nursing degree's UCAS deadline (C12's located excerpts hold the heading, not the
+  date) keep 0.2.0's unknowns (`pending_slots`, OI-14).
+- **Two student-finance regimes, two records each.** Courses starting before 1 January 2027
+  take the 2026 to 2027 caps (`funding:F05`); courses starting on or after it, the Lifelong
+  Learning Entitlement's (`funding:F12`), which the page says covers "most undergraduate"
+  courses without naming them. No record links a loan to a course: which applies follows
+  the course's start, and whether the course is covered stays the page's word.

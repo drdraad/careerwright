@@ -1,6 +1,38 @@
 {
- "about": "The school-leaver pages' labels (Task 7f, 2026-11-01): each page as the controller's fetch recorded it (planning/task-7f-fetch-output.json; through the session's HTTPS proxy, so via_proxy true and address_checked false), and each claim with its span located in the kept body (first occurrence; exact count). tools.school_leaver_pack builds pack 0.3.0 from them.",
+ "about": "The school-leaver pages' labels (Task 7f, 2026-11-01): each page as the controller's fetches recorded it (planning/task-7f-fetch-output.json and task-7f-fetch-output-more.json; through the session's HTTPS proxy, so via_proxy true and address_checked false), and each claim with its span located in the kept body (first occurrence; exact count). tools.school_leaver_pack builds pack 0.3.0 from them.",
  "sources": [
+  {
+   "source_id": "C11",
+   "kind": "course_page",
+   "route": "fetch",
+   "url": "https://www.gov.uk/government/publications/introduction-of-t-levels/introduction-of-t-levels",
+   "final_url": "https://www.gov.uk/government/publications/introduction-of-t-levels/introduction-of-t-levels",
+   "retrieved_at": "2026-11-01T18:24:30.457297+00:00",
+   "http_status": 200,
+   "content_type": "text/html",
+   "sha256": "06095b9df361e27fa5826ae320331a0edb8dae9281797179c483a797605ff321",
+   "rights_class": "govuk",
+   "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+   "retention": "body",
+   "template_family": "govuk-html-publication",
+   "split": "development"
+  },
+  {
+   "source_id": "F04",
+   "kind": "funding_page",
+   "route": "fetch",
+   "url": "https://www.gov.uk/employing-an-apprentice/get-funding",
+   "final_url": "https://www.gov.uk/employing-an-apprentice/get-funding",
+   "retrieved_at": "2026-11-01T18:41:54.640826+00:00",
+   "http_status": 200,
+   "content_type": "text/html",
+   "sha256": "1006f11706cba81754a8353fd2d5fc6b66dc3dad9a495a672bc646c8da480421",
+   "rights_class": "govuk",
+   "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+   "retention": "body",
+   "template_family": "govuk-mainstream-guide",
+   "split": "holdout"
+  },
   {
    "source_id": "F05",
    "kind": "funding_page",
@@ -114,23 +146,351 @@
    "split": "holdout"
   },
   {
-   "source_id": "C11",
-   "kind": "course_page",
+   "source_id": "F12",
+   "kind": "funding_page",
    "route": "fetch",
-   "url": "https://www.gov.uk/government/publications/introduction-of-t-levels/introduction-of-t-levels",
-   "final_url": "https://www.gov.uk/government/publications/introduction-of-t-levels/introduction-of-t-levels",
-   "retrieved_at": "2026-11-01T18:24:30.457297+00:00",
+   "url": "https://www.gov.uk/student-finance-on-or-after-1-january-2027",
+   "final_url": "https://www.gov.uk/student-finance-on-or-after-1-january-2027",
+   "retrieved_at": "2026-11-01T18:41:55.956189+00:00",
    "http_status": 200,
    "content_type": "text/html",
-   "sha256": "06095b9df361e27fa5826ae320331a0edb8dae9281797179c483a797605ff321",
+   "sha256": "a398a2c154ed5ce49ff40e7d7756d18961b4663c5f6ed7aeb400c05f45977ae3",
    "rights_class": "govuk",
    "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
    "retention": "body",
-   "template_family": "govuk-html-publication",
-   "split": "development"
+   "template_family": "govuk-mainstream-guide",
+   "split": "holdout"
+  },
+  {
+   "source_id": "F13",
+   "kind": "funding_page",
+   "route": "fetch",
+   "url": "https://www.gov.uk/repaying-your-student-loan/which-repayment-plan-you-are-on",
+   "final_url": "https://www.gov.uk/repaying-your-student-loan/which-repayment-plan-you-are-on",
+   "retrieved_at": "2026-11-01T18:42:00.508608+00:00",
+   "http_status": 200,
+   "content_type": "text/html",
+   "sha256": "020eeef15d91eabf9cfe42bb0c7a066dbbab6ba0d9f2abd1ef4c5b643c19b9ee",
+   "rights_class": "govuk",
+   "rights_status": "govuk: \"All content is available under the Open Government Licence v3.0, except where otherwise stated\" (page footer, read on https://www.gov.uk/guidance/free-courses-for-jobs) (read 2026-10-28)",
+   "retention": "body",
+   "template_family": "govuk-mainstream-guide",
+   "split": "holdout"
   }
  ],
  "claims": [
+  {
+   "claim_id": "C11.title",
+   "source_id": "C11",
+   "field": "title",
+   "value": "T Level",
+   "span": {
+    "start": 115,
+    "end": 139
+   },
+   "excerpt": "Introduction of T Levels",
+   "occurrences": 6
+  },
+  {
+   "claim_id": "C11.duration",
+   "source_id": "C11",
+   "field": "duration",
+   "value": [
+    {
+     "unit": "years",
+     "minimum": 2,
+     "maximum": 2,
+     "mode": null,
+     "typical": false,
+     "unbounded": false
+    }
+   ],
+   "span": {
+    "start": 4130,
+    "end": 4235
+   },
+   "excerpt": "T Levels are 2-year courses which are taken after GCSEs and are broadly equivalent in size to 3 A Levels.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "C11.entry_requirement",
+   "source_id": "C11",
+   "field": "entry_requirement",
+   "value": "taken after GCSEs",
+   "span": {
+    "start": 4130,
+    "end": 4235
+   },
+   "excerpt": "T Levels are 2-year courses which are taken after GCSEs and are broadly equivalent in size to 3 A Levels.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "C11.size_equivalence",
+   "source_id": "C11",
+   "field": "size_equivalence",
+   "value": "broadly equivalent in size to 3 A Levels",
+   "span": {
+    "start": 4130,
+    "end": 4235
+   },
+   "excerpt": "T Levels are 2-year courses which are taken after GCSEs and are broadly equivalent in size to 3 A Levels.",
+   "occurrences": 2,
+   "note": "the page names no qualification level for a T Level"
+  },
+  {
+   "claim_id": "C11.placement_duration",
+   "source_id": "C11",
+   "field": "placement_duration",
+   "value": [
+    {
+     "unit": "hours",
+     "minimum": 315,
+     "maximum": null,
+     "mode": null,
+     "typical": false,
+     "unbounded": false
+    }
+   ],
+   "span": {
+    "start": 4668,
+    "end": 4735
+   },
+   "excerpt": "an industry placement of at least 315 hours – approximately 45 days",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "C11.classroom_hours",
+   "source_id": "C11",
+   "field": "classroom_hours",
+   "value": [
+    {
+     "unit": "hours",
+     "minimum": 1100,
+     "maximum": 1300,
+     "mode": null,
+     "typical": true,
+     "unbounded": false
+    }
+   ],
+   "span": {
+    "start": 6844,
+    "end": 6994
+   },
+   "excerpt": "We expect the typical time to be between 1100 and 1300 classroom hours across the 2 years plus the mandatory Industry Placement of at least 315 hours.",
+   "occurrences": 2,
+   "note": "over the 2 years"
+  },
+  {
+   "claim_id": "C11.delivery_mode",
+   "source_id": "C11",
+   "field": "delivery_mode",
+   "value": "a technical qualification and an industry placement with an employer",
+   "span": {
+    "start": 9327,
+    "end": 9440
+   },
+   "excerpt": "T Levels require students to undertake both a technical qualification and an industry placement with an employer.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "C11.credential",
+   "source_id": "C11",
+   "field": "credential",
+   "value": "a nationally recognised T Level certificate with the overall grade",
+   "span": {
+    "start": 12798,
+    "end": 12949
+   },
+   "excerpt": "Students who complete their T Level get a nationally recognised certificate which shows their overall grade and a breakdown of what they have achieved.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "C11.assessment",
+   "source_id": "C11",
+   "field": "assessment",
+   "value": "an overall grade: pass, merit, distinction or distinction*",
+   "span": {
+    "start": 13007,
+    "end": 13090
+   },
+   "excerpt": "an overall grade for the T Level, shown as pass, merit, distinction or distinction*",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "C11.pass_rule",
+   "source_id": "C11",
+   "field": "pass_rule",
+   "value": "a grade 4 in English and maths GCSE is not required to pass",
+   "span": {
+    "start": 9632,
+    "end": 9776
+   },
+   "excerpt": "T Level students are not required to achieve either a grade 4 in English and maths GCSE or level 2 in functional skills to pass their programme.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "C11.availability",
+   "source_id": "C11",
+   "field": "availability",
+   "value": "at selected colleges, schools and other providers across England",
+   "span": {
+    "start": 4744,
+    "end": 4835
+   },
+   "excerpt": "The courses are available at selected colleges, schools and other providers across England.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "C11.subject_accounting",
+   "source_id": "C11",
+   "field": "subject",
+   "value": "accounting (T Level courses since September 2022)",
+   "span": {
+    "start": 85082,
+    "end": 85160
+   },
+   "excerpt": "September 2022</h3>\n\n<p>T Level courses started in:</p>\n\n<ul>\n  <li>accounting",
+   "occurrences": 1
+  },
+  {
+   "claim_id": "C11.progression",
+   "source_id": "C11",
+   "field": "progression",
+   "value": "UCAS tariff points are allocated to T Levels",
+   "span": {
+    "start": 14467,
+    "end": 14511
+   },
+   "excerpt": "UCAS tariff points are allocated to T Levels",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "C11.published_on",
+   "source_id": "C11",
+   "field": "published_on",
+   "value": "2018-05-25",
+   "span": {
+    "start": 28470,
+    "end": 28544
+   },
+   "excerpt": "<meta name=\"govuk:first-published-at\" content=\"2018-05-25T13:10:59+01:00\">",
+   "occurrences": 1,
+   "note": "the page's metadata state its first publication"
+  },
+  {
+   "claim_id": "C11.rules_updated_on",
+   "source_id": "C11",
+   "field": "rules_updated_on",
+   "value": "2026-01-26",
+   "span": {
+    "start": 28616,
+    "end": 28689
+   },
+   "excerpt": "<meta name=\"govuk:public-updated-at\" content=\"2026-01-26T12:32:02+00:00\">",
+   "occurrences": 1,
+   "note": "the page's metadata state its last public update"
+  },
+  {
+   "claim_id": "F04.programme",
+   "source_id": "F04",
+   "field": "programme",
+   "value": "government funding for apprenticeship training",
+   "span": {
+    "start": 142,
+    "end": 181
+   },
+   "excerpt": "Get funding for apprenticeship training",
+   "occurrences": 3
+  },
+  {
+   "claim_id": "F04.instrument_kind",
+   "source_id": "F04",
+   "field": "instrument_kind",
+   "value": "the government helps the employer pay for apprenticeship training",
+   "span": {
+    "start": 4837,
+    "end": 4909
+   },
+   "excerpt": "You can get help from the government to pay for apprenticeship training.",
+   "occurrences": 2,
+   "note": "written for employers: it names the government and the employer as payers and does not say what the apprentice pays"
+  },
+  {
+   "claim_id": "F04.eligible_costs",
+   "source_id": "F04",
+   "field": "eligible_costs",
+   "value": "the cost of training and assessment, up to the funding band maximum",
+   "span": {
+    "start": 5052,
+    "end": 5129
+   },
+   "excerpt": "You can get money to go towards the cost of training and assessment up to the",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F04.rule_age",
+   "source_id": "F04",
+   "field": "rule_age_band",
+   "value": "an employer not paying the levy: the government pays 100% (up to the funding band maximum) for an apprentice aged 16 to 24",
+   "span": {
+    "start": 5643,
+    "end": 5769
+   },
+   "excerpt": "The government will pay 100% of the cost (up to the funding band maximum) of training and assessing an apprentice if they are:",
+   "occurrences": 2,
+   "note": "the list goes on: 'aged 16 to 24'; 'aged 15' with a late-summer birthday"
+  },
+  {
+   "claim_id": "F04.employer_share",
+   "source_id": "F04",
+   "field": "employer_share",
+   "value": "for any other apprentice, the employer pays 5% of training and assessment",
+   "span": {
+    "start": 6006,
+    "end": 6103
+   },
+   "excerpt": "For all other apprentices, you pay 5% towards the cost of training and assessing your apprentice.",
+   "occurrences": 2,
+   "note": "for an employer that does not pay the levy"
+  },
+  {
+   "claim_id": "F04.timing",
+   "source_id": "F04",
+   "field": "timing",
+   "value": "the government pays its share directly to the training provider",
+   "span": {
+    "start": 6333,
+    "end": 6453
+   },
+   "excerpt": "The government will pay the rest (95%) up to the funding band maximum. They’ll pay it directly to the training provider.",
+   "occurrences": 2
+  },
+  {
+   "claim_id": "F04.published_on",
+   "source_id": "F04",
+   "field": "published_on",
+   "value": "2014-11-04",
+   "span": {
+    "start": 16368,
+    "end": 16442
+   },
+   "excerpt": "<meta name=\"govuk:first-published-at\" content=\"2014-11-04T14:35:46+00:00\">",
+   "occurrences": 1,
+   "note": "the page's metadata state its first publication"
+  },
+  {
+   "claim_id": "F04.rules_updated_on",
+   "source_id": "F04",
+   "field": "rules_updated_on",
+   "value": "2024-10-14",
+   "span": {
+    "start": 16514,
+    "end": 16587
+   },
+   "excerpt": "<meta name=\"govuk:public-updated-at\" content=\"2024-10-14T08:00:04+01:00\">",
+   "occurrences": 1,
+   "note": "the page's metadata state its last public update"
+  },
   {
    "claim_id": "F05.programme.tuition",
    "source_id": "F05",
@@ -877,215 +1237,387 @@
    "occurrences": 2
   },
   {
-   "claim_id": "C11.title",
-   "source_id": "C11",
-   "field": "title",
-   "value": "T Level",
+   "claim_id": "F12.programme.tuition",
+   "source_id": "F12",
+   "field": "programme",
+   "value": "Tuition Fee Loans through the Lifelong Learning Entitlement",
    "span": {
-    "start": 115,
-    "end": 139
+    "start": 4811,
+    "end": 4840
    },
-   "excerpt": "Introduction of T Levels",
+   "excerpt": "Lifelong Learning Entitlement",
+   "occurrences": 22
+  },
+  {
+   "claim_id": "F12.programme.maintenance",
+   "source_id": "F12",
+   "field": "programme",
+   "value": "Maintenance Loans through the Lifelong Learning Entitlement",
+   "span": {
+    "start": 4811,
+    "end": 4840
+   },
+   "excerpt": "Lifelong Learning Entitlement",
+   "occurrences": 22
+  },
+  {
+   "claim_id": "F12.rule_start",
+   "source_id": "F12",
+   "field": "rule_course",
+   "value": "courses starting on or after 1 January 2027 (the student may need to apply through the new system)",
+   "span": {
+    "start": 4650,
+    "end": 4780
+   },
+   "excerpt": "For courses starting on or after 1 January 2027, you may need to apply for student finance through the new student finance system.",
+   "occurrences": 3
+  },
+  {
+   "claim_id": "F12.rule_course",
+   "source_id": "F12",
+   "field": "rule_course",
+   "value": "most undergraduate and some postgraduate and further education courses",
+   "span": {
+    "start": 5229,
+    "end": 5314
+   },
+   "excerpt": "This includes most undergraduate and some postgraduate and further education courses.",
+   "occurrences": 3,
+   "note": "'most': whether a particular course is included is not stated"
+  },
+  {
+   "claim_id": "F12.eligible_costs.tuition",
+   "source_id": "F12",
+   "field": "eligible_costs",
+   "value": "course tuition fees",
+   "span": {
+    "start": 5938,
+    "end": 5992
+   },
+   "excerpt": "Tuition Fee Loans to help pay your course tuition fees",
    "occurrences": 6
   },
   {
-   "claim_id": "C11.duration",
-   "source_id": "C11",
-   "field": "duration",
-   "value": [
-    {
-     "unit": "years",
-     "minimum": 2,
-     "maximum": 2,
-     "mode": null,
-     "typical": false,
-     "unbounded": false
-    }
-   ],
+   "claim_id": "F12.eligible_costs.maintenance",
+   "source_id": "F12",
+   "field": "eligible_costs",
+   "value": "living costs",
    "span": {
-    "start": 4130,
-    "end": 4235
+    "start": 6025,
+    "end": 6073
    },
-   "excerpt": "T Levels are 2-year courses which are taken after GCSEs and are broadly equivalent in size to 3 A Levels.",
-   "occurrences": 2
+   "excerpt": "Maintenance Loans to help with your living costs",
+   "occurrences": 6
   },
   {
-   "claim_id": "C11.entry_requirement",
-   "source_id": "C11",
-   "field": "entry_requirement",
-   "value": "taken after GCSEs",
-   "span": {
-    "start": 4130,
-    "end": 4235
+   "claim_id": "F12.loan_maximum.tuition",
+   "source_id": "F12",
+   "field": "loan_maximum",
+   "value": {
+    "currency": "GBP",
+    "maximum_minor_units": 979000,
+    "period": null,
+    "repayable": null,
+    "applies_to": "every 120 credits studied (a full-time year of a bachelor's degree is usually 120 credits)"
    },
-   "excerpt": "T Levels are 2-year courses which are taken after GCSEs and are broadly equivalent in size to 3 A Levels.",
-   "occurrences": 2
+   "span": {
+    "start": 57901,
+    "end": 57971
+   },
+   "excerpt": "You can get up to a maximum of £9,790 for every 120 credits you study.",
+   "occurrences": 1,
+   "note": "in the page's own structured data (its FAQ holds the guide's 'What you'll get' part), not in this part's visible text"
   },
   {
-   "claim_id": "C11.size_equivalence",
-   "source_id": "C11",
-   "field": "size_equivalence",
-   "value": "broadly equivalent in size to 3 A Levels",
-   "span": {
-    "start": 4130,
-    "end": 4235
+   "claim_id": "F12.loan_maximum.tuition_total",
+   "source_id": "F12",
+   "field": "loan_maximum",
+   "value": {
+    "currency": "GBP",
+    "maximum_minor_units": 3916000,
+    "period": null,
+    "repayable": null,
+    "applies_to": "in total, depending on previous study (around 4 years of full-time study or 480 credits)"
    },
-   "excerpt": "T Levels are 2-year courses which are taken after GCSEs and are broadly equivalent in size to 3 A Levels.",
+   "span": {
+    "start": 56626,
+    "end": 56693
+   },
+   "excerpt": "you can apply for Tuition Fee Loans up to a total amount of £39,160",
+   "occurrences": 1,
+   "note": "in the page's own structured data (its FAQ holds the guide's 'What you'll get' part), not in this part's visible text"
+  },
+  {
+   "claim_id": "F12.rates_change",
+   "source_id": "F12",
+   "field": "rules_change",
+   "value": "the amounts are based on current rates and may change",
+   "span": {
+    "start": 56757,
+    "end": 56820
+   },
+   "excerpt": "This amount is based on current rates and may change over time.",
+   "occurrences": 1,
+   "note": "in the page's own structured data (its FAQ holds the guide's 'What you'll get' part), not in this part's visible text"
+  },
+  {
+   "claim_id": "F12.credits",
+   "source_id": "F12",
+   "field": "amount_rule",
+   "value": "a full-time year of a bachelor's degree is usually worth 120 credits",
+   "span": {
+    "start": 6358,
+    "end": 6435
+   },
+   "excerpt": "a year of studying a bachelor’s degree full time is usually worth 120 credits",
+   "occurrences": 6
+  },
+  {
+   "claim_id": "F12.loan_maximum.maintenance",
+   "source_id": "F12",
+   "field": "loan_maximum",
+   "value": {
+    "currency": "GBP",
+    "maximum_minor_units": 1541500,
+    "period": "year",
+    "repayable": null,
+    "applies_to": "a course year of up to 30 weeks, depending on where the student lives, credits, weeks and household income"
+   },
+   "span": {
+    "start": 61926,
+    "end": 62022
+   },
+   "excerpt": "You can get up to a maximum of £15,415 for your course year when you’re studying up to 30 weeks.",
+   "occurrences": 1,
+   "note": "in the page's own structured data (its FAQ holds the guide's 'What you'll get' part), not in this part's visible text"
+  },
+  {
+   "claim_id": "F12.rule_tuition_left",
+   "source_id": "F12",
+   "field": "rule_course",
+   "value": "a Maintenance Loan only with at least £1,587.50 of the Tuition Fee Loan amount left",
+   "span": {
+    "start": 61058,
+    "end": 61126
+   },
+   "excerpt": "still have at least £1,587.50 left from your Tuition Fee Loan amount",
+   "occurrences": 1,
+   "note": "in the page's own structured data (its FAQ holds the guide's 'What you'll get' part), not in this part's visible text"
+  },
+  {
+   "claim_id": "F12.rule_in_person",
+   "source_id": "F12",
+   "field": "rule_course",
+   "value": "a Maintenance Loan only when attending in person",
+   "span": {
+    "start": 61139,
+    "end": 61167
+   },
+   "excerpt": "attend your course in person",
    "occurrences": 2,
-   "note": "the page names no qualification level for a T Level"
+   "note": "in the page's own structured data (its FAQ holds the guide's 'What you'll get' part), not in this part's visible text"
   },
   {
-   "claim_id": "C11.placement_duration",
-   "source_id": "C11",
-   "field": "placement_duration",
-   "value": [
-    {
-     "unit": "hours",
-     "minimum": 315,
-     "maximum": null,
-     "mode": null,
-     "typical": false,
-     "unbounded": false
-    }
-   ],
+   "claim_id": "F12.timing.tuition",
+   "source_id": "F12",
+   "field": "timing",
+   "value": "paid directly to the university or college, which sets the tuition fee",
    "span": {
-    "start": 4668,
-    "end": 4735
+    "start": 70940,
+    "end": 71028
    },
-   "excerpt": "an industry placement of at least 315 hours – approximately 45 days",
-   "occurrences": 2
+   "excerpt": "Your university or college sets your tuition fee, and the loan is paid directly to them.",
+   "occurrences": 1,
+   "note": "in the page's own structured data (its FAQ holds the guide's 'What you'll get' part), not in this part's visible text"
   },
   {
-   "claim_id": "C11.classroom_hours",
-   "source_id": "C11",
-   "field": "classroom_hours",
-   "value": [
-    {
-     "unit": "hours",
-     "minimum": 1100,
-     "maximum": 1300,
-     "mode": null,
-     "typical": true,
-     "unbounded": false
-    }
-   ],
+   "claim_id": "F12.timing.maintenance",
+   "source_id": "F12",
+   "field": "timing",
+   "value": "paid directly into the student's bank account",
    "span": {
-    "start": 6844,
-    "end": 6994
+    "start": 71094,
+    "end": 71143
    },
-   "excerpt": "We expect the typical time to be between 1100 and 1300 classroom hours across the 2 years plus the mandatory Industry Placement of at least 315 hours.",
-   "occurrences": 2,
-   "note": "over the 2 years"
+   "excerpt": "The loan is paid directly into your bank account.",
+   "occurrences": 1,
+   "note": "in the page's own structured data (its FAQ holds the guide's 'What you'll get' part), not in this part's visible text"
   },
   {
-   "claim_id": "C11.delivery_mode",
-   "source_id": "C11",
-   "field": "delivery_mode",
-   "value": "a technical qualification and an industry placement with an employer",
+   "claim_id": "F12.payment_schedule",
+   "source_id": "F12",
+   "field": "payment_schedule",
+   "value": "up to 2 more payments a year in January, April, July or September",
    "span": {
-    "start": 9327,
-    "end": 9440
+    "start": 71498,
+    "end": 71637
    },
-   "excerpt": "T Levels require students to undertake both a technical qualification and an industry placement with an employer.",
-   "occurrences": 2
+   "excerpt": "You may receive up to 2 more payments a year in January, April, July or September, depending on when the course started and how long it is.",
+   "occurrences": 1,
+   "note": "in the page's own structured data (its FAQ holds the guide's 'What you'll get' part), not in this part's visible text"
   },
   {
-   "claim_id": "C11.credential",
-   "source_id": "C11",
-   "field": "credential",
-   "value": "a nationally recognised T Level certificate with the overall grade",
+   "claim_id": "F12.first_payment",
+   "source_id": "F12",
+   "field": "payment_schedule",
+   "value": "the first payment once the provider confirms the student has registered",
    "span": {
-    "start": 12798,
-    "end": 12949
+    "start": 71154,
+    "end": 71296
    },
-   "excerpt": "Students who complete their T Level get a nationally recognised certificate which shows their overall grade and a breakdown of what they have achieved.",
-   "occurrences": 2
+   "excerpt": "You’ll receive your first payment once your education provider has confirmed to Student Finance England that you’ve registered for the course.",
+   "occurrences": 1,
+   "note": "in the page's own structured data (its FAQ holds the guide's 'What you'll get' part), not in this part's visible text"
   },
   {
-   "claim_id": "C11.assessment",
-   "source_id": "C11",
-   "field": "assessment",
-   "value": "an overall grade: pass, merit, distinction or distinction*",
+   "claim_id": "F12.repayment",
+   "source_id": "F12",
+   "field": "repayment",
+   "value": "repaid once earning over £25,000 a year, after finishing or leaving the course",
    "span": {
-    "start": 13007,
-    "end": 13090
+    "start": 8511,
+    "end": 8620
    },
-   "excerpt": "an overall grade for the T Level, shown as pass, merit, distinction or distinction*",
-   "occurrences": 2
+   "excerpt": "For courses starting from 1 January 2027, you’ll start repaying your loans when you earn over £25,000 a year.",
+   "occurrences": 3
   },
   {
-   "claim_id": "C11.pass_rule",
-   "source_id": "C11",
-   "field": "pass_rule",
-   "value": "a grade 4 in English and maths GCSE is not required to pass",
+   "claim_id": "F12.write_off",
+   "source_id": "F12",
+   "field": "write_off",
+   "value": "written off 40 years after the April first due to repay",
    "span": {
-    "start": 9632,
-    "end": 9776
+    "start": 8651,
+    "end": 8733
    },
-   "excerpt": "T Level students are not required to achieve either a grade 4 in English and maths GCSE or level 2 in functional skills to pass their programme.",
-   "occurrences": 2
+   "excerpt": "Your loans will be written off 40 years after the April you’re first due to repay.",
+   "occurrences": 3
   },
   {
-   "claim_id": "C11.availability",
-   "source_id": "C11",
-   "field": "availability",
-   "value": "at selected colleges, schools and other providers across England",
+   "claim_id": "F12.interest",
+   "source_id": "F12",
+   "field": "interest",
+   "value": "currently 4.1%, from the first payment",
    "span": {
-    "start": 4744,
-    "end": 4835
+    "start": 8949,
+    "end": 8991
    },
-   "excerpt": "The courses are available at selected colleges, schools and other providers across England.",
-   "occurrences": 2
+   "excerpt": "You’ll currently be charged 4.1% interest:",
+   "occurrences": 3
   },
   {
-   "claim_id": "C11.subject_accounting",
-   "source_id": "C11",
-   "field": "subject",
-   "value": "accounting (T Level courses since September 2022)",
+   "claim_id": "F12.nhs_funding",
+   "source_id": "F12",
+   "field": "other_funding",
+   "value": "NHS funding or a bursary for certain courses such as nursing or social work",
    "span": {
-    "start": 85082,
-    "end": 85160
+    "start": 7716,
+    "end": 7806
    },
-   "excerpt": "September 2022</h3>\n\n<p>T Level courses started in:</p>\n\n<ul>\n  <li>accounting",
-   "occurrences": 1
+   "excerpt": "NHS funding or a bursary if you’re studying certain courses such as nursing or social work",
+   "occurrences": 4
   },
   {
-   "claim_id": "C11.progression",
-   "source_id": "C11",
-   "field": "progression",
-   "value": "UCAS tariff points are allocated to T Levels",
+   "claim_id": "F12.rule_residency.status",
+   "source_id": "F12",
+   "field": "rule_residency",
+   "value": "a UK national or Irish citizen, or with settled status in the UK",
    "span": {
-    "start": 14467,
-    "end": 14511
+    "start": 53504,
+    "end": 53579
    },
-   "excerpt": "UCAS tariff points are allocated to T Levels",
-   "occurrences": 2
+   "excerpt": "If you’re a UK national or Irish citizen or have ‘settled status’ in the UK",
+   "occurrences": 1,
+   "note": "in the page's own structured data (its FAQ holds the guide's 'What you'll get' part), not in this part's visible text"
   },
   {
-   "claim_id": "C11.published_on",
-   "source_id": "C11",
+   "claim_id": "F12.rule_residency.home",
+   "source_id": "F12",
+   "field": "rule_residency",
+   "value": "home in England",
+   "span": {
+    "start": 53702,
+    "end": 53725
+   },
+   "excerpt": "your home is in England",
+   "occurrences": 1,
+   "note": "in the page's own structured data (its FAQ holds the guide's 'What you'll get' part), not in this part's visible text"
+  },
+  {
+   "claim_id": "F12.rule_residency.three_years",
+   "source_id": "F12",
+   "field": "rule_residency",
+   "value": "living in the UK, Channel Islands or Isle of Man for 3 years before the first day of the month the course starts",
+   "span": {
+    "start": 53738,
+    "end": 53876
+   },
+   "excerpt": "you’ve been continuously living in the UK, Channel Islands or Isle of Man for 3 years before the first day of the month your course starts",
+   "occurrences": 1,
+   "note": "in the page's own structured data (its FAQ holds the guide's 'What you'll get' part), not in this part's visible text"
+  },
+  {
+   "claim_id": "F12.published_on",
+   "source_id": "F12",
    "field": "published_on",
-   "value": "2018-05-25",
+   "value": "2026-01-30",
    "span": {
-    "start": 28470,
-    "end": 28544
+    "start": 12243,
+    "end": 12317
    },
-   "excerpt": "<meta name=\"govuk:first-published-at\" content=\"2018-05-25T13:10:59+01:00\">",
+   "excerpt": "<meta name=\"govuk:first-published-at\" content=\"2026-01-30T16:39:24+00:00\">",
    "occurrences": 1,
    "note": "the page's metadata state its first publication"
   },
   {
-   "claim_id": "C11.rules_updated_on",
-   "source_id": "C11",
+   "claim_id": "F12.rules_updated_on",
+   "source_id": "F12",
    "field": "rules_updated_on",
-   "value": "2026-01-26",
+   "value": "2026-01-30",
    "span": {
-    "start": 28616,
-    "end": 28689
+    "start": 12389,
+    "end": 12462
    },
-   "excerpt": "<meta name=\"govuk:public-updated-at\" content=\"2026-01-26T12:32:02+00:00\">",
+   "excerpt": "<meta name=\"govuk:public-updated-at\" content=\"2026-01-30T16:39:24+00:00\">",
    "occurrences": 1,
    "note": "the page's metadata state its last public update"
+  },
+  {
+   "claim_id": "F13.plan_5.undergraduate",
+   "source_id": "F13",
+   "field": "repayment_plan",
+   "value": "Plan 5 for an undergraduate course started on or after 1 August 2023",
+   "span": {
+    "start": 46767,
+    "end": 46908
+   },
+   "excerpt": "If you started your course on or after 1 August 2023</h3>\n\n<p>You’ll be on Plan 5 if:</p>\n\n<ul>\n  <li>you’re studying an undergraduate course",
+   "occurrences": 1
+  },
+  {
+   "claim_id": "F13.plan_5.learner_loan",
+   "source_id": "F13",
+   "field": "repayment_plan",
+   "value": "Plan 5 for an Advanced Learner Loan, for a course started on or after 1 August 2023",
+   "span": {
+    "start": 46994,
+    "end": 47064
+   },
+   "excerpt": "you take out an <a href=\"/advanced-learner-loan\">Advanced Learner Loan",
+   "occurrences": 2,
+   "note": "the first occurrence, in the list under 'If you started your course on or after 1 August 2023'"
+  },
+  {
+   "claim_id": "F13.plan_5.lifelong",
+   "source_id": "F13",
+   "field": "repayment_plan",
+   "value": "Plan 5 for student finance through the Lifelong Learning Entitlement",
+   "span": {
+    "start": 47081,
+    "end": 47206
+   },
+   "excerpt": "you take out student finance through your <a href=\"/student-finance-on-or-after-1-january-2027\">Lifelong Learning Entitlement",
+   "occurrences": 1
   }
  ]
 }

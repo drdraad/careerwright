@@ -5,16 +5,19 @@ v1.6; ADR 0011), every new or changed record `proposed` for the school-leaver pa
   controller's fetch recorded it (through the guarded fetcher, `tools.corpus --batch`, via the
   session's HTTPS proxy), and each claim with its span in the kept body (the first occurrence
   and the exact count). The bodies stay in the gitignored `var/evidence/corpus/`.
-- **New records:** the Tuition Fee Loan and the Maintenance Loan (each with its payment,
-  repayment, age and residency rules), the 16 to 19 Bursary Fund, and a T Level (an option and
-  its offering). Every one `proposed`, dated by its pages' retrieval.
+- **New records:** the Tuition Fee Loan and the Maintenance Loan for courses starting before
+  1 January 2027, and the same two loans through the Lifelong Learning Entitlement for courses
+  starting on or after it (each with its payment, repayment, age and residency rules); the
+  16 to 19 Bursary Fund; the government's funding of apprenticeship training; and a T Level
+  (an option and its offering). Every one `proposed`, dated by its pages' retrieval.
 - **One changed record:** the Advanced Learner Loan (`funding:F02`) gains how it is paid and
-  repaid and what it covers, from two more pages of its guide. Its session 2 review stays as
-  it was given; it was and stays `proposed`.
+  repaid, its repayment plan and what it covers, from three more pages. Its session 2 review
+  stays as it was given; it was and stays `proposed`.
 - **Unchanged:** every other record, and versions 0.1.0 and 0.2.0 with their pins.
-- **Not yet in it** (no value is guessed): the apprentice's training fee (the page fetched does
-  not state it) and the nursing degree's UCAS deadline (its page answered 404). Both fields
-  keep their 0.2.0 unknowns until their pages are fetched.
+- **Not in it** (no value is guessed): the apprentice's training fee (the funding page names
+  the government and the employer as payers, not what the apprentice pays) and the nursing
+  degree's UCAS deadline (the UCAS page's located excerpts name the date's heading, not the
+  date). Both fields keep their 0.2.0 unknowns.
 
 It also writes the school-leaver pack session's package (`docs/reviews/`): every row of the
 new and changed records beside its span, the ones that change a route first.
@@ -57,27 +60,32 @@ LABEL_REVIEW = (
     "new or changed in 0.3.0 are not run - requires human (the school-leaver pack session, H-07)"
 )
 NOTES = [
-    "Version 0.3.0 adds the school-leaver pages (Task 7f, plan v1.6) to version 0.2.0: seven "
-    "GOV.UK pages on student finance, the Advanced Learner Loan and the 16 to 19 Bursary Fund "
-    "(F05-F11) and the Department for Education's introduction of T Levels (C11), retrieved on "
-    "2026-11-01. Its four new records and one changed record (funding:F02) are proposed for "
-    "the school-leaver pack session; versions 0.1.0 and 0.2.0 are unchanged.",
+    "Version 0.3.0 adds the school-leaver pages (Task 7f, plan v1.6) to version 0.2.0: ten "
+    "GOV.UK pages on student finance, its repayment plans, the Advanced Learner Loan, the 16 to "
+    "19 Bursary Fund and apprenticeship training funding (F04-F13) and the Department for "
+    "Education's introduction of T Levels (C11), retrieved on 2026-11-01. Its seven new "
+    "records and one changed record (funding:F02) are proposed for the school-leaver pack "
+    "session; versions 0.1.0 and 0.2.0 are unchanged.",
     "The 2026-11-01 pages were fetched by the controller through the guarded fetcher via the "
     "session's HTTPS proxy: every check ran except the address check, which the proxy makes "
     "(each record: via_proxy true, address_checked false; corpus/manifest.json).",
+    "Which student loans apply depends on the course's start: funding:F05 and "
+    "funding:F05.maintenance hold the caps for courses starting before 1 January 2027 (the 2025 "
+    "to 2026 and 2026 to 2027 academic years); funding:F12 and funding:F12.maintenance hold the "
+    "Lifelong Learning Entitlement's for courses starting on or after it, 'most undergraduate' "
+    "courses among them. A course starting in September 2027, such as offering:C08, falls in "
+    "the second, if it is one of those courses: the page does not name courses. A cap is never "
+    "what a student gets.",
     "Not in 0.3.0, so no value is guessed: the apprentice's training fee (offering:C09) stays "
-    "unknown, since the page fetched for it (F04, GOV.UK's 'Become an apprentice') does not "
-    "state who pays for training; the nursing degree's UCAS deadline (offering:C08) stays "
-    "unknown, since its page (C12) answered 404. Both slots wait for a page.",
-    "A student-finance amount is a cap for the academic year its column names, never what a "
-    "student gets; the page says student finance changes for courses starting on or after "
-    "1 January 2027 (F05.rules_change), so the 2026 to 2027 caps may not apply to a course "
-    "starting in 2027.",
+    "unknown, since the funding page (F04) names the government and the employer as payers "
+    "but not what the apprentice pays; the nursing degree's UCAS deadline (offering:C08) stays "
+    "unknown, since the UCAS page's located excerpts (C12, class other, not in this pack) name "
+    "the equal consideration date's heading but not the date.",
 ]
 NEW_FUNDING: list[dict[str, Any]] = [
     {
         "record_id": "funding:F05",
-        "source_ids": ["F05", "F06", "F07"],
+        "source_ids": ["F05", "F06", "F07", "F13"],
         "programme": "F05.programme.tuition",
         "instrument_kind": "loan",
         "eligible_costs": "F05.eligible_costs.tuition",
@@ -102,11 +110,12 @@ NEW_FUNDING: list[dict[str, Any]] = [
             "F07.repayment_rule",
             "F07.interest.plan_5",
             "F07.interest_rule",
+            "F13.plan_5.undergraduate",
         ],
     },
     {
         "record_id": "funding:F05.maintenance",
-        "source_ids": ["F05", "F06", "F07"],
+        "source_ids": ["F05", "F06", "F07", "F13"],
         "programme": "F05.programme.maintenance",
         "instrument_kind": "loan",
         "eligible_costs": "F05.eligible_costs.maintenance",
@@ -135,6 +144,7 @@ NEW_FUNDING: list[dict[str, Any]] = [
             "F07.repayment_rule",
             "F07.interest.plan_5",
             "F07.interest_rule",
+            "F13.plan_5.undergraduate",
         ],
     },
     {
@@ -166,6 +176,79 @@ NEW_FUNDING: list[dict[str, Any]] = [
             "F11.rule_vulnerable_group",
             "F11.discretionary_criteria",
         ],
+    },
+    {
+        "record_id": "funding:F12",
+        "source_ids": ["F12", "F13"],
+        "programme": "F12.programme.tuition",
+        "instrument_kind": "loan",
+        "eligible_costs": "F12.eligible_costs.tuition",
+        "rules": [
+            "F12.rule_start",
+            "F12.rule_course",
+            "F12.rule_residency.status",
+            "F12.rule_residency.home",
+            "F12.rule_residency.three_years",
+        ],
+        "timing": "F12.timing.tuition",
+        "repayment": "F12.repayment",
+        "exclusions": [],
+        "published_on": "F12.published_on",
+        "rules_updated_on": "F12.rules_updated_on",
+        "facts": [
+            "F12.loan_maximum.tuition",
+            "F12.loan_maximum.tuition_total",
+            "F12.credits",
+            "F12.rates_change",
+            "F12.write_off",
+            "F12.interest",
+            "F12.nhs_funding",
+            "F13.plan_5.lifelong",
+        ],
+    },
+    {
+        "record_id": "funding:F12.maintenance",
+        "source_ids": ["F12", "F13"],
+        "programme": "F12.programme.maintenance",
+        "instrument_kind": "loan",
+        "eligible_costs": "F12.eligible_costs.maintenance",
+        "rules": [
+            "F12.rule_start",
+            "F12.rule_course",
+            "F12.rule_residency.status",
+            "F12.rule_residency.home",
+            "F12.rule_residency.three_years",
+            "F12.rule_tuition_left",
+            "F12.rule_in_person",
+        ],
+        "timing": "F12.timing.maintenance",
+        "repayment": "F12.repayment",
+        "exclusions": [],
+        "published_on": "F12.published_on",
+        "rules_updated_on": "F12.rules_updated_on",
+        "facts": [
+            "F12.loan_maximum.maintenance",
+            "F12.first_payment",
+            "F12.payment_schedule",
+            "F12.rates_change",
+            "F12.write_off",
+            "F12.interest",
+            "F13.plan_5.lifelong",
+        ],
+    },
+    {
+        "record_id": "funding:F04",
+        "source_ids": ["F04"],
+        "programme": "F04.programme",
+        "instrument_kind": "programme",
+        "eligible_costs": "F04.eligible_costs",
+        "rules": ["F04.rule_age"],
+        "timing": "F04.timing",
+        "repayment": {"unknown": "not a loan"},
+        "exclusions": [],
+        "published_on": "F04.published_on",
+        "rules_updated_on": "F04.rules_updated_on",
+        "facts": ["F04.instrument_kind", "F04.employer_share"],
     },
 ]
 T_LEVEL_OPTION: dict[str, Any] = {
@@ -222,7 +305,7 @@ T_LEVEL_OFFERING: dict[str, Any] = {
 }
 # funding:F02, the Advanced Learner Loan: what two more pages of its guide state.
 ALL_CHANGE: dict[str, Any] = {
-    "source_ids": ["F02", "F01", "F08", "F09"],
+    "source_ids": ["F02", "F01", "F08", "F09", "F13"],
     "eligible_costs": "F08.eligible_costs",
     "timing": "F08.timing",
     "repayment": "F09.repayment",
@@ -234,6 +317,7 @@ ALL_FACTS = [
     "F09.interest",
     "F09.alternative_if_eligible",
     "F09.write_off",
+    "F13.plan_5.learner_loan",
 ]
 
 
@@ -333,6 +417,7 @@ FIRST_PREFIXES = ("rule_", "exclusion", "fact: loan_", "fact: bursary_", "fact: 
 FIRST_FACTS = (
     *("fact: rules_change", "fact: means_test", "fact: amount_rule", "fact: rule_"),
     *("fact: interest", "fact: placement_duration", "fact: classroom_hours", "fact: pass_rule"),
+    *("fact: write_off", "fact: payment_schedule", "fact: employer_share", "fact: other_funding"),
 )
 
 
@@ -354,24 +439,34 @@ def package_rows(pack: Pack, before: Pack) -> tuple[list[Row], list[Row]]:
 
 
 WAITING = """\
-## Waiting for a page (not asked yet)
+## Still unknown (not asked)
 
-- **The apprentice's training fee** (`offering:C09`). The page fetched for it, GOV.UK's
-  "Become an apprentice" (F04), does not say who pays for an apprentice's training. The fee
-  stays unknown, never £0, until a page that states it is fetched.
-- **The nursing degree's UCAS deadline** (`offering:C08`). The UCAS page proposed (C12)
-  answered 404. The deadline stays unknown until its page is fetched.
-- **Which repayment plan a student loan for a course starting in 2027 is on.** The repayment
-  page (F07) gives each plan's threshold, not which plan applies. Student finance also
-  changes for courses starting on or after 1 January 2027 (asked below), and that page is
-  not yet fetched.
+- **The apprentice's training fee** (`offering:C09`). GOV.UK's funding page for employers
+  (F04) says the government and the employer pay for the training (asked below), but not
+  what the apprentice pays. The fee stays unknown, never £0.
+- **The nursing degree's UCAS deadline** (`offering:C08`). UCAS's dates page (C12) was
+  fetched, but the parts located on it name the "Equal consideration date for applications
+  for most undergraduate courses" without the date itself. The deadline stays unknown. The
+  page is not GOV.UK, so its rights wait for you at this session.
+
+## Which loans a September 2027 start gets
+
+Student finance changes for courses starting on or after 1 January 2027. The pack keeps both
+sets of rules, each with its own record:
+
+- **Courses starting before then:** `funding:F05` and `funding:F05.maintenance` (the 2026 to
+  2027 caps).
+- **Courses starting on or after then:** `funding:F12` and `funding:F12.maintenance`, the
+  Lifelong Learning Entitlement. The page says it covers "most undergraduate" courses but
+  names none, so the nursing degree (from September 2027) falls here only if it is one of
+  them.
 """
 
 HOW = """\
 ## How to answer
 
 1. Read the row's excerpt. Open the page if you need its context: each page's address is in
-   `corpus/manifest.json` (slots F05 to F11 and C11).
+   `corpus/manifest.json` (slots F04 to F13 and C11).
 2. Write **yes** if the page states the value as shown. For an "unknown" row, yes means the
    page does not state it.
 3. Write **no** otherwise, with the right reading.
@@ -379,8 +474,8 @@ HOW = """\
 
 A record becomes reviewed only when every one of its rows is answered yes. Otherwise it stays
 proposed, and a "no" is applied as a correction with its span. Version {version} is not
-changed: the decisions are published as a new version. Rights are not asked here: every page
-is GOV.UK, under the Open Government Licence.
+changed: the decisions are published as a new version. The rows ask no rights question: every
+page they cite is GOV.UK, under the Open Government Licence.
 
 Money is shown in pounds. "up to" is a cap the page states, never what a person gets.
 Excerpts are the page's own text, HTML included, with runs of whitespace collapsed. The live
