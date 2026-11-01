@@ -440,7 +440,7 @@ its rules on protected gates, unknown and readiness (decisions 4, 5 and 7) are u
   - **readiness only where a reviewed rubric exists** (provisional, R6): `assessed` needs at
     least one required row a rubric models, every such rubric `reviewed`, and a result other
     than `insufficient_coverage`. Otherwise `not_assessed` with its reason (`no_rubric`,
-    `insufficient_coverage`, `rubrics_not_reviewed`) and no result. Reference 0.1.0 is
+    `insufficient_coverage`, `rubrics_not_reviewed`) and no result. Reference 0.2.0 is
     `proposed` (session 2 said no to every anchor set), so today no target is assessed in
     Skills; `GET .../readiness` and planning are unchanged;
   - and once: the question graph shared across targets, and the usual skills of the
@@ -448,6 +448,13 @@ its rules on protected gates, unknown and readiness (decisions 4, 5 and 7) are u
   The ten course pages' mappings are reviewed one by one in
   `test_course_outcomes_review.py` (packs 0.1.0 and 0.2.0): none states a level, and
   completing any course, as stated or accepted, never raises its row or makes its target
-  ready, so a route resting on it reads "readiness not reached in this model". The app still
-  reads pack and reference 0.1.0; moving the capability model to a later pack is not this
-  line's.
+  ready, so a route resting on it reads "readiness not reached in this model".
+  - **Fix round 1.** Span offsets are UTF-16 code units, as a browser's selection gives them;
+    the server converts them to characters and refuses an offset inside a character
+    (`span_splits_character`), so an emoji or LinkedIn-style bold letters never shift a span.
+    The capability model now reads the reviewed pack 0.2.0 and reference 0.2.0 through their
+    pins (`PACK_VERSION`, `REFERENCE_VERSION`): the same targets, crosswalks, rubrics and
+    gates as 0.1.0; its records' review states and session 2's five corrected outcome
+    mappings change; no outcome states a level. Planning and the API's other capability
+    reads use the same data, so no two chapters disagree. Target records decided before keep
+    their `pack_version` label 0.1.0; the same pack targets hold.

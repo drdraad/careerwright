@@ -181,7 +181,8 @@ def skills_view(
 
 class SelectAdvertSpans(VersionedCommand):
     """The parts of one of the person's own example adverts that say what the target asks
-    for, as character offsets into its text. An empty list clears the selection."""
+    for, as offsets into its text in UTF-16 code units (a browser's selection), converted to
+    characters on the server. An empty list clears the selection."""
 
     target: TextValue = Field(description="One of the profile's target titles.")
     job_id: uuid.UUID = Field(description="One of the person's own examples for that target.")

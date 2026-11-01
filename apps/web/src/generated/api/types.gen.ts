@@ -207,15 +207,21 @@ export type AdvertExample = {
 /**
  * AdvertSpan
  *
- * Character offsets into an example's text: `start` inclusive, `end` exclusive.
+ * Offsets into an example's text in UTF-16 code units, as a browser's selection counts
+ * them (an emoji or a mathematical bold letter is two): `start` inclusive, `end` exclusive.
+ * The server converts them to characters and refuses an offset inside a character.
  */
 export type AdvertSpan = {
     /**
      * Start
+     *
+     * Inclusive, in UTF-16 code units of the text.
      */
     start: number;
     /**
      * End
+     *
+     * Exclusive, in UTF-16 code units of the text.
      */
     end: number;
 };
@@ -8141,7 +8147,8 @@ export type SeedState = typeof SeedState[keyof typeof SeedState];
  * SelectAdvertSpans
  *
  * The parts of one of the person's own example adverts that say what the target asks
- * for, as character offsets into its text. An empty list clears the selection.
+ * for, as offsets into its text in UTF-16 code units (a browser's selection), converted to
+ * characters on the server. An empty list clears the selection.
  */
 export type SelectAdvertSpans = {
     /**
@@ -8174,10 +8181,14 @@ export type SelectAdvertSpans = {
 export type SelectedSpan = {
     /**
      * Start
+     *
+     * Inclusive, in UTF-16 code units of the text.
      */
     start: number;
     /**
      * End
+     *
+     * Exclusive, in UTF-16 code units of the text.
      */
     end: number;
     /**

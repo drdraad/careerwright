@@ -3,8 +3,9 @@ STATE-11; ADR 0012 as amended): readiness only where a reviewed rubric exists, "
 my job" never evidence, an expected qualification never met, and the person's chosen advert
 spans checked against their own text."""
 
+import hashlib
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -15,6 +16,7 @@ from careerwright.capability.adverts import (
     check_spans,
     read_spans,
 )
+from careerwright.capability.commands import committed_data
 from careerwright.capability.evidence import Holding
 from careerwright.capability.matrix import (
     EscoSeed,
@@ -25,9 +27,9 @@ from careerwright.capability.matrix import (
     RubricView,
     build_matrix,
 )
-from careerwright.capability.outcomes import pack_outcomes
 from careerwright.capability.readiness import Assessment, ReadinessState, assess
-from careerwright.capability.reference import load_reference
+from careerwright.capability.reference import PINS as REFERENCE_PINS
+from careerwright.capability.reference import reference_path
 from careerwright.capability.skills import (
     EntryStanding,
     NotAssessedReason,
@@ -39,14 +41,16 @@ from careerwright.capability.skills import (
     names,
     target_skills,
 )
-from careerwright.catalogue.option_pack import load_pack
+from careerwright.catalogue.option_pack import PINS as PACK_PINS
+from careerwright.catalogue.option_pack import pack_path
 from careerwright.errors import CareerwrightError, ErrorCode
 from careerwright.profile.document import QualificationStatus
 from tests.support.capability import gate_row, self_report, skill_row, statement, synthetic_matrix
 
-PACK = load_pack("0.1.0")
-REFERENCE = load_reference("0.1.0", PACK)
-OUTCOMES = pack_outcomes(PACK, REFERENCE)
+DATA = committed_data()  # what the app reads: the reviewed pack 0.2.0 and its reference
+PACK = DATA.pack
+REFERENCE = DATA.reference
+OUTCOMES = list(DATA.outcomes)
 NOW = datetime(2026, 11, 1, 12, 0, tzinfo=UTC)
 RUBRIC = "fixture-rubric-1"
 SQL = uuid.UUID("00000000-0000-4000-8000-00000000c001")
@@ -99,6 +103,16 @@ def reviewed(row: MatrixRow) -> MatrixRow:
     assert row.rubric is not None
     rubric = RubricView(version_id=row.rubric.version_id, anchors={}, review_state="reviewed")
     return row.model_copy(update={"rubric": rubric})
+
+
+@pytest.mark.req("OPTN-08")
+def test_skills_reads_the_reviewed_pack_0_2_0_and_its_reference_through_their_pins() -> None:
+    assert (PACK.pack_version, PACK.dated) == ("0.2.0", date(2026, 10, 30))
+    assert (REFERENCE.reference_version, REFERENCE.pack_version) == ("0.2.0", "0.2.0")
+    pack_bytes = pack_path("0.2.0").read_bytes()
+    reference_bytes = reference_path("0.2.0").read_bytes()
+    assert hashlib.sha256(pack_bytes).hexdigest() == PACK_PINS["0.2.0"]
+    assert hashlib.sha256(reference_bytes).hexdigest() == REFERENCE_PINS["0.2.0"]
 
 
 # --- readiness only where a reviewed rubric exists ---------------------------------------
@@ -162,7 +176,8 @@ def test_no_pack_target_is_assessed_while_its_rubrics_are_proposed(
     # What it asks: every required row, its review state and its pack records' date (R9).
     assert {r.row_id for r in found.requirements} == {r.row_id for r in matrix.rows if r.required}
     assert all(r.review_state == "proposed" for r in found.requirements)
-    assert all(r.as_of == PACK.dated for r in found.requirements if r.employer_specific)
+    # Its records' retrieval date, never the pack's date and never "current".
+    assert {r.as_of for r in found.requirements} == {date(2026, 10, 29)}
     assert all(r.gate.protected for r in found.requirements if r.gate is not None)
 
 
@@ -385,3 +400,46 @@ def test_a_span_longer_than_a_requirement_line_is_refused() -> None:
 
     assert refused.value.details == {"field": "spans", "reason": "span_too_long"}
     assert check_spans(text, [AdvertSpan(start=0, end=MAX_SPAN_CHARS)])
+
+
+# Offsets are UTF-16 code units, as a browser's selection gives them (review I1): an emoji
+# and LinkedIn-style mathematical bold letters are astral characters, two units each.
+BOLD = "\U0001d5e6\U0001d5e4\U0001d5df"  # "SQL" in mathematical sans-serif bold
+ASTRAL = f"Hiring now \U0001f680 {BOLD} analyst.\nYou will write {BOLD} daily."
+
+
+def utf16(text: str) -> int:
+    return len(text.encode("utf-16-le")) // 2
+
+
+@pytest.mark.req("MAP1-01")
+def test_offsets_are_utf16_code_units_after_and_inside_astral_characters() -> None:
+    after = ASTRAL.index("analyst")
+    inside = ASTRAL.index(f"write {BOLD}")
+    spans = [
+        AdvertSpan(start=utf16(ASTRAL[:after]), end=utf16(ASTRAL[: after + 7])),
+        AdvertSpan(start=utf16(ASTRAL[:inside]), end=utf16(ASTRAL[: inside + 6 + len(BOLD)])),
+    ]
+
+    ordered = check_spans(ASTRAL, spans)
+
+    assert [s.excerpt for s in read_spans(ASTRAL, ordered)] == ["analyst", f"write {BOLD}"]
+    assert [(s.start, s.end) for s in ordered] == [(s.start, s.end) for s in spans]
+
+
+@pytest.mark.req("MAP1-01")
+def test_a_span_splitting_an_astral_character_is_refused_with_its_reason() -> None:
+    start = utf16(ASTRAL[: ASTRAL.index(BOLD)])
+    for span in (
+        AdvertSpan(start=start + 1, end=start + 4),
+        AdvertSpan(start=start, end=start + 3),
+    ):
+        with pytest.raises(CareerwrightError) as refused:
+            check_spans(ASTRAL, [span])
+
+        assert refused.value.details == {"field": "spans", "reason": "span_splits_character"}
+    end = utf16(ASTRAL)
+    with pytest.raises(CareerwrightError) as outside:
+        check_spans(ASTRAL, [AdvertSpan(start=0, end=end + 1)])
+    assert outside.value.details == {"field": "spans", "reason": "span_outside_text"}
+    assert check_spans(ASTRAL, [AdvertSpan(start=0, end=end)])

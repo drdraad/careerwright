@@ -2,7 +2,7 @@
 MAP1-01; ADR 0012, its Task 10 amendment line; ADR 0009, its Task 10 amendment line).
 
 - `advert_span_selections`: for one target (its `title_key`) and one of the person's own
-  pasted examples for it (`job_id`), the spans they chose, as character offsets into the
+  pasted examples for it (`job_id`), the spans they chose, as UTF-16 code-unit offsets into the
   example's kept text, with that text's SHA-256. Offsets only: the words are read back from
   the sealed text, so no advert text is stored here. Append-only for the API role: each save
   is a new row taking the next capability version, and the latest for a target and example

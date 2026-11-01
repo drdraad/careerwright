@@ -71,9 +71,11 @@ from careerwright.profile.records import TargetCoverage, TargetLink, TargetRecor
 from careerwright.profile.targets import PackTarget, PackTargets, stored_targets, target_titles
 from careerwright.vocabulary import DataMode
 
-# The versions the capability model reads: Task 7c's reviewed pack is a new version here.
-PACK_VERSION = "0.1.0"
-REFERENCE_VERSION = "0.1.0"
+# The versions the capability model reads, each through its pin (`PINS`, `load_pack`,
+# `load_reference`): Task 7c's reviewed pack 0.2.0 and the reference 0.2.0 that fits it (Task
+# 10A fix round 1). 0.1.0 stays committed and unchanged.
+PACK_VERSION = "0.2.0"
+REFERENCE_VERSION = "0.2.0"
 
 
 @dataclass(frozen=True)
