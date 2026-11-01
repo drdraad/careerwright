@@ -11,11 +11,13 @@ Facts and codes, never sentences (ruling R11): the web words every code.
 - **What the target asks** (`requirements`): every required row of its matrix (the pack's
   rows, a protected gate, rows the person set essential), with its review state and the
   pack record's date, and the person's qualifications that name it as entry facts beside it.
-- **Readiness only where a reviewed rubric exists.** A target is `assessed` when at least one
-  required row is modelled by a rubric, every such rubric is reviewed, and the capability
-  model's result is not `insufficient_coverage`. Otherwise it is `not_assessed`, with the
-  reason (no rubric, insufficient coverage, or rubrics not reviewed, in that order) and
-  what it asks, and no readiness result at all.
+- **Readiness where a rubric exists, with its review state.** A target is `assessed` when at
+  least one required row is modelled by a rubric and the capability model's result is not
+  `insufficient_coverage`; its readiness is the capability model's result, unchanged, and
+  `rubric_review` says whether every rubric it rests on is `reviewed` or any is still
+  `proposed` (the product owner's answer of 2026-11-01: show it, labelled as resting on a
+  draft checklist). Otherwise it is `not_assessed`, with the reason (no rubric, then
+  insufficient coverage) and what it asks, and no readiness result at all.
 - **Entry facts.** A qualification the person gave names a requirement when its words, as a
   concept (`careerwright.concept_key`), appear whole in the requirement's label or in a
   posting's wording of it. Expected is never met; achieved is the person's own statement,
@@ -73,9 +75,9 @@ class NotAssessedReason(StrEnum):
     # row with no rubric, or a regulation no typed gate models): the capability model's
     # `insufficient_coverage`.
     INSUFFICIENT_COVERAGE = "insufficient_coverage"
-    # Rubrics model it, but not every one is reviewed: a readiness result would rest on
-    # anchors no person has accepted.
-    RUBRICS_NOT_REVIEWED = "rubrics_not_reviewed"
+
+
+RubricReview = Literal["proposed", "reviewed"]
 
 
 class EntryStanding(StrEnum):
@@ -158,6 +160,9 @@ class TargetSkills(StrictModel):
     assessment_state: SkillsAssessmentState
     not_assessed_reason: NotAssessedReason | None
     readiness: Assessment | None  # only when assessed: never a result otherwise
+    # Only when assessed: `reviewed` when every rubric the result rests on is reviewed;
+    # `proposed` when any is still a draft (the screens say "based on a draft checklist").
+    rubric_review: RubricReview | None
 
 
 class PersonQualification(StrictModel):
@@ -169,15 +174,18 @@ class PersonQualification(StrictModel):
 
 def assessment_state(
     matrix: Matrix, assessment: Assessment
-) -> tuple[SkillsAssessmentState, NotAssessedReason | None]:
-    modelled = [r for r in matrix.rows if r.required and r.rubric is not None]
-    if not modelled:
-        return SkillsAssessmentState.NOT_ASSESSED, NotAssessedReason.NO_RUBRIC
+) -> tuple[SkillsAssessmentState, NotAssessedReason | None, RubricReview | None]:
+    """Whether the target is assessed, why not, and the review state of the rubrics an
+    assessed result rests on."""
+    rubrics = [r.rubric for r in matrix.rows if r.required and r.rubric is not None]
+    if not rubrics:
+        return SkillsAssessmentState.NOT_ASSESSED, NotAssessedReason.NO_RUBRIC, None
     if assessment.state is ReadinessState.INSUFFICIENT_COVERAGE:
-        return SkillsAssessmentState.NOT_ASSESSED, NotAssessedReason.INSUFFICIENT_COVERAGE
-    if any(r.rubric is not None and r.rubric.review_state != "reviewed" for r in modelled):
-        return SkillsAssessmentState.NOT_ASSESSED, NotAssessedReason.RUBRICS_NOT_REVIEWED
-    return SkillsAssessmentState.ASSESSED, None
+        return SkillsAssessmentState.NOT_ASSESSED, NotAssessedReason.INSUFFICIENT_COVERAGE, None
+    review: RubricReview = (
+        "reviewed" if all(r.review_state == "reviewed" for r in rubrics) else "proposed"
+    )
+    return SkillsAssessmentState.ASSESSED, None, review
 
 
 def names(qualification_key: str, requirement_keys: Sequence[str]) -> bool:
@@ -290,7 +298,7 @@ def target_skills(
         matrix.definition_version,
     ):
         raise ValueError("the assessment is of another matrix")
-    state, reason = assessment_state(matrix, assessment)
+    state, reason, review = assessment_state(matrix, assessment)
     sources = matrix.sources
     return TargetSkills(
         target_key=matrix.target_key,
@@ -311,4 +319,5 @@ def target_skills(
         assessment_state=state,
         not_assessed_reason=reason,
         readiness=assessment if state is SkillsAssessmentState.ASSESSED else None,
+        rubric_review=review,
     )
