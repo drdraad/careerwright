@@ -637,6 +637,15 @@ function Slate({
   suggestBlocked?: string | undefined;
 }) {
   const [controls, setControls] = useState<SlateControls>(NO_CONTROLS);
+  const role = profile.document.current_role.state;
+  // Careerwright knows the person's work only from a role they gave (Task 6f): without one,
+  // nothing is close to what they do now, and "Closer to what I do" isn't offered. Chosen
+  // before the role stopped being known, it goes back to Balanced: no hidden view stays
+  // applied (Task 6f review M3).
+  const workKnown = role === "provided";
+  if (!workKnown && controls.emphasis === "practical") {
+    setControls((current) => ({ ...current, emphasis: NO_CONTROLS.emphasis }));
+  }
   // The suggestion shown in full; by default the first one listed.
   const [opened, setOpened] = useState<string | null>(null);
   // The suggestion just made a target: focus goes to the words that say it is saved.
@@ -681,10 +690,6 @@ function Slate({
   }
   const data = slate.data;
   const named = profile.document.target_titles;
-  const role = profile.document.current_role.state;
-  // Careerwright knows the person's work only from a role they gave (Task 6f): without one,
-  // nothing is close to what they do now, and "Closer to what I do" isn't offered.
-  const workKnown = role === "provided";
   const titlesGiven = workKnown || (named.state === "provided" && (named.value ?? []).length > 0);
   const emphases = (Object.keys(EMPHASIS) as Emphasis[]).filter(
     (emphasis) => workKnown || emphasis !== "practical",
