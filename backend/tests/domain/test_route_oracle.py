@@ -5,8 +5,10 @@ pruning rests on (both spend caps, repayments alone above the payment cap, work 
 sessions, workload, prerequisites, exclusive groups, bridge roles, two offers still to accept,
 every unknown that sets an option aside, Task 12a's included: a "no" to the entry requirements,
 unconfirmed eligibility conditions, supports not confirmed to stack, work rights not known to
-be held) and the ones it must never prune on (the reserve, receipts, support, debt, the deficit
-cap, applications, economic cost)."""
+be held, Task 12c's tuition fee loan with no amount) and the ones it must never prune on (the
+reserve, receipts, support, debt, the deficit cap, applications, economic cost). Task 12c's
+tuition fee loan paid to the provider comes in every state (approved, applied for, not applied
+for, refused, any eligibility, no amount), and what it pays must agree too."""
 
 from datetime import date, time
 
@@ -28,6 +30,7 @@ from careerwright.planning.catalogue import (
     Recurring,
     Session,
     Support,
+    TuitionFeeLoan,
     Variant,
     WorkPattern,
     WorkPatternKind,
@@ -42,12 +45,14 @@ from careerwright.planning.compiler import (
     compile_input,
 )
 from careerwright.planning.layers import peel
+from careerwright.planning.ledgers import LoanToRepay
 from careerwright.planning.search import SearchCoverage, search_routes
 from tests.support.planning import (
     CONSTRUCTED,
     START,
     catalogue_of,
     gbp,
+    loan_statuses,
     month_end,
     month_start,
     option,
@@ -56,6 +61,7 @@ from tests.support.planning import (
     readiness_of,
     repayments_beside_an_unknown,
     support,
+    tuition_loan,
     undated_relief,
 )
 from tests.support.route_oracle import Oracle
@@ -65,6 +71,7 @@ GATES = ("gate:one", "gate:two")
 CONDITIONS = ("eligibility_age", "eligibility_residency")
 SCHEMES = ("funding:one", "funding:two")
 FEE = st.integers(min_value=0, max_value=40_000)
+BIG_FEE = st.integers(min_value=0, max_value=300_000)  # a university's fee, above most caps
 SLOW = settings(max_examples=150, deadline=None, suppress_health_check=[HealthCheck.too_slow])
 STATUS = {
     Feasibility.FEASIBLE: "feasible",
@@ -105,6 +112,23 @@ def funding(draw: st.DrawFn) -> Support:
     )
     # Two schemes, so one scheme now and then pays for two options (review 12a, Important 2).
     return granted.model_copy(update={"instrument_id": draw(st.sampled_from(SCHEMES))})
+
+
+def fee_loan(draw: st.DrawFn, unknowns: bool) -> TuitionFeeLoan:
+    """A tuition fee loan paid to the provider (Task 12c) in any of its statuses: approved, not
+    yet applied for or applied for, refused, with any eligibility; now and then no amount."""
+    approved = draw(st.booleans())
+    return tuition_loan(
+        None if unknowns and odds(draw, 4) else draw(BIG_FEE),
+        application=AwardState.APPROVED
+        if approved
+        else draw(
+            st.sampled_from([AwardState.NOT_APPLIED, AwardState.APPLIED, AwardState.REFUSED])
+        ),
+        eligibility=EligibilityStatus.CONFIRMED
+        if approved
+        else draw(st.sampled_from(EligibilityStatus)),
+    )
 
 
 @st.composite
@@ -150,20 +174,27 @@ def variant(
             else draw(st.integers(min_value=1, max_value=4)),
             cited=CONSTRUCTED,
         )
+    # A tuition fee loan (Task 12c) comes with a fee for it to pay, so routes that use it are
+    # reached; a fee above the caps then lets the loan make the difference.
+    loan = fee_loan(draw, unknowns) if odds(draw, 3) else None
+    fees = st.lists(
+        st.tuples(st.integers(min_value=0, max_value=horizon), FEE if loan is None else BIG_FEE),
+        min_size=0 if loan is None else 1,
+        max_size=2,
+    )
     concept_record, offering, chosen = option(
         name,
         start=begins if dated else None,
         finish=month_end(begins, draw(st.integers(min_value=1, max_value=3))) if dated else None,
         hours=None if unknown() else draw(st.integers(min_value=0, max_value=12)),
-        payments=tuple(
-            draw(st.lists(st.tuples(st.integers(min_value=0, max_value=horizon), FEE), max_size=2))
-        ),
+        payments=tuple(draw(fees)),
         due=((date(2026, 12, 15), draw(FEE)),) if unknown() else (),
         kind=kind,
         pattern=work_pattern(draw) if odds(draw, 3) else None,
         wage=draw(st.integers(min_value=0, max_value=100_000)) if offered else None,
         supports=tuple(funding(draw) for _ in range(draw(st.sampled_from([0, 0, 0, 1, 2])))),
         stacking_confirmed=draw(st.booleans()),
+        tuition_fee_loan=loan,
         condition_statuses=statuses,
         eligibility_conditions=conditions,
         offer=OfferGate(accepted=draw(st.booleans()), role_class="synthetic role")
@@ -266,6 +297,13 @@ def instances(draw: st.DrawFn, *, unknowns: bool) -> MonthlyInput:
     return compile_input(inputs, catalogue, readiness=basis)
 
 
+def borrowed(loans: list[LoanToRepay]) -> int | None:
+    """What a route's tuition fee loans pay in all, or None where an amount is not known."""
+    if any(loan.amount is None for loan in loans):
+        return None
+    return sum(loan.amount.minor_units for loan in loans if loan.amount is not None)
+
+
 def exclusive_schemes() -> FundingInstrument:
     return FundingInstrument(
         instrument_id=SCHEMES[0],
@@ -354,10 +392,35 @@ def test_the_oracle_reads_a_course_behind_an_application_as_conditional_never_no
     assert oracle.check(frozenset({"applied"})).status == "feasible"
 
 
+@pytest.mark.req("OPT1-08", "FUNDING-06")
+def test_the_oracle_reads_a_tuition_fee_loan_in_every_state() -> None:
+    oracle = Oracle(loan_statuses())
+
+    def alone(name: str) -> tuple[str, int | None, int | None]:
+        checked = oracle.check(frozenset({name}))
+        return checked.status, checked.cost, checked.borrowed
+
+    # Approved, applied for or not yet applied for: the £9,000 is the lender's, not the
+    # student's, so £1,500 limits hold (the last two rest on approval, beside the self-paid
+    # route the search does not read).
+    assert alone("approved") == ("feasible", 0, 900_000)
+    assert alone("applied") == ("feasible", 0, 900_000)
+    assert alone("not-applied") == ("feasible", 0, 900_000)
+    # Refused, or for someone ineligible: the student pays, beyond their limits.
+    assert alone("refused") == ("not_feasible", 900_000, 0)
+    assert alone("ineligible") == ("not_feasible", 900_000, 0)
+    # No amount: unresolved, never £0.
+    assert alone("no-amount") == ("unresolved", None, None)
+    # A £1,000 grant first, then a £7,500 loan: £500 is the student's, in March.
+    assert alone("part-loan") == ("feasible", 50_000, 750_000)
+    assert oracle.solve().outcome == "routes_found"
+
+
 @pytest.mark.req("OPT1-08", "OPT1-02", "OPT1-07")
 @SLOW
 @example(monthly=undated_relief())  # review 13a, Important 1
 @example(monthly=repayments_beside_an_unknown())  # review 12a, Important 3
+@example(monthly=loan_statuses())  # Task 12c: the tuition fee loan in every state
 @given(monthly=INSTANCES)
 def test_the_search_finds_exactly_the_oracle_s_feasible_schedules_objectives_and_layers(
     monthly: MonthlyInput,
@@ -372,6 +435,9 @@ def test_the_search_finds_exactly_the_oracle_s_feasible_schedules_objectives_and
     )
     assert {r: s.layer for r, s in found.items()} == {
         r: (n if n <= 3 else None) for r, n in oracle.layers.items()
+    }
+    assert {r: borrowed(s.loans_to_repay) for r, s in found.items()} == {
+        r: oracle.checks[r].borrowed for r in oracle.archive
     }
     assert result.feasible_without_milestone == oracle.without_milestone
     # Both directions (review 12a, Important 3): "no route" exactly when the oracle proves it,
@@ -396,8 +462,9 @@ def test_the_rank_stage_s_layers_equal_iterative_peeling_on_every_complete_searc
     assert [s.layer for s in result.schedules] == peel(points)
 
 
-@pytest.mark.req("OPT1-08")
+@pytest.mark.req("OPT1-08", "FUNDING-06")
 @SLOW
+@example(monthly=loan_statuses())
 @given(monthly=INSTANCES)
 def test_the_independent_checker_agrees_with_the_route_checker_on_every_candidate(
     monthly: MonthlyInput,
@@ -408,6 +475,8 @@ def test_the_independent_checker_agrees_with_the_route_checker_on_every_candidat
         mine = oracle.check(route)
         theirs = check_route(monthly, sorted(route))
         assert mine.status == STATUS[theirs.feasibility], sorted(route)
+        # What the tuition fee loans pay, as loans to repay (Task 12c): unknown stays unknown.
+        assert mine.borrowed == borrowed(theirs.loans_to_repay), sorted(route)
         if mine.status == "feasible":
             assert mine.months == theirs.months_to_readiness, sorted(route)
             cost = theirs.objective_cost.minor_units if theirs.objective_cost else None

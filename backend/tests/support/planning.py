@@ -29,6 +29,7 @@ from careerwright.planning.catalogue import (
     RecordState,
     Recurring,
     Support,
+    TuitionFeeLoan,
     Variant,
     Wage,
     WorkPattern,
@@ -294,6 +295,7 @@ def option(
     supports: tuple[Support, ...] = (),
     stacking_confirmed: bool = False,
     condition_statuses: Mapping[str, EligibilityStatus] | None = None,
+    tuition_fee_loan: TuitionFeeLoan | None = None,
     offer: OfferGate | None = None,
     unknown_cost: str | None = None,
     recurring: Recurring | None = None,
@@ -351,6 +353,7 @@ def option(
         supports=list(supports),
         stacking_confirmed=stacking_confirmed,
         condition_statuses=dict(condition_statuses or {}),
+        tuition_fee_loan=tuition_fee_loan,
     )
     return stable, dated, variant
 
@@ -393,6 +396,22 @@ def support(
         award=award,
         assumed=assumed,
         review_state=state,
+        cited=CONSTRUCTED,
+    )
+
+
+def tuition_loan(
+    amount: int | None,
+    *,
+    application: AwardState = AwardState.APPROVED,
+    eligibility: EligibilityStatus = EligibilityStatus.CONFIRMED,
+) -> TuitionFeeLoan:
+    """A tuition fee loan paid straight to the provider, as a person states it (synthetic)."""
+    return TuitionFeeLoan(
+        amount=gbp(amount) if amount is not None else None,
+        eligibility=eligibility,
+        application=application,
+        review_state=RecordState.ACCEPTED_ASSUMPTION,
         cited=CONSTRUCTED,
     )
 
@@ -487,6 +506,44 @@ def repayments_beside_an_unknown() -> MonthlyInput:
     ]
     inputs = person(horizon=2, opening=1_000_000, monthly_cap=1000, existing_debts=[card])
     readiness = readiness_of({"offering:fine": (ROW,), "offering:unpriced": (ROW,)})
+    return compile_input(inputs, catalogue_of(*options), readiness=readiness)
+
+
+def loan_statuses() -> MonthlyInput:
+    """Task 12c: a student with £1,000 and £1,500 limits, and £9,000 courses whose fee a tuition
+    fee loan pays in each of its states: approved, applied for, not yet applied for, refused,
+    for someone ineligible, with no amount stated, and approved for less than the fee beside a
+    £1,000 grant to the provider."""
+    fee = 900_000
+    loans = {
+        "approved": tuition_loan(fee),
+        "applied": tuition_loan(
+            fee,
+            application=AwardState.APPLIED,
+            eligibility=EligibilityStatus.POTENTIALLY_ELIGIBLE,
+        ),
+        "not-applied": tuition_loan(fee, application=AwardState.NOT_APPLIED),
+        "refused": tuition_loan(fee, application=AwardState.REFUSED),
+        "ineligible": tuition_loan(
+            fee, application=AwardState.APPLIED, eligibility=EligibilityStatus.INELIGIBLE
+        ),
+        "no-amount": tuition_loan(None),
+    }
+    options = [
+        option(name, finish=month_end(START, 3), payments=((0, fee),), tuition_fee_loan=loan)
+        for name, loan in loans.items()
+    ]
+    options.append(
+        option(
+            "part-loan",
+            finish=month_end(START, 3),
+            payments=((0, fee // 2), (2, fee // 2)),
+            supports=(support(paid_to="provider", amount=100_000),),
+            tuition_fee_loan=tuition_loan(fee - 150_000),
+        )
+    )
+    inputs = person(horizon=3, opening=100_000, direct_cap=150_000, monthly_cap=150_000)
+    readiness = readiness_of({o.offering_id: (ROW,) for _, o, _ in options})
     return compile_input(inputs, catalogue_of(*options), readiness=readiness)
 
 

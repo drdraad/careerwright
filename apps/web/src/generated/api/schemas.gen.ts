@@ -2084,7 +2084,8 @@ export const ConditionSchema = {
             enum: [
                 'offer',
                 'award',
-                'application'
+                'application',
+                'loan'
             ],
             title: 'Kind'
         },
@@ -2108,7 +2109,8 @@ export const ConditionSchema = {
             enum: [
                 'confirm_offer_accepted',
                 'verify_funding_award',
-                'confirm_admission'
+                'confirm_admission',
+                'confirm_loan_approved'
             ],
             title: 'Verification'
         }
@@ -2122,7 +2124,7 @@ export const ConditionSchema = {
         'verification'
     ],
     title: 'Condition',
-    description: 'What the route rests on that has not happened, with its blocking verification: an\noffer to accept, an award to approve, or a place to win by applying in time (an\napplication the route itself does not hold, with no admission recorded).'
+    description: 'What the route rests on that has not happened, with its blocking verification: an\noffer to accept, an award to approve, a place to win by applying in time (an application\nthe route itself does not hold, with no admission recorded), or a tuition fee loan to be\napproved (never an award: a loan is never support).'
 } as const;
 
 export const ConfidenceSchema = {
@@ -3820,7 +3822,8 @@ export const FindingCodeSchema = {
         'repayments_above_payment_cap',
         'job_transitions',
         'scheme_shared_unconfirmed',
-        'exclusive_schemes'
+        'exclusive_schemes',
+        'loan_amount_unknown'
     ],
     title: 'FindingCode'
 } as const;
@@ -5034,6 +5037,60 @@ export const LabelMatchOutSchema = {
         'isco_label'
     ],
     title: 'LabelMatchOut'
+} as const;
+
+export const LoanToRepaySchema = {
+    properties: {
+        variant_id: {
+            type: 'string',
+            title: 'Variant Id'
+        },
+        due: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Due'
+        },
+        amount: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        repayment: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        conditional: {
+            type: 'boolean',
+            title: 'Conditional'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'variant_id',
+        'due',
+        'amount',
+        'conditional'
+    ],
+    title: 'LoanToRepay',
+    description: 'What a tuition fee loan paid straight to the provider pays for a route (spec section\n22): a loan the person repays later, never their payment, cash, support or a receipt. Facts\nonly; the web words them (R11).'
 } as const;
 
 export const LocationSchema = {
@@ -10673,6 +10730,7 @@ export const RouteQualificationSchema = {
         'conditional_offer',
         'conditional_award',
         'conditional_application',
+        'conditional_loan',
         'readiness_not_assessed'
     ],
     title: 'RouteQualification'
@@ -11696,6 +11754,13 @@ export const ScheduleSchema = {
             },
             type: 'array',
             title: 'Preferences'
+        },
+        loans_to_repay: {
+            items: {
+                $ref: '#/components/schemas/LoanToRepay'
+            },
+            type: 'array',
+            title: 'Loans To Repay'
         },
         layer: {
             anyOf: [
@@ -16097,6 +16162,75 @@ export const TrendStateSchema = {
     title: 'TrendState'
 } as const;
 
+export const TuitionFeeLoanSchema = {
+    properties: {
+        amount: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Null: not known, never £0.'
+        },
+        eligibility: {
+            $ref: '#/components/schemas/EligibilityStatus'
+        },
+        application: {
+            $ref: '#/components/schemas/AwardState'
+        },
+        review_state: {
+            $ref: '#/components/schemas/RecordState'
+        },
+        cited: {
+            $ref: '#/components/schemas/Citation'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'amount',
+        'eligibility',
+        'application',
+        'review_state',
+        'cited'
+    ],
+    title: 'TuitionFeeLoan',
+    description: 'A tuition fee loan paid straight to the provider, as the person states it for one\nvariant (spec section 22, 2026-11-01; FUNDING-06). It pays the variant\'s fees (never its\nextra costs), after any support paid to the provider, up to its amount: what it pays is not\nthe person\'s payment, cash or direct spending, and the route carries it as a loan to repay\nlater. It is never support, a grant, income or a receipt, and Careerwright never chooses\nit: the person states it. Its repayment is not modelled in L0: unknown, never 0.\n\nIts statuses are the funding statuses (ADR 0013 decision 5): only a loan the person\nconfirms approved counts in every scenario; one not yet approved, for which they are or may\nbe eligible, makes the route conditional on it, beside the route where they pay the fee\n(the no-award scenario). An unknown amount leaves the route unresolved, never £0.'
+} as const;
+
+export const TuitionFeeLoanInputSchema = {
+    properties: {
+        amount: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Null: not known, never £0.'
+        },
+        eligibility: {
+            $ref: '#/components/schemas/EligibilityStatus'
+        },
+        application: {
+            $ref: '#/components/schemas/AwardState'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'eligibility',
+        'application'
+    ],
+    title: 'TuitionFeeLoanInput',
+    description: 'A tuition fee loan paid straight to the provider, as the person states it for one option\n(spec section 22, 2026-11-01): its amount and its funding statuses (ADR 0013 decision 5).\nThe rules of `planning.catalogue.TuitionFeeLoan`: an approval needs confirmed eligibility.\nNever support: a maintenance loan or any other loan stated as a support is refused.'
+} as const;
+
 export const TurnOutSchema = {
     properties: {
         turn_id: {
@@ -16717,6 +16851,17 @@ export const VariantSchema = {
             description: 'The person confirmed that this variant\'s supports may be combined: neither excludes the other and together they stay within each one\'s eligible costs. Until then, more than one support leaves the route unresolved.',
             default: false
         },
+        tuition_fee_loan: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/TuitionFeeLoan'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'A tuition fee loan paid straight to the provider, as the person stated it: a loan to repay later, never support. Null: none stated.'
+        },
         condition_statuses: {
             additionalProperties: {
                 $ref: '#/components/schemas/EligibilityStatus'
@@ -16790,6 +16935,17 @@ export const VariantInputsSchema = {
             title: 'Stacking Confirmed',
             description: 'The supports may be combined: neither excludes the other and together they stay within each one\'s eligible costs.',
             default: false
+        },
+        tuition_fee_loan: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/TuitionFeeLoanInput'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'A tuition fee loan paid straight to the provider: a loan to repay later, never support. Null: none stated.'
         },
         entry_requirements_met: {
             anyOf: [

@@ -8,7 +8,9 @@ input data types (`MonthlyInput` and the records in it, their raw fields rather 
 convenience properties) and asks the capability model for readiness, which planning code never
 decides (RDY-1). Every rule is written again from the specification and ADR 0013, plainly and
 slowly: every combination of the catalogue, one route at a time, month by month, no pruning.
-It reads the base scenario only, as the search does.
+It reads the base scenario only, as the search does. Task 12c's rule, a tuition fee loan paid
+straight to the university, is written from the specification's section 22 row (2026-11-01)
+and section 12's FIN-1, not from the checker.
 """
 
 from collections.abc import Iterator
@@ -24,6 +26,7 @@ from careerwright.planning.catalogue import (
     EligibilityStatus,
     Session,
     Support,
+    TuitionFeeLoan,
 )
 from careerwright.planning.compiler import (
     CompiledVariant,
@@ -54,6 +57,7 @@ class Checked:
     months: int | None  # to the readiness milestone; None when not reached
     cost: int | None  # the comparison's cost: economic, or direct only
     readiness: ReadinessState | None  # the last state the route reaches
+    borrowed: int | None  # what tuition fee loans pay the providers; None: not known
 
 
 @dataclass(frozen=True)
@@ -240,6 +244,17 @@ def _counted(support: Support) -> bool:
     )
 
 
+def _loan_used(loan: TuitionFeeLoan) -> bool:
+    """In the base scenario: an approved loan, or one not refused that the person is or may be
+    eligible for, which the route then rests on."""
+    if loan.application is AwardState.APPROVED:
+        return True
+    return loan.application is not AwardState.REFUSED and loan.eligibility in (
+        EligibilityStatus.CONFIRMED,
+        EligibilityStatus.POTENTIALLY_ELIGIBLE,
+    )
+
+
 def _overlap(a: Session, b: Session) -> bool:
     return a.weekday == b.weekday and a.starts < b.ends and b.starts < a.ends
 
@@ -261,6 +276,8 @@ class _RouteCheck:
         self.income = [0] * (self.months + 1)
         self.hours = [0] * (self.months + 1)
         self.direct = 0  # the known part of direct cost
+        self.borrowed = 0  # what tuition fee loans send to providers: a loan to repay
+        self.borrowed_known = True
         self.costs_known = True
         self.debt = self._debt()
 
@@ -294,7 +311,13 @@ class _RouteCheck:
                 baseline.net_income_by_month[m - 1] - self.income[m] for m in self._each_month()
             )
         direct = max(0, self.direct) if self.costs_known else None
-        economic = direct + difference if direct is not None and difference is not None else None
+        # The cost over the horizon still holds the tuition the loan paid, once: a loan is
+        # repaid, so it is not a discount (spec section 12), only not the student's money now.
+        economic = (
+            max(0, self.direct + self.borrowed) + difference
+            if self.costs_known and difference is not None
+            else None
+        )
         if self.inputs.objective_basis == "economic" and baseline is None:
             self.unknown = True
         cost = economic if self.inputs.objective_basis == "economic" else direct
@@ -302,7 +325,13 @@ class _RouteCheck:
         status: Status = (
             "not_feasible" if self.broken else "unresolved" if self.unknown else "feasible"
         )
-        return Checked(status=status, months=months, cost=cost, readiness=readiness)
+        return Checked(
+            status=status,
+            months=months,
+            cost=cost,
+            readiness=readiness,
+            borrowed=self.borrowed if self.borrowed_known else None,
+        )
 
     def _each_month(self) -> range:
         return range(1, self.months + 1)
@@ -345,10 +374,33 @@ class _RouteCheck:
         recurring_total = None
         if recurring is not None and recurring.count is not None and not recurring.at_least:
             recurring_total = recurring.amount.minor_units * recurring.count
+        # Spec section 22 (2026-11-01): a tuition fee loan paid straight to the university pays
+        # the tuition (never extras) after any grant, up to its amount. That money goes from the
+        # lender to the provider: it is not the student's payment, so it is in none of their
+        # limits or cash, and it is no receipt either. Approved, it is used in every case; not
+        # yet approved but not refused, for someone who is or may be eligible, the route counts
+        # on it (the base case). Its amount not stated: nobody knows what the student pays, but
+        # at least nothing of the tuition (so a cap broken even then is broken).
+        # `loan_room`: False with no loan used, None with an unknown amount, else what is left.
+        loan = v.tuition_fee_loan
+        loan_room: int | Literal[False] | None = False
+        if loan is not None and _loan_used(loan):
+            if loan.amount is None:
+                loan_room = None
+                self.costs_known = False
+                self.unknown = True
+                self.borrowed_known = False
+            else:
+                loan_room = loan.amount.minor_units
         if recurring is not None and not (waived or recurring_total):
             self.costs_known = False
             self.unknown = True
-            self._too_much_at_once(recurring.amount.minor_units)
+            each = recurring.amount.minor_units
+            if loan_room is None:
+                each = 0
+            elif loan_room is not False:
+                each = max(0, each - loan_room)
+            self._too_much_at_once(each)
         # A fee the page states for an eligible learner is the person's only once they have
         # confirmed every condition; a fee not stated at all is already unknown.
         fee_stated = v.cost_unknown is None and (recurring is None or bool(recurring_total))
@@ -382,9 +434,17 @@ class _RouteCheck:
                     take = owed if s.covers_fees_in_full else min(left[n], owed)
                     covered += take
                     left[n] -= take
-            paid = amount - covered
+            # Whatever grants leave of a tuition fee, the loan sends to the provider.
+            from_loan = 0
+            if loan_room is not False and kind != "extra":
+                still_owed = amount - covered
+                from_loan = still_owed if loan_room is None else min(loan_room, still_owed)
+                if loan_room is not None:
+                    loan_room -= from_loan
+            self.borrowed += from_loan
+            paid = amount - covered - from_loan
             if kind != "extra":
-                fees += paid
+                fees += amount - covered  # a grant to the person is set against the whole fee
             if month is None:
                 self.direct += paid
                 self._too_much_at_once(paid)

@@ -26,16 +26,18 @@ adds variants of later concepts.
    requirements or weekly hours, a payment due before the planning start, a start before it,
    an application deadline already passed, the person's "no" to its entry requirements, an
    eligibility condition of its stated fee not confirmed, supports whose stacking is not
-   confirmed, or, alone, a direct cost or a month's payments above its cap, or two schemes
-   recorded as exclusive among its own supports. Each is computed
-   from the variant by itself (its dates, its payments and own support, its hours, the
+   confirmed, its own tuition fee loan counted with no amount stated (Task 12c), or, alone, a
+   direct cost or a month's payments above its cap, or two schemes recorded as exclusive among
+   its own supports. Each is computed
+   from the variant by itself (its dates, its payments, own support and own loan, its hours, the
    person's answers about it), so every route containing it repeats it, or, for unknown weekly
    hours, is unknown or over the limit in each month the variant is active. The screen runs
    before every other cut, the empty route's included, so an option set aside for an unknown
    always reaches the outcome; its record keeps every unknown and every breach its own check
    found, apart.
 3. *Spend caps.* A route's direct cost is the sum of each variant's own net cost, never below
-   zero (a variant's support reduces only its own fees), and a month's payments are the sum of
+   zero (a variant's support and its tuition fee loan reduce only its own fees; the fee a loan
+   pays is in neither figure), and a month's payments are the sum of
    each variant's own payments in it, beside debt repayments fixed by the inputs. Adding a
    variant never lowers either, so a child whose sum already exceeds the direct-spend cap or a
    month's payment cap is never checked, nor anything below it; nor is a node whose
@@ -121,9 +123,10 @@ from careerwright.planning.families import (
     family_key,
 )
 from careerwright.planning.layers import rank
+from careerwright.planning.ledgers import LoanToRepay
 
 ALGORITHM_VERSION = "canonical-dfs-1"
-PRUNING_VERSION = "sound-pruning-4"  # the six rules above: change it with any rule
+PRUNING_VERSION = "sound-pruning-5"  # the six rules above: change it with any rule
 # The rank stage's own limit (S6.8). Ranking the archive cap's 50,000 schedules takes about a
 # second (`tools.rank_benchmark`), so it is a bound, never the expected case.
 RANK_SECONDS = 5
@@ -143,6 +146,8 @@ _OWN_UNRESOLVED = frozenset(
         FindingCode.ENTRY_REQUIREMENTS_NOT_MET,
         FindingCode.ELIGIBILITY_UNCONFIRMED,
         FindingCode.STACKING_UNCONFIRMED,
+        # Task 12c: its own tuition fee loan counts but states no amount.
+        FindingCode.LOAN_AMOUNT_UNKNOWN,
     }
 )
 _OWN_VIOLATIONS = frozenset(
@@ -268,6 +273,9 @@ class Schedule(StrictModel):
     qualifications: list[RouteQualification | Qualification]
     conditions: list[Condition]
     preferences: list[Finding]  # an optional preference left unmet: never a hard limit
+    # What a tuition fee loan paid to the provider pays, as a loan to repay (Task 12c). The
+    # default reads a result stored before it existed.
+    loans_to_repay: list[LoanToRepay] = Field(default_factory=list)
     layer: int | None  # 1 to 3; None: beyond the third layer
 
 
@@ -918,5 +926,6 @@ def _schedule(route: tuple[CompiledVariant, ...], check: RouteCheck, key: Family
         qualifications=check.qualifications,
         conditions=check.conditions,
         preferences=[f for f in check.findings if f.kind is FindingKind.PREFERENCE],
+        loans_to_repay=check.loans_to_repay,
         layer=None,
     )

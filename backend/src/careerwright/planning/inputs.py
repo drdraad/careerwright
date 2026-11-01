@@ -17,7 +17,8 @@ answer: "no debts" is `[]`, not asked is null.
 - **Work rights and remote working live here** (ADR 0013 amendment): the person's
   circumstances for the plan, never inferred from a city, and remote work never takes a city.
 - **Per option** (`VariantInputs`): the work pattern, take-home wage, funding statuses (each
-  support, whether they stack, each eligibility condition of the stated fee) and the entry
+  support, whether they stack, each eligibility condition of the stated fee), a tuition fee
+  loan paid straight to the provider (Task 12c: a loan to repay, never support) and the entry
   confirmation. A place or an accepted offer the person holds (`admissions`) is the starting
   position: its application gate is verified and its offer accepted.
 - **Outcome decisions** (ADR 0012 decision 11): accepting a provisional mapping makes it the
@@ -46,6 +47,7 @@ from careerwright.planning.catalogue import (
     InstrumentKind,
     RecordState,
     Support,
+    TuitionFeeLoan,
     Wage,
     WorkPattern,
     WorkPatternKind,
@@ -168,6 +170,28 @@ class SupportInput(StrictModel):
         )
 
 
+class TuitionFeeLoanInput(StrictModel):
+    """A tuition fee loan paid straight to the provider, as the person states it for one option
+    (spec section 22, 2026-11-01): its amount and its funding statuses (ADR 0013 decision 5).
+    The rules of `planning.catalogue.TuitionFeeLoan`: an approval needs confirmed eligibility.
+    Never support: a maintenance loan or any other loan stated as a support is refused."""
+
+    amount: Money | None = Field(default=None, description="Null: not known, never £0.")
+    eligibility: EligibilityStatus
+    application: AwardState
+
+    @model_validator(mode="after")
+    def _a_loan(self) -> Self:
+        self.loan(Citation(basis=CitationBasis.PERSON))  # the same rules, raised here
+        return self
+
+    def loan(self, cited: Citation) -> TuitionFeeLoan:
+        """As the planning model reads it: the person's assumption, never a reviewed record."""
+        return TuitionFeeLoan(
+            **self.model_dump(), review_state=RecordState.ACCEPTED_ASSUMPTION, cited=cited
+        )
+
+
 class VariantInputs(StrictModel):
     """What the person confirmed for one option (a variant of the planning catalogue)."""
 
@@ -179,6 +203,11 @@ class VariantInputs(StrictModel):
         default=False,
         description="The supports may be combined: neither excludes the other and together "
         "they stay within each one's eligible costs.",
+    )
+    tuition_fee_loan: TuitionFeeLoanInput | None = Field(
+        default=None,
+        description="A tuition fee loan paid straight to the provider: a loan to repay later, "
+        "never support. Null: none stated.",
     )
     entry_requirements_met: bool | None = Field(
         default=None, description="Null: not yet answered. False: the person's own no."
@@ -527,6 +556,9 @@ def _with_answers(
                     else None,
                     "supports": [s.support(cited) for s in found.supports],
                     "stacking_confirmed": found.stacking_confirmed,
+                    "tuition_fee_loan": found.tuition_fee_loan.loan(cited)
+                    if found.tuition_fee_loan is not None
+                    else None,
                     "entry_requirements_met": found.entry_requirements_met,
                     "condition_statuses": dict(found.condition_statuses),
                 }

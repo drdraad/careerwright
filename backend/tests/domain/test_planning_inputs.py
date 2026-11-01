@@ -43,6 +43,7 @@ from careerwright.planning.inputs import (
     RemoteWork,
     SpendingCaps,
     SupportInput,
+    TuitionFeeLoanInput,
     VariantInputs,
     WorkPatternInput,
     decided_outcomes,
@@ -306,6 +307,35 @@ def test_a_scheme_the_person_confirms_pays_for_several_options_names_one_of_thei
         PlanningInputsIn(variants=[first], shared_schemes=["funding:elsewhere"])  # no support
     with pytest.raises(ValidationError):
         PlanningInputsIn(variants=[first], shared_schemes=["funding:employer"] * 2)
+
+
+@pytest.mark.req("PLN-11", "FUNDING-06")
+def test_a_tuition_fee_loan_the_person_states_reaches_its_option_as_their_assumption() -> None:
+    stated = TuitionFeeLoanInput(
+        amount=gbp(925000), eligibility=EligibilityStatus.CONFIRMED, application=AwardState.APPLIED
+    )
+    answers = VariantInputs(variant_id="degree", tuition_fee_loan=stated)
+    courses = catalogue_of(option("degree", payments=((0, 925000),)), option("other"))
+
+    prepared = ready(complete(variants=[answers]), courses)
+    loan = next(v for v in prepared.catalogue.variants if v.variant_id == "degree").tuition_fee_loan
+    other = next(v for v in prepared.catalogue.variants if v.variant_id == "other")
+    result = checked(prepared, ["degree"])
+
+    assert loan is not None
+    assert (loan.amount, loan.eligibility, loan.application) == (
+        gbp(925000),
+        EligibilityStatus.CONFIRMED,
+        AwardState.APPLIED,
+    )
+    assert loan.review_state is RecordState.ACCEPTED_ASSUMPTION  # never a reviewed record
+    assert loan.cited.basis is CitationBasis.PERSON
+    assert other.tuition_fee_loan is None
+    assert [c.verification for c in result.conditions] == ["confirm_loan_approved"]
+    unstated = TuitionFeeLoanInput(
+        eligibility=EligibilityStatus.CONFIRMED, application=AwardState.APPROVED
+    )
+    assert unstated.amount is None  # not stated: unknown, never £0
 
 
 @pytest.mark.req("PLN-11", "FUNDING-04", "FUNDING-05")

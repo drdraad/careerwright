@@ -8,7 +8,8 @@ A family's identity is its canonical action graph, never an unordered set of act
   way it is taken, where one intake is offered several ways (full or part time, carried by
   `outcomes_from`: a different family); the work pattern it runs with (a study break or
   reduced hours change the job-role sequence); and its financing and conditional gates (each
-  support's instrument and award state, and an offer still to be accepted);
+  support's instrument and award state, a tuition fee loan paid to the provider and its
+  application state, and an offer still to be accepted);
 - **precedence:** which action finishes in a month before another starts. Two actions neither
   of which comes first run in parallel, so the same actions in sequence and in parallel are
   two families.
@@ -40,7 +41,8 @@ class FamilyAction(StrictModel):
     concept_id: str
     way: str | None  # the offering, when it is one way of taking an intake
     work_pattern: WorkPatternKind | None
-    financing: list[str]  # "instrument:award" for each support it rests on
+    # "instrument:award" for each support it rests on, and "tuition_fee_loan:application"
+    financing: list[str]
     conditional_offer: bool
 
 
@@ -125,7 +127,16 @@ def _action(variant: CompiledVariant) -> FamilyAction:
         concept_id=variant.concept_id,
         way=variant.offering_id if variant.outcome_offering_id != variant.offering_id else None,
         work_pattern=pattern.kind if pattern is not None else None,
-        financing=sorted(f"{s.instrument_id}:{s.award.value}" for s in variant.supports),
+        financing=sorted(
+            [
+                *(f"{s.instrument_id}:{s.award.value}" for s in variant.supports),
+                *(
+                    [f"tuition_fee_loan:{variant.tuition_fee_loan.application.value}"]
+                    if variant.tuition_fee_loan is not None
+                    else []
+                ),
+            ]
+        ),
         conditional_offer=variant.conditional_offer,
     )
 

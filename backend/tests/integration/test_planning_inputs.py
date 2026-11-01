@@ -99,6 +99,7 @@ def everything() -> dict[str, Any]:
                     }
                 ],
                 "stacking_confirmed": False,
+                "tuition_fee_loan": None,
                 "entry_requirements_met": None,
                 "condition_statuses": {},
             },
@@ -108,6 +109,12 @@ def everything() -> dict[str, Any]:
                 "wage": None,
                 "supports": [],
                 "stacking_confirmed": False,
+                # Task 12c: a tuition fee loan paid to the provider, not yet approved.
+                "tuition_fee_loan": {
+                    "amount": gbp(925000),
+                    "eligibility": "potentially_eligible",
+                    "application": "applied",
+                },
                 "entry_requirements_met": False,
                 "condition_statuses": {"eligibility_age": "confirmed"},
             },
@@ -125,7 +132,7 @@ def everything() -> dict[str, Any]:
     }
 
 
-@pytest.mark.req("PLN-11", "API-05", "VERSIONS-01")
+@pytest.mark.req("PLN-11", "API-05", "VERSIONS-01", "FUNDING-06")
 def test_every_input_round_trips_through_its_command_and_a_stale_version_is_refused(
     api: ApiClient, ada: str, infra: Infra
 ) -> None:
@@ -293,8 +300,10 @@ def test_an_answer_must_fit_one_of_the_workspace_s_own_options(
     assert read(api, ada, workspace_id)["version"] == 0  # nothing was stored
 
 
-@pytest.mark.req("PLN-11", "FUNDING-04")
+@pytest.mark.req("PLN-11", "FUNDING-04", "FUNDING-06")
 def test_a_loan_is_refused_as_support_before_anything_is_stored(api: ApiClient, ada: str) -> None:
+    # A loan paid to the person (a maintenance loan, say) is still refused as support: only
+    # a tuition fee loan paid to the provider has its own answer (Task 12c).
     workspace_id = workspace(api, ada)
     loan = {
         "instrument_id": "funding:F02",
@@ -354,7 +363,7 @@ def test_another_person_sees_none_of_it_and_history_is_append_only(
         )
 
 
-@pytest.mark.req("PLN-11", "FUNDING-04", "BND1-05")
+@pytest.mark.req("PLN-11", "FUNDING-04", "FUNDING-06", "BND1-05")
 @pytest.mark.parametrize(
     "document",
     [
@@ -379,6 +388,38 @@ def test_another_person_sees_none_of_it_and_history_is_append_only(
             ]
         },
         {"outcome_decisions": [{"outcome_id": "o", "decision": "maybe"}]},
+        # Task 12c: a tuition fee loan's statuses, and an approval needs confirmed eligibility.
+        {
+            "variants": [
+                {
+                    "variant_id": "v",
+                    "tuition_fee_loan": {"eligibility": "confirmed", "application": "maybe"},
+                }
+            ]
+        },
+        {
+            "variants": [
+                {
+                    "variant_id": "v",
+                    "tuition_fee_loan": {
+                        "eligibility": "potentially_eligible",
+                        "application": "approved",
+                    },
+                }
+            ]
+        },
+        {
+            "variants": [
+                {
+                    "variant_id": "v",
+                    "tuition_fee_loan": {
+                        "amount": {"minor_units": -1, "currency": "GBP"},
+                        "eligibility": "confirmed",
+                        "application": "approved",
+                    },
+                }
+            ]
+        },
     ],
 )
 def test_the_database_repeats_the_domain_rules(
