@@ -140,7 +140,7 @@ class AcquisitionService:
         try:
             if isinstance(request, FetchRequest):
                 result: AcquisitionResult = acquire_page(
-                    self._fetcher, self._pacer, request.url, now=now
+                    self._fetcher, self._pacer, request.url, now=now, read_text=request.read_text
                 )
             else:
                 result = acquire_adzuna(

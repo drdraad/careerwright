@@ -30,7 +30,14 @@ from careerwright.evidence import adzuna
 from careerwright.evidence.addresses import CheckedUrl, UrlRefusal
 from careerwright.evidence.adzuna import AdzunaQuery
 from careerwright.evidence.fetcher import JSON_TYPES, Admit, Fetched, Fetcher, FetchFailure
-from careerwright.evidence.pages import EXTRACTION_TEXT_BYTES, parse_page, redact_page, visible_text
+from careerwright.evidence.pages import (
+    EXTRACTION_TEXT_BYTES,
+    ROLE_TEXT_BYTES,
+    parse_page,
+    redact_page,
+    role_text,
+    visible_text,
+)
 from careerwright.evidence.records import (
     MODEL_READABLE,
     AttemptReason,
@@ -51,6 +58,9 @@ ADZUNA_PROVIDER = "adzuna"
 
 class FetchRequest(StrictModel):
     url: str = Field(min_length=1, max_length=2_048)
+    # Role research (Task 6e): return the page's visible text too, for the DBOS worker to
+    # check a title against. The worker is never told the title.
+    read_text: bool = False
 
 
 class AdzunaRequest(StrictModel):
@@ -90,6 +100,10 @@ class AcquisitionResult(StrictModel):
     # text only, whatever the class keeps of the body; the DBOS worker seals it as that run's
     # input and erases it once the run settles (fix round 2, rulings 9-11).
     extraction_text: str | None = Field(default=None, max_length=EXTRACTION_TEXT_BYTES)
+    # Role research only (`FetchRequest.read_text`): the page's whole visible text without
+    # personal details (`pages.role_text`), for the title check. Never kept or sealed: the
+    # DBOS worker records its hash, the span and the excerpt around it.
+    role_text: str | None = Field(default=None, max_length=ROLE_TEXT_BYTES)
     total: int | None = Field(default=None, ge=0)  # Adzuna's count of matching adverts
     http_requests: int = Field(default=0, ge=0)  # sent for it, robots.txt included
     fetched_at: datetime
@@ -168,10 +182,12 @@ def acquire_page(
     *,
     now: datetime,
     classify: Callable[[str], PageRights] = classify_page,
+    read_text: bool = False,
 ) -> AcquisitionResult:
     """`classify`: the page's class from its final host; the manifest's, except where the
     corpus tool records an agent's classification (`tools.corpus`). A refused URL is
-    recorded without it: only a checked URL is ever recorded as one."""
+    recorded without it: only a checked URL is ever recorded as one. `read_text`: role
+    research's request for the page's whole visible text (`role_text`)."""
     checked = fetcher.check(url)
     if isinstance(checked, UrlRefusal):
         return AcquisitionResult(
@@ -185,7 +201,7 @@ def acquire_page(
     result = fetcher.fetch_page(checked.url, admission(pacer))
     if isinstance(result, FetchFailure):
         return _failure_result(InputRoute.FETCH, checked.host, checked.url, result, now)
-    return _page_result(fetcher, result, checked.host, now, classify)
+    return _page_result(fetcher, result, checked.host, now, classify, read_text=read_text)
 
 
 def _page_result(
@@ -194,6 +210,8 @@ def _page_result(
     host: str,
     now: datetime,
     classify: Callable[[str], PageRights],
+    *,
+    read_text: bool = False,
 ) -> AcquisitionResult:
     # Third parties' personal details go first, so the hash that spans index into, the
     # claims and any kept body are all without them; the retrieved bytes keep their own hash.
@@ -230,7 +248,11 @@ def _page_result(
         body_b64=base64.b64encode(kept).decode() if keep else None,
         copies=parsed.postings,
         extraction=parsed.extraction,
-        extraction_text=visible_text(text) if parsed.extraction in MODEL_READABLE else None,
+        # A role page is never handed to a model (Task 6e): only its title is checked.
+        extraction_text=visible_text(text)
+        if parsed.extraction in MODEL_READABLE and not read_text
+        else None,
+        role_text=role_text(text) if read_text else None,
         http_requests=page.requests,
         fetched_at=now,
     )

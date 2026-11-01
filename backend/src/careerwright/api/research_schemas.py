@@ -1,6 +1,7 @@
 """The research API contract: acquisitions, source attempts, jobs with their copies and
 claims, and freshness (Task 7A). Enums come from the domain modules once (GC10)."""
 
+import dataclasses
 import uuid
 from datetime import date, datetime
 from typing import Any, Literal
@@ -22,6 +23,7 @@ from careerwright.evidence.acquisition import (
     extraction_state,
 )
 from careerwright.evidence.addresses import UrlRefusal
+from careerwright.evidence.corroboration import NotYetFoundReason
 from careerwright.evidence.extraction_runs import ModelSpendEstimate
 from careerwright.evidence.freshness import Freshness, FreshnessKind, FreshnessView
 from careerwright.evidence.records import (
@@ -42,7 +44,8 @@ from careerwright.evidence.records import (
     ValidationState,
     WorkMode,
 )
-from careerwright.evidence.search import SearchProposal
+from careerwright.evidence.role_research import PageView, ResearchState, ResearchView
+from careerwright.evidence.search import SearchEmptyReason, SearchProposal
 from careerwright.evidence.store import AdvertCounts, AttemptRow, ClaimRow, CopyRow, ExtractionRow
 from careerwright.identity.failures import FailureClass
 from careerwright.money import Money
@@ -513,3 +516,81 @@ class JobPage(ResponseModel):
         "shown before it starts (MODEL-08); none for a demo workspace, which never calls a "
         "model."
     )
+
+
+# --- research this role (Task 6e; ADR 0015) ----------------------------------------------
+
+
+class RolePageOut(ResponseModel):
+    """One page read for a title: what Careerwright checked, never what the page claims."""
+
+    position: int
+    url: str | None = Field(description="The checked address read; a link, https or http.")
+    host: str | None
+    status: AttemptStatus | None = Field(description="None: not tried yet.")
+    reason: AttemptReason | None = Field(description="Why it was blocked or failed.")
+    rights_class: RightsClass | None = Field(description="Its class, from the source manifest.")
+    retrieved_at: datetime | None = Field(description="When it was read, if it was.")
+    title_verified: bool | None = Field(
+        description="Whether the title is on the page word for word; None: the page wasn't "
+        "read, so nothing is known about it."
+    )
+    quote: str | None = Field(
+        description="The page's own words around the title (at most 200 characters), where "
+        "the title is verified."
+    )
+    source: int | None = Field(
+        description="The independent source it counts in (1, 2, ...): copies of one advert, "
+        "and pages of one host, share one."
+    )
+
+    @classmethod
+    def of(cls, page: PageView) -> "RolePageOut":
+        return cls(**dataclasses.asdict(page))
+
+
+class RoleResearchOut(ResponseModel):
+    """Research this role: a title no list holds, searched (only the title and England were
+    sent) and its pages read. Private to the workspace, proposed and dated. `found` and
+    `not_yet_found` are the only results, and neither says whether a role exists."""
+
+    research_id: uuid.UUID
+    title: str
+    review_state: Literal["proposed"]
+    created_at: datetime
+    state: ResearchState
+    not_yet_found_reason: NotYetFoundReason | None = Field(
+        description="With not_yet_found: no page read shows the title, or only one source does."
+    )
+    sources: int = Field(description="Independent sources showing the title, copies counted once.")
+    official: bool = Field(
+        description="An official page (gov.uk, public sector or a "
+        "professional body, by the source manifest) shows the title."
+    )
+    candidates: int = Field(description="The pages the search proposed that can be fetched.")
+    empty_reason: SearchEmptyReason | None = Field(
+        description="With no_pages: why the search proposed none (never that the role "
+        "doesn't exist)."
+    )
+    search: RunOut
+    reading: RunOut | None = Field(description="None until the pages are being read.")
+    pages: list[RolePageOut]
+
+    @classmethod
+    def of(cls, view: ResearchView, search: RunOut, reading: RunOut | None) -> "RoleResearchOut":
+        result = view.corroboration
+        return cls(
+            research_id=view.research.research_id,
+            title=view.research.title,
+            review_state="proposed",
+            created_at=view.research.created_at,
+            state=view.state,
+            not_yet_found_reason=view.not_yet_found_reason,
+            sources=result.sources if result else 0,
+            official=result.official if result else False,
+            candidates=view.candidates,
+            empty_reason=view.empty_reason,
+            search=search,
+            reading=reading,
+            pages=[RolePageOut.of(p) for p in view.pages],
+        )

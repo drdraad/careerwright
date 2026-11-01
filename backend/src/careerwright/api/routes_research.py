@@ -19,6 +19,7 @@ from careerwright.api.research_schemas import (
     JobOut,
     JobPage,
     ModelSpendOut,
+    RoleResearchOut,
     SearchOut,
     SkippedOut,
     SourceClaimOut,
@@ -29,7 +30,9 @@ from careerwright.api.research_schemas import (
 from careerwright.api.routes_runs import run_out
 from careerwright.db import Tx, actor_transaction
 from careerwright.evidence import acquisition as research
+from careerwright.evidence import role_research
 from careerwright.evidence.acquisition import PasteText, SubmitAcquisition
+from careerwright.evidence.role_research import ResearchView, StartRoleResearch
 from careerwright.evidence.search import SubmitSearch, search_view, submit_search
 from careerwright.identity.keyring import Keyring
 from careerwright.identity.receipts import CommandResult, fingerprint, run_idempotent
@@ -158,6 +161,128 @@ def get_search(
 ) -> SearchOut:
     with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
         return search_out(tx, deps.keyring, workspace_id, run_id)
+
+
+def role_research_out(tx: Tx, keyring: Keyring, view: ResearchView) -> RoleResearchOut:
+    return RoleResearchOut.of(
+        view,
+        run_out(tx, keyring, view.search),
+        run_out(tx, keyring, view.reading) if view.reading else None,
+    )
+
+
+@router.post(
+    "/role-research",
+    status_code=202,
+    response_model=RoleResearchOut,
+    operation_id="start_role_research",
+)
+def start_role_research(
+    workspace_id: uuid.UUID,
+    body: StartRoleResearch,
+    caller: CallerDep,
+    deps: Deps,
+    key: IdempotencyKey,
+) -> JSONResponse:
+    """Research a title no list holds (202 + the research): one bounded search told only the
+    title and England, on the profile version you saw. Its estimated cost is the source
+    search's (`GET .../spend/estimate?kind=source_search`)."""
+
+    def execute(tx: Tx) -> CommandResult:
+        research_id = role_research.start_research(
+            tx,
+            caller.actor,
+            workspace_id,
+            body,
+            models=deps.models,
+            keyring=deps.keyring,
+            runtime_mode=deps.settings.runtime_mode,
+            defaults=deps.spend_defaults,
+            now=deps.clock(),
+        )
+        view = role_research.view(tx, deps.keyring, workspace_id, research_id)
+        out = role_research_out(tx, deps.keyring, view)
+        return CommandResult(202, out.model_dump(mode="json"), workspace_id)
+
+    request = {"workspace_id": str(workspace_id), **body.model_dump(mode="json")}
+    status, response = run_idempotent(
+        deps.engine,
+        caller.actor.actor_id,
+        key,
+        "start_role_research",
+        fingerprint("start_role_research", request),
+        execute,
+    )
+    return JSONResponse(response, status_code=status)
+
+
+@router.post(
+    "/role-research/{research_id}/reading",
+    status_code=202,
+    response_model=RoleResearchOut,
+    operation_id="read_role_pages",
+)
+def read_role_pages(
+    workspace_id: uuid.UUID,
+    research_id: uuid.UUID,
+    caller: CallerDep,
+    deps: Deps,
+    key: IdempotencyKey,
+) -> JSONResponse:
+    """Read the search's pages, up to five, through the restricted acquisition worker (202);
+    200 with the same research when its reading has started already. It calls no model."""
+
+    def execute(tx: Tx) -> CommandResult:
+        started = role_research.start_reading(
+            tx,
+            caller.actor,
+            workspace_id,
+            research_id,
+            keyring=deps.keyring,
+            runtime_mode=deps.settings.runtime_mode,
+            now=deps.clock(),
+        )
+        view = role_research.view(tx, deps.keyring, workspace_id, research_id)
+        out = role_research_out(tx, deps.keyring, view)
+        return CommandResult(202 if started else 200, out.model_dump(mode="json"), workspace_id)
+
+    request = {"workspace_id": str(workspace_id), "research_id": str(research_id)}
+    status, response = run_idempotent(
+        deps.engine,
+        caller.actor.actor_id,
+        key,
+        "read_role_pages",
+        fingerprint("read_role_pages", request),
+        execute,
+    )
+    return JSONResponse(response, status_code=status)
+
+
+@router.get(
+    "/role-research", response_model=list[RoleResearchOut], operation_id="list_role_research"
+)
+def list_role_research(
+    workspace_id: uuid.UUID, caller: CallerDep, deps: Deps
+) -> list[RoleResearchOut]:
+    """The workspace's researches, newest first (at most 20)."""
+    with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
+        return [
+            role_research_out(tx, deps.keyring, v)
+            for v in role_research.views(tx, deps.keyring, workspace_id)
+        ]
+
+
+@router.get(
+    "/role-research/{research_id}",
+    response_model=RoleResearchOut,
+    operation_id="get_role_research",
+)
+def get_role_research(
+    workspace_id: uuid.UUID, research_id: uuid.UUID, caller: CallerDep, deps: Deps
+) -> RoleResearchOut:
+    with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
+        view = role_research.view(tx, deps.keyring, workspace_id, research_id)
+        return role_research_out(tx, deps.keyring, view)
 
 
 @router.post(

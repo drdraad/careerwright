@@ -33,10 +33,12 @@ from careerwright.evidence.search import (
     MAX_OUTPUT_TOKENS,
     MAX_REQUESTS,
     MAX_TOOL_CALLS,
-    SearchInput,
+    ROLE_INSTRUCTIONS,
+    RoleSearchInput,
     SearchOutput,
     SearchProposal,
     render_prompt,
+    render_role_prompt,
 )
 from careerwright.identity.activity import PartialSink, RunTask, TruncationGuard
 from careerwright.identity.model_registry import ModelMode
@@ -80,11 +82,17 @@ def run_search(
     makes the one request stream."""
     if raw_input is None:
         raise ValueError("a source search has a sealed input")
-    context = SearchInput.model_validate_json(raw_input)
+    context = search.sealed_search_input(raw_input)
+    # Role research (Task 6e) is the same bounded request with its own instructions, told
+    # only the title and England.
+    if isinstance(context, RoleSearchInput):
+        instructions, prompt = ROLE_INSTRUCTIONS, render_role_prompt(context)
+    else:
+        instructions, prompt = INSTRUCTIONS, render_prompt(context)
     agent = Agent(
         model,
         output_type=NativeOutput(SearchOutput),
-        instructions=INSTRUCTIONS,
+        instructions=instructions,
         retries={"tools": 0, "output": 0},
         capabilities=[
             TruncationGuard(),
@@ -112,7 +120,7 @@ def run_search(
     )
     asyncio.run(
         agent.run(
-            render_prompt(context),
+            prompt,
             usage_limits=UsageLimits(request_limit=MAX_REQUESTS),
             model_settings=settings,
         )

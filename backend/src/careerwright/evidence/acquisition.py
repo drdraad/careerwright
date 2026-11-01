@@ -35,10 +35,11 @@ from careerwright.catalogue.pay import FloorCounts, FloorVerdict, floor_counts
 from careerwright.config import RuntimeMode
 from careerwright.db import Engine, Tx, run_transaction
 from careerwright.errors import CareerwrightError, ErrorCode, ErrorStage
-from careerwright.evidence import store
+from careerwright.evidence import role_store, store
 from careerwright.evidence.acquire import ADZUNA_PROVIDER, AcquisitionResult
 from careerwright.evidence.addresses import CheckedUrl, UrlRefusal, check_url
 from careerwright.evidence.adzuna import CREDENTIAL_PARAMETERS, AdzunaQuery, recorded_url
+from careerwright.evidence.corroboration import check_title
 from careerwright.evidence.extraction_runs import (
     ModelSpendEstimate,
     acquisition_model_spend,
@@ -851,15 +852,15 @@ def _kept_body_checked(result: AcquisitionResult) -> AcquisitionResult:
             "copies": [],
             "extraction": None,
             "extraction_text": None,
+            "role_text": None,
             "total": None,
         }
     )
 
 
-def _record_copies(
+def _record_document(
     tx: Tx, rt: AcquisitionRuntime, run: Run, attempt_id: uuid.UUID, result: AcquisitionResult
 ) -> None:
-    now = result.fetched_at
     if result.body_b64 is not None and result.retention is Retention.BODY:
         store.insert_document(
             tx,
@@ -870,6 +871,31 @@ def _record_copies(
                 base64.b64decode(result.body_b64), document_context(run.workspace_id, attempt_id)
             ),
         )
+
+
+def _record_role_page(
+    tx: Tx,
+    rt: AcquisitionRuntime,
+    run: Run,
+    attempt_id: uuid.UUID,
+    result: AcquisitionResult,
+    title: str,
+) -> None:
+    """A page read for role research (Task 6e): its body where its class keeps it, and what
+    code found of the title in its visible text. Its postings are never recorded as jobs and
+    it is never handed to a model; the text itself is not kept."""
+    _record_document(tx, rt, run, attempt_id, result)
+    check = check_title(title, result.role_text or "", result.copies, provider=result.provider)
+    role_store.insert_page_check(
+        tx, attempt_id=attempt_id, workspace_id=run.workspace_id, check=check
+    )
+
+
+def _record_copies(
+    tx: Tx, rt: AcquisitionRuntime, run: Run, attempt_id: uuid.UUID, result: AcquisitionResult
+) -> None:
+    now = result.fetched_at
+    _record_document(tx, rt, run, attempt_id, result)
     record_copies(
         tx,
         workspace_id=run.workspace_id,
@@ -934,7 +960,7 @@ def acquire_target(rt: AcquisitionRuntime, run_id: uuid.UUID, position: int) -> 
         if target.route is InputRoute.ADZUNA and target.query is not None:
             result = rt.client.adzuna(AdzunaQuery.model_validate(target.query))
         elif target.url is not None:
-            result = rt.client.fetch(target.url)
+            result = rt.client.fetch(target.url, read_text=target.role_title is not None)
         else:  # refused when submitted: recorded as blocked, nothing is asked for
             result = AcquisitionResult(
                 route=InputRoute.FETCH,
@@ -947,8 +973,9 @@ def acquire_target(rt: AcquisitionRuntime, run_id: uuid.UUID, position: int) -> 
     except AcquisitionUnavailableError:
         result = _unavailable(target, rt.clock())
     result = _kept_body_checked(result)
+    role_title = target.role_title  # a page read for role research: no posting, no model
     with run_transaction(rt.engine, run_id) as tx:
-        if model_readable(result):
+        if model_readable(result) and role_title is None:
             # First, before any other lock or insert: the page may start an extraction run,
             # which a cancel must see or be seen by. The cancel takes this lock and then the
             # workspace's row, which a kept body's document would already hold by its key
@@ -966,12 +993,14 @@ def acquire_target(rt: AcquisitionRuntime, run_id: uuid.UUID, position: int) -> 
                 "reason": FailureClass.ACCESS_REVOKED.value,
             }
         store.finish_attempt(tx, attempt_id, result, http_requests=result.http_requests)
-        if result.status is AttemptStatus.SUCCEEDED:
+        if result.status is AttemptStatus.SUCCEEDED and role_title is not None:
+            _record_role_page(tx, rt, run, attempt_id, result, role_title)
+        elif result.status is AttemptStatus.SUCCEEDED:
             _record_copies(tx, rt, run, attempt_id, result)
             # A page whose structured data gave no posting goes to the workspace's own model
             # extraction run, or says why not (fix round 2, rulings 9-10).
             start_extraction(tx, rt.keyring, rt.models, run, attempt_id, result, rt.clock())
-        elif target.url and result.requested_url:
+        elif target.url and result.requested_url and role_title is None:
             store.job_attempted(
                 tx,
                 store.jobs_from_url(tx, run.workspace_id, result.requested_url),
