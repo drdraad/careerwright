@@ -168,6 +168,13 @@ const SUPPORT_NOTE = {
       source_url: "https://giveusashout.org/get-help/",
       checked_on: "2026-10-28",
     },
+    {
+      name: "Childline",
+      contact: "Call 0800 1111 or use the 1-2-1 chat online (free, 24 hours a day, 7 days a week)",
+      when: "For children and young people",
+      source_url: "https://www.childline.org.uk/get-support/contacting-childline/",
+      checked_on: "2026-11-01",
+    },
   ],
 };
 

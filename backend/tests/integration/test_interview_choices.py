@@ -26,7 +26,7 @@ from tools.leak_scan import Needle, scan
 pytestmark = pytest.mark.integration
 
 DISTRESS = "Some days I just want to die, and I don't know why I'm even looking for jobs."
-SERVICES = {"Emergency services", "NHS 111", "Samaritans", "Shout"}
+SERVICES = {"Emergency services", "NHS 111", "Samaritans", "Shout", "Childline"}
 
 
 @pytest.fixture
@@ -139,12 +139,13 @@ def test_a_message_with_a_risk_stem_is_sent_with_the_support_panel_and_none_of_i
     # decision, 2026-10-31), and since slice C the answers typed in the conversation's review
     # step and a title's seniority and industry ("every place a person types") are screened
     # too. Accepted at session 1; the three phrasings and the screens added after it are not
-    # yet reviewed.
-    assert panel["policy_version"] == safety.POLICY_VERSION == "support-policy-11"
+    # yet reviewed. support-policy-12 (Task 6f): Childline joins the services.
+    assert panel["policy_version"] == safety.POLICY_VERSION == "support-policy-12"
     assert panel["review_status"] == safety.REVIEW_STATUS
     assert panel["review_status"].startswith("accepted for L0 at session 1")
     assert "not yet reviewed as built" in panel["review_status"]
     assert {r["name"] for r in panel["resources"]} == SERVICES
+    assert all(r["source_url"].startswith("https://") for r in panel["resources"])
     assert panel["message"] == safety.SUPPORT_NOTE  # "...sent to Careerwright as usual."
     assert (ordinary.status_code, ordinary.json()["support_note"]) == (202, None)
     assert replayed.json()["turn_id"] == flagged.json()["turn_id"]  # the same turn, replayed
