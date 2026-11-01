@@ -661,6 +661,8 @@ export const ROLE_RESEARCH = {
     one_source_only:
       "Careerwright found the title, word for word, on one source only. Copies of one advert count once.",
     not_on_any_page: "None of the pages Careerwright read uses the title word for word.",
+    // Never "not on any page": a page that couldn't be read might use it (`unread` counts them).
+    pages_unread: "Careerwright couldn't read every page the search found, so it can't say yet.",
   } satisfies Record<NotYetFoundReason, string>,
   unread: (pages: number) =>
     pages === 1

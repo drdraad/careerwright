@@ -244,6 +244,49 @@ def test_one_source_leaves_it_not_yet_found_in_independent_sources(
 
 
 @pytest.mark.req("DIV1-15")
+@pytest.mark.parametrize(
+    ("paths", "reason", "unread"),
+    [
+        ([("growers.guild.example", "/role/instructing")], "not_on_any_page", 0),
+        (
+            [("growers.guild.example", "/role/missing"), ("jobs.board.example", "/role/missing")],
+            "pages_unread",
+            2,
+        ),
+        (
+            [
+                ("growers.guild.example", "/role/instructing"),
+                ("jobs.board.example", "/role/missing"),
+            ],
+            "pages_unread",
+            1,
+        ),
+    ],
+    ids=["every page read", "no page read", "one page read, one not"],
+)
+def test_a_page_that_could_not_be_read_is_never_a_page_without_the_title(
+    infra: Infra,
+    api: ApiClient,
+    ada: str,
+    sources: SourceServer,
+    service_url: str,
+    tmp_path: Path,
+    paths: list[tuple[str, str]],
+    reason: str,
+    unread: int,
+) -> None:
+    # The first live run (2026-11-01): every page failed, and the result said "not on any page".
+    # A missing page answers 404, so its reading fails and the run still completes.
+    scenario = make_scenario(infra, api, ada, tmp_path)
+    shown = research_of(infra, api, scenario, sources, service_url, tmp_path, paths)
+
+    assert (shown["state"], shown["not_yet_found_reason"]) == ("not_yet_found", reason)
+    assert (shown["sources"], shown["reading"]["status"]) == (0, "complete")
+    not_read = [p for p in shown["pages"] if p["title_verified"] is None]
+    assert [(p["status"], p["reason"]) for p in not_read] == [("failed", "http_error")] * unread
+
+
+@pytest.mark.req("DIV1-15")
 def test_one_official_page_is_enough(
     infra: Infra,
     api: ApiClient,

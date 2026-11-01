@@ -511,7 +511,34 @@ def test_pages_that_never_show_the_title_say_so() -> None:
 
     assert result.verdict is RoleVerdict.NOT_YET_FOUND
     assert result.reason is NotYetFoundReason.NOT_ON_ANY_PAGE
-    assert result.sources == 0
+    assert (result.sources, result.unread) == (0, 0)
+
+
+@pytest.mark.req("DIV1-15")
+def test_pages_that_could_not_be_read_are_never_pages_without_the_title() -> None:
+    # Every page failed (the first live run: robots.txt unreachable on all five).
+    none_read = corroborate([], unread=5)
+    # Some read without the title, the rest failed: the failed ones might have shown it.
+    partly_read = corroborate([evidence("p1", "a.example", page_text("Nothing here."))], unread=2)
+
+    for result, unread in ((none_read, 5), (partly_read, 2)):
+        assert result.verdict is RoleVerdict.NOT_YET_FOUND  # never "doesn't exist"
+        assert result.reason is NotYetFoundReason.PAGES_UNREAD
+        assert (result.sources, result.unread) == (0, unread)
+
+
+@pytest.mark.req("DIV1-15")
+def test_one_source_with_pages_unread_is_still_one_source_and_counts_them() -> None:
+    result = corroborate([evidence("p1", "careers.northwind.example", page_text(ADVERT))], unread=1)
+
+    assert result.reason is NotYetFoundReason.ONE_SOURCE_ONLY
+    assert (result.sources, result.unread) == (1, 1)
+
+
+@pytest.mark.req("DIV1-15")
+def test_no_page_at_all_is_not_a_result() -> None:
+    with pytest.raises(ValueError, match="no page"):
+        corroborate([])
 
 
 def record(**changes: object) -> TargetRecord:

@@ -92,7 +92,17 @@ def _reader() -> Reader:
 
 def page_notes(title: str, results: list[AcquisitionResult]) -> dict[str, Any]:
     """What the row records of the pages read: hosts, classes, outcomes and the verdict; never
-    a URL or a page's words."""
+    a URL or a page's words. A page not read is counted apart (`pages_unread`), never as a page
+    without the title; with no page to read there is no verdict."""
+    if not results:
+        return {
+            "pages": [],
+            "verdict": None,
+            "reason": "no_pages",
+            "unread": 0,
+            "sources": 0,
+            "official": False,
+        }
     evidence = [
         PageEvidence(
             ref=str(n),
@@ -103,7 +113,7 @@ def page_notes(title: str, results: list[AcquisitionResult]) -> dict[str, Any]:
         for n, r in enumerate(results)
         if r.status is AttemptStatus.SUCCEEDED
     ]
-    result = corroborate(evidence)
+    result = corroborate(evidence, unread=len(results) - len(evidence))
     group_of = {ref: n for n, group in enumerate(result.groups, start=1) for ref in group}
     checked = {e.ref: e.check.verified for e in evidence}
     return {
@@ -120,6 +130,7 @@ def page_notes(title: str, results: list[AcquisitionResult]) -> dict[str, Any]:
         ],
         "verdict": result.verdict.value,
         "reason": result.reason.value if result.reason else None,
+        "unread": result.unread,
         "sources": result.sources,
         "official": result.official,
     }

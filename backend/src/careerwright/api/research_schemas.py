@@ -560,7 +560,10 @@ class RoleResearchOut(ResponseModel):
     created_at: datetime
     state: ResearchState
     not_yet_found_reason: NotYetFoundReason | None = Field(
-        description="With not_yet_found: no page read shows the title, or only one source does."
+        description="With not_yet_found: every page was read and none shows the title "
+        "(not_on_any_page), only one source does (one_source_only), or none read shows it and "
+        "some couldn't be read (pages_unread; the pages whose title_verified is None), never "
+        "counted as pages without the title."
     )
     sources: int = Field(description="Independent sources showing the title, copies counted once.")
     official: bool = Field(
