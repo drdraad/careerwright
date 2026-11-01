@@ -400,7 +400,9 @@ Decisions 1 to 3's fourth layer is built (S2.9; `careerwright.evidence.role_rese
   employer and they differ. A page that couldn't be read is never counted as a page without
   the title: a reading that ended before the rule could say found is `reading_stopped`, never
   "not yet found", and a complete reading with unread pages says how many. Verified spans are
-  a fact, so a role found before a reading was stopped stays found.
+  a fact, so a role found before a reading was stopped stays found. A complete reading where
+  no page read shows the title and some couldn't be read is `pages_unread`, never
+  `not_on_any_page`, which needs every page read (follow-up, 2026-11-01, after the first live run).
 - **The record** (decision 3) is `role_researches`: the title, its search, its reading,
   `review_state` always `proposed` (a CHECK), dated and private to the workspace. Its page checks
   are its source claims, with the quotes and the dates one step away in the web. Making a found
