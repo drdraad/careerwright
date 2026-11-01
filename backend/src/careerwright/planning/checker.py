@@ -16,14 +16,16 @@ What it reports, kept apart (Global Constraint 6):
   resolved by this monthly model", never "ineligible"), a missing baseline; and what waits on
   the person (Task 12a): work rights not known to be held, an eligibility condition of a stated
   fee, the stacking of two supports or one scheme paying for two options not confirmed, and
-  their own "no" to an entry requirement. Unknown never passes and is never zero.
+  their own "no" to an entry requirement; and (Task 12b) an entry requirement met only by a
+  qualification they expect, "if you get your grades". Unknown never passes and is never zero.
 - **Ledgers and objectives:** the direct-spend, income-difference, liquidity and debt ledgers;
   months to the modelled application-readiness milestone, which the capability model decides;
   direct and economic cost.
 - **Qualifications and conditions:** proposed records, accepted assumptions, synthetic data,
   and the conditions a route rests on (an offer to accept, an award to approve, a place to
   win by applying in time, a tuition fee loan to be approved), each with a blocking
-  verification. Only a route with none is "affordable and feasible" unqualified (OPTN-09).
+  verification; and (Task 12b) a figure the person supplied or an option they added. Only a
+  route with none is "affordable and feasible" unqualified (OPTN-09).
 - **A tuition fee loan paid straight to the provider** (Task 12c; spec section 22): the fee
   it pays is in neither the cash ledger, nor direct spending, nor the monthly payment cap's
   payments, and is never support or a receipt; the route carries it as a loan to repay
@@ -147,6 +149,9 @@ class FindingCode(StrEnum):
     # Task 12c (spec section 22). A tuition fee loan paid straight to the provider counts in
     # this scenario but its amount is not stated: what the person pays is not known, never £0.
     LOAN_AMOUNT_UNKNOWN = "loan_amount_unknown"
+    # Task 12b (plan v1.6). A stated entry requirement named only by a qualification the person
+    # expects: met only if they get their grades, so unresolved until they confirm the result.
+    ENTRY_REQUIREMENTS_EXPECTED = "entry_requirements_expected"
 
 
 _UNRESOLVED = frozenset(
@@ -166,6 +171,7 @@ _UNRESOLVED = frozenset(
         FindingCode.WORK_RIGHTS_NOT_HELD,
         FindingCode.SCHEME_SHARED_UNCONFIRMED,
         FindingCode.LOAN_AMOUNT_UNKNOWN,
+        FindingCode.ENTRY_REQUIREMENTS_EXPECTED,
     }
 )
 MOST_JOB_TRANSITIONS = 1  # spec section 12: at most one conditional bridge-role transition
@@ -210,6 +216,10 @@ class RouteQualification(StrEnum):
     CONDITIONAL_APPLICATION = "conditional_application"
     CONDITIONAL_LOAN = "conditional_loan"  # a tuition fee loan not yet approved (Task 12c)
     READINESS_NOT_ASSESSED = "readiness_not_assessed"
+    # Task 12b: it rests on a figure the person supplied (not reviewed), or on an option they
+    # added themselves (their own record, never reviewed).
+    SUPPLIED_FIGURES = "supplied_figures"
+    OWN_OPTIONS = "own_options"
 
 
 class Condition(StrictModel):
@@ -579,6 +589,8 @@ class _Check:
                 self.add(FindingCode.ENTRY_REQUIREMENTS_UNCONFIRMED, variant_id=variant.variant_id)
             if variant.entry_not_met:
                 self.add(FindingCode.ENTRY_REQUIREMENTS_NOT_MET, variant_id=variant.variant_id)
+            if variant.entry_expected:
+                self.add(FindingCode.ENTRY_REQUIREMENTS_EXPECTED, variant_id=variant.variant_id)
 
     def _work_rights(self) -> None:
         """Every route needs the right to work; this model checks no visa or sponsorship."""
@@ -1264,6 +1276,10 @@ class _Check:
             found.append(RouteQualification.CONDITIONAL_LOAN)
         if self.monthly.readiness is None:
             found.append(RouteQualification.READINESS_NOT_ASSESSED)
+        if any(v.supplied for v in self.selected):
+            found.append(RouteQualification.SUPPLIED_FIGURES)
+        if any(v.added_by_person for v in self.selected):
+            found.append(RouteQualification.OWN_OPTIONS)
         # Every qualification readiness carries, by name, the provisional matrix included: in
         # L0 a route resting on the pack reads qualified (R9; ADR 0013 decision 10). A name
         # both lists share ("proposed_records") is listed once.

@@ -43,6 +43,7 @@ from careerwright.planning.catalogue import (
     RecordState,
     Recurring,
     Session,
+    SuppliedFact,
     Support,
     TuitionFeeLoan,
     Wage,
@@ -223,6 +224,11 @@ class CompiledVariant(StrictModel):
     application_gate: str | None
     entry_unconfirmed: bool  # stated entry requirements the person has not yet answered
     entry_not_met: bool  # the person's own "no" to them: still unresolved, never ineligible
+    # Task 12b; each default reads a snapshot sealed before it existed. Met only if the person
+    # gets the grades they expect: unresolved, never met.
+    entry_expected: bool = False
+    supplied: list[SuppliedFact] = Field(default_factory=list)  # the person's own figures
+    added_by_person: bool = False  # an option the person added themselves (S5.7)
 
     @property
     def conditional_offer(self) -> bool:
@@ -371,6 +377,11 @@ def compile_input(
                 and variant.entry_requirements_met is None,
                 entry_not_met=bool(concept.entry_requirements)
                 and variant.entry_requirements_met is False,
+                entry_expected=bool(concept.entry_requirements)
+                and variant.entry_expected
+                and variant.entry_requirements_met is not False,
+                supplied=offering.supplied,
+                added_by_person=concept.added_by_person,
             )
         )
     exclusions = {

@@ -303,7 +303,7 @@ def _user_claim(
     return Claim(field=field_name, value=value, span=span, validation=ValidationState.USER_SUPPLIED)
 
 
-def _reference_url(url: str) -> str:
+def reference_url(url: str) -> str:
     """A pasted text's source, kept only as a checked URL (it is shown as a link)."""
     recorded = _recordable(url)
     if isinstance(recorded, RefusedTarget):
@@ -342,7 +342,7 @@ def paste_text(
             stage=ErrorStage.REQUEST,
             details={"reason": "exemplars_per_target", "limit": MAX_EXEMPLARS_PER_TARGET},
         )
-    source_url = _reference_url(command.source_url) if command.source_url else None
+    source_url = reference_url(command.source_url) if command.source_url else None
     # Third parties' contact details go before anything is hashed, sealed or claimed.
     command = command.model_copy(
         update={

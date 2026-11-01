@@ -26,7 +26,8 @@ adds variants of later concepts.
    requirements or weekly hours, a payment due before the planning start, a start before it,
    an application deadline already passed, the person's "no" to its entry requirements, an
    eligibility condition of its stated fee not confirmed, supports whose stacking is not
-   confirmed, its own tuition fee loan counted with no amount stated (Task 12c), or, alone, a
+   confirmed, its own tuition fee loan counted with no amount stated (Task 12c), entry
+   requirements met only by a qualification the person expects (Task 12b), or, alone, a
    direct cost or a month's payments above its cap, or two schemes recorded as exclusive among
    its own supports. Each is computed
    from the variant by itself (its dates, its payments, own support and own loan, its hours, the
@@ -126,7 +127,7 @@ from careerwright.planning.layers import rank
 from careerwright.planning.ledgers import LoanToRepay
 
 ALGORITHM_VERSION = "canonical-dfs-1"
-PRUNING_VERSION = "sound-pruning-5"  # the six rules above: change it with any rule
+PRUNING_VERSION = "sound-pruning-6"  # the six rules above: change it with any rule
 # The rank stage's own limit (S6.8). Ranking the archive cap's 50,000 schedules takes about a
 # second (`tools.rank_benchmark`), so it is a bound, never the expected case.
 RANK_SECONDS = 5
@@ -148,6 +149,8 @@ _OWN_UNRESOLVED = frozenset(
         FindingCode.STACKING_UNCONFIRMED,
         # Task 12c: its own tuition fee loan counts but states no amount.
         FindingCode.LOAN_AMOUNT_UNKNOWN,
+        # Task 12b: its entry requirements met only by a qualification the person expects.
+        FindingCode.ENTRY_REQUIREMENTS_EXPECTED,
     }
 )
 _OWN_VIOLATIONS = frozenset(
@@ -821,11 +824,13 @@ def check_scope(monthly: MonthlyInput, limits: M0SearchLimits) -> None:
         ("months", monthly.inputs.horizon_months, limits.max_months),
     ):
         if size > limit:
+            # The counts beside the bound (Task 12b): the person retains options to narrow it
+            # (`StatedInputs.excluded_variants`); nothing is cut to the first ones silently.
             raise CareerwrightError(
                 ErrorCode.MODEL_SCOPE_EXCEEDED,
                 "This comparison is larger than the monthly model searches.",
                 stage=ErrorStage.PLANNING,
-                details={"reason": reason, "limit": limit},
+                details={"reason": reason, "limit": limit, "size": size},
             )
 
 

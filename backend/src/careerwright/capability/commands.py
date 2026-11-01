@@ -71,10 +71,11 @@ from careerwright.profile.records import TargetCoverage, TargetLink, TargetRecor
 from careerwright.profile.targets import PackTarget, PackTargets, stored_targets, target_titles
 from careerwright.vocabulary import DataMode
 
-# The versions the capability model reads, each through its pin (`PINS`, `load_pack`,
-# `load_reference`): Task 7c's reviewed pack 0.2.0 and the reference 0.2.0 that fits it (Task
-# 10A fix round 1). 0.1.0 stays committed and unchanged.
-PACK_VERSION = "0.2.0"
+# The versions the capability model and planning read, each through its pin (`PINS`,
+# `load_pack`, `load_reference`): Task 7f's reviewed school-leaver pack 0.4.0 (Task 12b), and
+# the reference 0.2.0, carried unchanged to it because 0.4.0 keeps 0.2.0's targets, skill rows,
+# requirements and postings (`reference.CARRIED_TO`). Earlier versions stay committed.
+PACK_VERSION = "0.4.0"
 REFERENCE_VERSION = "0.2.0"
 
 

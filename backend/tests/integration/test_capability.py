@@ -73,11 +73,12 @@ def test_matrices_are_served_for_each_target_with_the_pack_s_date_and_review_sta
 
     assert body["version"] == 0
     assert body["profile_version"] == 1
-    # The reviewed pack 0.2.0 (session 2's record, Task 7c): 55 records reviewed, 66 proposed.
-    assert body["pack"]["pack_version"] == "0.2.0"
-    assert body["pack"]["dated"] == "2026-10-30"
-    assert body["pack"]["records_reviewed"] == 55
-    assert body["pack"]["records_proposed"] == 66
+    # The reviewed school-leaver pack 0.4.0 (Task 7f; pinned by Task 12b): 62 records
+    # reviewed, 67 proposed.
+    assert body["pack"]["pack_version"] == "0.4.0"
+    assert body["pack"]["dated"] == "2026-11-01"
+    assert body["pack"]["records_reviewed"] == 62
+    assert body["pack"]["records_proposed"] == 67
     assert body["reference"]["review_state"] == "proposed"
     # A synthetic workspace's results say so (M8).
     assert (body["synthetic"], body["data_mode"]) == (True, "live_assisted")
@@ -91,7 +92,7 @@ def test_matrices_are_served_for_each_target_with_the_pack_s_date_and_review_sta
     gate = row(nurse, NMC)
     assert gate["gate"]["protected"] is True
     assert gate["required"] is True
-    # Each citation carries its own record's review state: in 0.2.0 some of the postings
+    # Each citation carries its own record's review state: in 0.4.0 some of the postings
     # naming the gate are reviewed and some proposed, so the row stays proposed.
     assert {c["review_state"] for c in gate["citations"]} == {"reviewed", "proposed"}
     assert gate["review_state"] == "proposed"
@@ -586,7 +587,7 @@ def test_questions_and_readiness_carry_the_pack_labels_and_the_workspace_s_synth
     readiness = api.get(f"{base(workspace_id)}/readiness", ada).json()
     unlabelled = api.get(f"{base(real)}/readiness", ada).json()
 
-    assert questions["pack"]["dated"] == "2026-10-30"  # pack 0.2.0's date
+    assert questions["pack"]["dated"] == "2026-11-01"  # pack 0.4.0's date
     assert questions["reference"]["review_state"] == "proposed"
     prompt_rows = [r for p in questions["graph"]["prompts"] for r in p["rows"]]
     assert prompt_rows

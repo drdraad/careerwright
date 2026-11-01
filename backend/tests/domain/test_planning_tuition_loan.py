@@ -405,7 +405,7 @@ def test_the_search_archives_the_loan_funded_degree_and_sets_an_unknown_amount_a
     unpriced = _search(degree(tuition_fee_loan=tuition_loan(None)))
     self_paid = _search(degree())
 
-    assert PRUNING_VERSION == "sound-pruning-5"
+    assert PRUNING_VERSION == "sound-pruning-6"  # Task 12b: expected entry joined rule 2
     [schedule] = confirmed.schedules
     assert (schedule.route, schedule.direct_cost) == (["degree"], gbp(0))
     assert schedule.loans_to_repay == [

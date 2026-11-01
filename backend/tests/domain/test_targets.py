@@ -208,11 +208,11 @@ def test_several_pack_targets_crosswalked_to_one_occupation_are_never_guessed_be
 def test_the_migration_backfills_with_the_committed_pack_targets_and_crosswalks() -> None:
     committed = pack_targets(committed_data())
 
-    # Migration 0034 backfilled with pack 0.1.0. The app now reads the reviewed pack 0.2.0
-    # (Task 10A fix round 1), whose targets and crosswalks are 0.1.0's, so every backfilled
+    # Migration 0034 backfilled with pack 0.1.0. The app now reads the reviewed school-leaver
+    # pack 0.4.0 (Task 12b), whose targets and crosswalks are 0.1.0's, so every backfilled
     # record still names a target the committed pack holds.
     assert migration.PACK_VERSION == "0.1.0"
-    assert committed.version == "0.2.0"
+    assert committed.version == "0.4.0"
     assert (
         tuple((t.target_id, t.title, t.esco_uri) for t in committed.targets)
         == migration.PACK_TARGETS

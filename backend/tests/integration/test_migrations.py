@@ -61,8 +61,8 @@ pytestmark = pytest.mark.integration
 
 def decisions(records: list[TargetRecord]) -> list[TargetRecord]:
     """Records as decisions, apart from the pack version each was decided against: migrations
-    0034-0036 decided against pack 0.1.0, the app now decides against the reviewed 0.2.0
-    (Task 10A fix round 1), and both packs hold the same targets and crosswalks
+    0034-0036 decided against pack 0.1.0, the app now decides against the reviewed 0.4.0
+    (Task 12b), and both packs hold the same targets and crosswalks
     (`tests/domain/test_targets.py`)."""
     return [dataclasses.replace(r, pack_version="") for r in records]
 

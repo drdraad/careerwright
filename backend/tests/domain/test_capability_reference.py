@@ -8,8 +8,10 @@ from typing import Any
 import pytest
 
 from careerwright.capability.reference import (
+    CARRIED_TO,
     PINS,
     ReferenceError,
+    carried_changes,
     check_reference,
     load_reference,
     parse_reference,
@@ -84,6 +86,39 @@ def test_a_reference_whose_bytes_are_not_its_pin_is_refused(tmp_path: Any) -> No
     with pytest.raises(ReferenceError, match=r"written for option pack 0\.2\.0, not 0\.1\.0"):
         load_reference("0.2.0", pack)  # each version fits the pack it was written for
     assert set(PINS) == {REFERENCE, "0.2.0"}
+
+
+@pytest.mark.req("MAP1-07", "OPTN-08")
+def test_reference_0_2_0_is_carried_unchanged_to_the_school_leaver_pack_0_4_0() -> None:
+    """Task 12b: pack 0.4.0 adds courses and funding only, so the reference 0.2.0 fits it as
+    written: the same targets, skill rows, requirements and postings, every check passing."""
+    pack = load_pack("0.4.0")
+    reference = load_reference("0.2.0", pack)
+
+    assert (reference.reference_version, reference.pack_version) == ("0.2.0", "0.2.0")
+    assert check_reference(reference, pack) == []
+    assert carried_changes(load_pack("0.2.0"), pack) == []
+    assert CARRIED_TO["0.2.0"] == frozenset({"0.4.0"})  # 0.3.0 was never carried
+    assert set(CARRIED_TO) == {"0.2.0"}
+    with pytest.raises(ReferenceError, match=r"written for option pack 0\.2\.0, not 0\.3\.0"):
+        load_reference("0.2.0", load_pack("0.3.0"))
+
+
+@pytest.mark.req("MAP1-07")
+def test_a_carried_reference_is_refused_where_the_later_pack_changes_its_capability_parts() -> None:
+    later = load_pack("0.4.0")
+    renamed = later.model_copy(
+        update={
+            "targets": [
+                later.targets[0].model_copy(update={"title": "Another title"}),
+                *later.targets[1:],
+            ]
+        }
+    )
+
+    assert carried_changes(load_pack("0.2.0"), renamed) == [
+        "option pack 0.4.0 changes the targets of 0.2.0"
+    ]
 
 
 def test_a_rubric_missing_an_anchor_is_named() -> None:
