@@ -302,6 +302,19 @@ These bind every task and every review.
   - **Up to three implementers at once,** on disjoint modules: one in the main tree and up to
     two in worktrees. This widens R15's two; R15's other rules stand. Each card's
     **Parallel** line still decides what may overlap.
+- R17 Pipelining (the product owner, 1 November 2026: "Use your best judgement in enhancing
+  the dev process", after the controller proposed it).
+  - **A task with a screen splits into a backend half and a screens half.** The backend half
+    (domain code, API facts and codes, migrations, the generated client, tests) may start
+    before its card's human-session precondition when that session judges words or looks
+    only (session W2, the end-to-end session for its experience findings); the screens half
+    waits for it. A session that decides scope or data (the school-leaver pack session, a
+    rights or domain review) still gates both halves.
+  - **Up to four implementers at once** (widens R16's three): one in the main tree, up to
+    three in worktrees, on disjoint files. Card **Parallel** lines are read per half: a
+    backend half may overlap another task's screens half when their files are disjoint.
+  - Each half gets its own reviewer and its own fix round (R16); `make acceptance` runs once
+    per batch of integrated halves.
 
 ## Order, dependencies and dispatch preconditions (plan v1.6, ADR 0008)
 
