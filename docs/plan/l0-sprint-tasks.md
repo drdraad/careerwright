@@ -270,6 +270,12 @@ read it as below.
       controller runs `make acceptance` once per batch of integrated pieces or halves.
     - A task with a screen splits into a backend half and a screens half.
     - The controller makes every web fetch and every live call (Environment facts).
+    - One paper file per piece: the implementer's report, with its review and fix round
+      appended to it; no separate review-dispatch, re-review or proposal files (the product
+      owner's yes to the lean review, 1 November 2026).
+    - The infrastructure is frozen for L0: no new services, workflows or run kinds; new pure
+      computation runs in-process; a genuine need goes to the product owner as one question
+      (the same yes).
   - **R13 Path before polish** (plan v1.5; permanent, for every remaining task, Sprint W
     included). A refactor, a hardening, or a world or visual refinement that no failing check,
     reproduced defect, truth rule, accessibility rule or Global Constraint requires goes to the

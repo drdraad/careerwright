@@ -6,7 +6,7 @@
 - Date: 2026-10-28
 - Amended: 2026-10-29 (plan v1.2, then v1.3) and 2026-10-31, the product owner's approval
   of the audit (plan v1.5; the last section).
-- Source: [`docs/plan/l0-assessment-handover.md`](../plan/l0-assessment-handover.md), an
+- Source: [`docs/plan/archive/l0-assessment-handover.md`](../plan/archive/l0-assessment-handover.md), an
   assessment of the specification and the plan against the repository at `cfdae68`, after
   Sprints 0–2. Applied as product specification v1.3, development plan v1.1, the task file
   (`docs/plan/l0-sprint-tasks.md`, rulings R4, R9 and R10, Tasks 6b, 6c, 7b, 7c, 13a and
