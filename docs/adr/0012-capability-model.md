@@ -458,3 +458,14 @@ its rules on protected gates, unknown and readiness (decisions 4, 5 and 7) are u
     mappings change; no outcome states a level. Planning and the API's other capability
     reads use the same data, so no two chapters disagree. Target records decided before keep
     their `pack_version` label 0.1.0; the same pack targets hold.
+  - **Readiness on a draft checklist (the product owner's answer, 2026-11-01: "A", show the
+    judgement with a note that it rests on a draft checklist).** This replaces the strict
+    "readiness only where a reviewed rubric exists" reading above. Skills is `assessed`
+    wherever a required row is modelled by a rubric and the result is not
+    `insufficient_coverage`; its `readiness` is the capability model's result unchanged (the
+    same one `GET .../readiness` gives, still qualified `proposed_rubrics`), and
+    `rubric_review` is `reviewed` when every rubric it rests on is reviewed, else `proposed`
+    (the screens say "based on a draft checklist"). Nothing modelled, eligibility alone or
+    insufficient coverage stays `not_assessed` (`no_rubric`, `insufficient_coverage`), never
+    ready; the reason `rubrics_not_reviewed` is no longer given and is removed. P05's
+    "apply now" now shows in Skills, labelled draft.
