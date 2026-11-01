@@ -135,6 +135,23 @@ def test_a_title_s_details_are_kept_per_title_and_only_for_the_person_s_own_titl
         assert refused.json()["error"]["details"]["reason"] == "not_your_title"
 
 
+@pytest.mark.req("PROF-11")
+def test_a_title_of_punctuation_alone_takes_no_details_and_a_save_for_it_is_refused(
+    api: ApiClient, ada: str
+) -> None:
+    # Fix round 1: no letters or digits gives no concept key; this save was a 500 before.
+    workspace = api.create_workspace(ada, "Punctuation title (synthetic)")["workspace_id"]
+    edit(api, ada, workspace, 0, current_role="-", target_titles=["Doula"])
+
+    listed = details(api, ada, workspace)
+    refused = put_details(api, ada, workspace, "role", "-", 0, seniority="Senior")
+
+    assert shown(listed) == [("target", "Doula", None, None, 0)]
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["error"]["code"] == "VALIDATION_FAILED"
+    assert refused.json()["error"]["details"]["reason"] == "not_your_title"
+
+
 @pytest.mark.req("PROF-11", "ASSESS-01")
 def test_a_skill_marked_not_part_of_my_job_is_a_display_state_never_evidence(
     api: ApiClient, ada: str, infra: Infra
