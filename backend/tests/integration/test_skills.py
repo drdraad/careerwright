@@ -46,7 +46,7 @@ def paste(api: ApiClient, token: str, workspace_id: str, for_target: str) -> str
         {"target": for_target, "title": "Data Quality Analyst", "text": ADVERT},
     )
     assert pasted.status_code == 201, pasted.text
-    return str(pasted.json()["job_id"])
+    return str(pasted.json()["job"]["job_id"])  # the paste answers with the job's detail
 
 
 def select(
