@@ -12,6 +12,10 @@ S5.5), in integer GBP minor units. Pure.
   (TIME1-05). A month-end balance never rescues a month whose lower bound fails.
 - **Debt:** existing debt's balance, interest and repayment, apart from cash. New borrowing is
   never planned (spec section 10).
+- **A loan to repay** (Task 12c; spec section 22): a fee that a tuition fee loan the person
+  stated pays straight to the provider is in neither the direct-spend nor the liquidity
+  ledger, never support or a receipt; the route lists it apart (`LoanToRepay`), with its
+  repayment unknown.
 
 A month's figure that rests on an amount not known (a payment whose amount or month is not
 stated, pay from an option with no dates) is null, never the known part shown as a known one
@@ -21,7 +25,7 @@ only make worse.
 
 from pydantic import BaseModel, ConfigDict
 
-from careerwright.money import Minor
+from careerwright.money import Minor, Money
 
 BASIS_POINTS = 10_000
 
@@ -49,6 +53,20 @@ class Liability(StrictModel):
     variant_id: str
     due: str | None  # its month or date; None: the variant's dates are not known
     amount_minor: Minor
+
+
+class LoanToRepay(StrictModel):
+    """What a tuition fee loan paid straight to the provider pays for a route (spec section
+    22): a loan the person repays later, never their payment, cash, support or a receipt. Facts
+    only; the web words them (R11)."""
+
+    variant_id: str
+    # The month the fee it pays falls due (beyond the horizon too); None: not known, because
+    # the loan's amount or the fee's month is not.
+    due: str | None
+    amount: Money | None  # None: not known, never £0
+    repayment: Money | None = None  # not modelled in L0: unknown, never 0
+    conditional: bool  # it rests on the loan's approval, not yet confirmed
 
 
 class DirectLedger(StrictModel):

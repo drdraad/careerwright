@@ -44,6 +44,7 @@ from careerwright.planning.catalogue import (
     Recurring,
     Session,
     Support,
+    TuitionFeeLoan,
     Wage,
     WorkPattern,
 )
@@ -207,6 +208,9 @@ class CompiledVariant(StrictModel):
     recurring: Recurring | None
     supports: list[Support]
     stacking_confirmed: bool  # its supports may be combined, as the person confirmed
+    # A tuition fee loan paid straight to the provider (spec section 22): a loan to repay,
+    # never support. The default reads a snapshot sealed before it existed.
+    tuition_fee_loan: TuitionFeeLoan | None = None
     # The offering's eligibility conditions the person has not confirmed: its stated fee is
     # an eligible learner's, so it is not known to be theirs.
     unconfirmed_conditions: list[str]
@@ -311,6 +315,11 @@ def compile_input(
                     concept.review_state,
                     offering.review_state,
                     *(s.review_state for s in variant.supports),
+                    *(
+                        [variant.tuition_fee_loan.review_state]
+                        if variant.tuition_fee_loan is not None
+                        else []
+                    ),
                 ],
                 synthetic=concept.synthetic or offering.synthetic,
                 placed=placed,
@@ -337,6 +346,7 @@ def compile_input(
                 recurring=plan.recurring if plan is not None else None,
                 supports=variant.supports,
                 stacking_confirmed=variant.stacking_confirmed,
+                tuition_fee_loan=variant.tuition_fee_loan,
                 unconfirmed_conditions=[
                     c.field
                     for c in offering.eligibility_conditions

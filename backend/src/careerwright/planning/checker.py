@@ -22,13 +22,20 @@ What it reports, kept apart (Global Constraint 6):
   direct and economic cost.
 - **Qualifications and conditions:** proposed records, accepted assumptions, synthetic data,
   and the conditions a route rests on (an offer to accept, an award to approve, a place to
-  win by applying in time), each with a blocking verification. Only a route with none is
-  "affordable and feasible" unqualified (OPTN-09).
+  win by applying in time, a tuition fee loan to be approved), each with a blocking
+  verification. Only a route with none is "affordable and feasible" unqualified (OPTN-09).
+- **A tuition fee loan paid straight to the provider** (Task 12c; spec section 22): the fee
+  it pays is in neither the cash ledger, nor direct spending, nor the monthly payment cap's
+  payments, and is never support or a receipt; the route carries it as a loan to repay
+  (`loans_to_repay`: its amount and month, its repayment unknown). The economic cost still
+  counts that fee once, because the loan is repaid (spec section 12: loan principal is a
+  liquidity source, not a discount). Every other loan stays information.
 
 Scenarios (S5.6): `base` assumes each condition happens as planned; `delay` moves every
-conditional offer and award `scenario_delay_months` later; `no_award` drops every award not
-already approved; `no_offer` drops every activity behind an offer not already accepted, so
-its wages and its experience go together. No adaptive policy is optimised and no hiring
+conditional offer, award and tuition fee loan `scenario_delay_months` later; `no_award` drops
+every award and tuition fee loan not already approved (the route where the person pays);
+`no_offer` drops every activity behind an offer not already accepted, so its wages and its
+experience go together. No adaptive policy is optimised and no hiring
 probability is invented.
 """
 
@@ -57,6 +64,7 @@ from careerwright.planning.ledgers import (
     IncomeMonth,
     Ledgers,
     Liability,
+    LoanToRepay,
     balances,
     debt,
     liquidity,
@@ -136,6 +144,9 @@ class FindingCode(StrEnum):
     # Two schemes a record states may not be combined, both counted in the route (the reason
     # names them).
     EXCLUSIVE_SCHEMES = "exclusive_schemes"
+    # Task 12c (spec section 22). A tuition fee loan paid straight to the provider counts in
+    # this scenario but its amount is not stated: what the person pays is not known, never £0.
+    LOAN_AMOUNT_UNKNOWN = "loan_amount_unknown"
 
 
 _UNRESOLVED = frozenset(
@@ -154,6 +165,7 @@ _UNRESOLVED = frozenset(
         FindingCode.WORK_RIGHTS_UNKNOWN,
         FindingCode.WORK_RIGHTS_NOT_HELD,
         FindingCode.SCHEME_SHARED_UNCONFIRMED,
+        FindingCode.LOAN_AMOUNT_UNKNOWN,
     }
 )
 MOST_JOB_TRANSITIONS = 1  # spec section 12: at most one conditional bridge-role transition
@@ -196,18 +208,25 @@ class RouteQualification(StrEnum):
     CONDITIONAL_OFFER = "conditional_offer"
     CONDITIONAL_AWARD = "conditional_award"
     CONDITIONAL_APPLICATION = "conditional_application"
+    CONDITIONAL_LOAN = "conditional_loan"  # a tuition fee loan not yet approved (Task 12c)
     READINESS_NOT_ASSESSED = "readiness_not_assessed"
 
 
 class Condition(StrictModel):
     """What the route rests on that has not happened, with its blocking verification: an
-    offer to accept, an award to approve, or a place to win by applying in time (an
-    application the route itself does not hold, with no admission recorded)."""
+    offer to accept, an award to approve, a place to win by applying in time (an application
+    the route itself does not hold, with no admission recorded), or a tuition fee loan to be
+    approved (never an award: a loan is never support)."""
 
-    kind: Literal["offer", "award", "application"]
+    kind: Literal["offer", "award", "application", "loan"]
     variant_id: str
     instrument_id: str | None
-    verification: Literal["confirm_offer_accepted", "verify_funding_award", "confirm_admission"]
+    verification: Literal[
+        "confirm_offer_accepted",
+        "verify_funding_award",
+        "confirm_admission",
+        "confirm_loan_approved",
+    ]
 
 
 class RouteCheck(StrictModel):
@@ -233,6 +252,9 @@ class RouteCheck(StrictModel):
     objective_cost: SignedMoney | None  # the comparison's cost: economic or direct only
     peak_monthly_payment: Money | None
     minimum_prefunded_cash: SignedMoney | None  # the lowest monthly lower bound
+    # What a tuition fee loan paid straight to the provider pays, by month: a loan to repay
+    # later, in neither the cash ledger nor direct spending (spec section 22; Task 12c).
+    loans_to_repay: list[LoanToRepay]
     ledgers: Ledgers
 
 
@@ -298,6 +320,29 @@ class _Cover:
     offset: int
     support: Support
     left: int
+
+
+@dataclass
+class _Lender:
+    """A tuition fee loan counted in this scenario: from which month of the variant it pays,
+    and what of it is left. With its amount unknown (`left` None) it pays every fee in the
+    known part: the least the person could pay, so a limit broken even then is broken."""
+
+    offset: int
+    conditional: bool
+    left: int | None
+    lent: dict[int | None, int] = field(default_factory=dict)  # by month index; None: unknown
+
+    def lendable(self, owed: int) -> int:
+        return owed if self.left is None else min(self.left, owed)
+
+    def lend(self, index: int | None, owed: int) -> int:
+        take = self.lendable(owed)
+        if self.left is not None:
+            self.left -= take
+        if take:
+            self.lent[index] = self.lent.get(index, 0) + take
+        return take
 
 
 @dataclass
@@ -389,6 +434,8 @@ class _Check:
         # have, so a reserve breach there is real), but no month shows it as a known receipt.
         self.receipts_shown = True
         self.conditions: list[Condition] = []
+        self.loans: list[LoanToRepay] = []
+        self.lent = 0  # what tuition fee loans paid: in the economic cost only
 
     def add(self, code: FindingCode, **values: object) -> None:
         kind = (
@@ -445,8 +492,11 @@ class _Check:
         )
         self._caps(lost, bounds)
         readiness_state, readiness_qualifications, ready_at = self._readiness()
+        # The economic cost counts a fee a tuition fee loan pays, once: the loan is repaid
+        # later, so it moves when the person pays, never what the change costs (spec section
+        # 12: loan principal is a liquidity source, not a discount; ADR 0013, Task 12c).
         economic = (
-            direct.total_minor + income_ledger.difference_minor
+            max(0, self._net_paid() + self.lent) + income_ledger.difference_minor
             if direct.total_minor is not None and income_ledger.difference_minor is not None
             else None
         )
@@ -488,6 +538,7 @@ class _Check:
             minimum_prefunded_cash=_signed(
                 min(lower for _, lower, _ in bounds) if complete_cash and bounds else None
             ),
+            loans_to_repay=self.loans,
             ledgers=Ledgers(direct=direct, income=income_ledger, liquidity=cash, debts=self.debts),
         )
 
@@ -640,6 +691,7 @@ class _Check:
             self.add(
                 FindingCode.COST_UNKNOWN, variant_id=variant.variant_id, reason=variant.cost_unknown
             )
+        loan = self._loan(timeline)
         due = self._due(timeline)
         recurring = variant.recurring
         if recurring is not None and not (waived or recurring.total_minor):
@@ -649,7 +701,11 @@ class _Check:
                 variant_id=variant.variant_id,
                 reason="the number or the exact amount of its payments is not stated",
             )
-            self._single_payment(recurring.amount.minor_units, variant.variant_id)
+            # The least the person pays of one instalment: a loan paying from the start may
+            # pay it, up to its amount (all of it, while its amount is unknown).
+            instalment = recurring.amount.minor_units
+            lendable = loan.lendable(instalment) if loan is not None and loan.offset == 0 else 0
+            self._single_payment(instalment - lendable, variant.variant_id)
         # A stated fee that is an eligible learner's: while a condition is unconfirmed, the
         # stated payments stay a lower bound for the limits (funding never raises a price),
         # and the cost itself is not known. Where no fee is stated, its cost is the unknown.
@@ -678,8 +734,14 @@ class _Check:
                 take = owed if cover.support.covers_fees_in_full else min(cover.left, owed)
                 covered += take
                 cover.left -= take
-            paid = amount - covered
-            fees += paid if kind != "extra" else 0
+            # A tuition fee loan pays what support leaves of a fee, never an extra cost: the
+            # provider is paid, so it is neither the person's payment nor a receipt.
+            lent = 0
+            if loan is not None and kind != "extra" and self._covered(timeline, index, loan.offset):
+                lent = loan.lend(index, amount - covered)
+            paid = amount - covered - lent
+            # Support paid to the person lowers the fees once, whoever pays them.
+            fees += paid + lent if kind != "extra" else 0
             if index is None:
                 self.payments_known = False  # it could fall in any month
                 self.unscheduled.append(
@@ -701,6 +763,59 @@ class _Check:
             if support.paid_to == "person":
                 self._receipt(timeline, support, fees)
                 fees = max(0, fees - support.amount_minor)
+        if loan is not None:
+            self._to_repay(variant.variant_id, loan)
+
+    def _loan(self, timeline: _Timeline) -> "_Lender | None":
+        """The variant's tuition fee loan, if it counts in this scenario, as a conditional award
+        would (ADR 0013 decisions 5 and 9): approved, in every scenario; not yet approved, the
+        route rests on it in the base and delay scenarios only, and in the delay one it pays
+        only the fees due `scenario_delay_months` or more after the variant starts."""
+        variant = timeline.variant
+        loan = variant.tuition_fee_loan
+        if loan is None or not (
+            loan.confirmed or (loan.conditional and self.scenario is not Scenario.NO_AWARD)
+        ):
+            return None
+        if loan.conditional:
+            self.conditions.append(
+                Condition(
+                    kind="loan",
+                    variant_id=variant.variant_id,
+                    instrument_id=None,
+                    verification="confirm_loan_approved",
+                )
+            )
+        if loan.amount is None:
+            self._unknown_payments()
+            self.add(FindingCode.LOAN_AMOUNT_UNKNOWN, variant_id=variant.variant_id)
+        delayed = self.scenario is Scenario.DELAY and loan.conditional
+        return _Lender(
+            offset=self.inputs.scenario_delay_months if delayed else 0,
+            conditional=loan.conditional,
+            left=loan.amount.minor_units if loan.amount is not None else None,
+        )
+
+    def _to_repay(self, variant_id: str, loan: "_Lender") -> None:
+        """What the loan paid, as a loan to repay: by the month each fee falls due, or, while
+        its amount is unknown, one entry with neither amount nor month (never £0)."""
+        self.lent += sum(loan.lent.values())
+        if loan.left is None:
+            self.loans.append(
+                LoanToRepay(
+                    variant_id=variant_id, due=None, amount=None, conditional=loan.conditional
+                )
+            )
+            return
+        for index, amount in sorted(loan.lent.items(), key=lambda i: (i[0] is None, i[0] or 0)):
+            self.loans.append(
+                LoanToRepay(
+                    variant_id=variant_id,
+                    due=self.label(index) if index is not None else None,
+                    amount=_money(amount),
+                    conditional=loan.conditional,
+                )
+            )
 
     def _unknown_payments(self) -> None:
         """Some payment's amount is not known: neither the total nor any month's row is."""
@@ -982,12 +1097,7 @@ class _Check:
             )
             for n in range(self.horizon)
         ]
-        paid = (
-            sum(self.months.payments)
-            + sum(item.amount_minor for item in self.beyond)
-            + sum(item.amount_minor for item in self.unscheduled)
-        )
-        total = paid - sum(self.months.support) - self.support_outside
+        total = self._net_paid()
         return DirectLedger(
             months=months,
             beyond_horizon=self.beyond,
@@ -997,17 +1107,23 @@ class _Check:
             total_minor=max(0, total) if self.costs_known else None,
         )
 
-    def _caps(self, lost: list[int], bounds: list[tuple[int, int, int]]) -> None:
-        inputs = self.inputs
-        # The known part only: an unknown cost can only add to it, so exceeding a cap on the
-        # known part is a violation whatever the rest turns out to be.
-        known = (
+    def _net_paid(self) -> int:
+        """What the person pays, every month, after the horizon and with no month yet, less the
+        support paid to them that counts against it: possibly below zero. A fee a tuition fee
+        loan pays is not in it."""
+        return (
             sum(self.months.payments)
             + sum(i.amount_minor for i in self.beyond)
             + sum(i.amount_minor for i in self.unscheduled)
             - sum(self.months.support)
             - self.support_outside
         )
+
+    def _caps(self, lost: list[int], bounds: list[tuple[int, int, int]]) -> None:
+        inputs = self.inputs
+        # The known part only: an unknown cost can only add to it, so exceeding a cap on the
+        # known part is a violation whatever the rest turns out to be.
+        known = self._net_paid()
         # An unknown hard limit is never a pass (review I2): the deficit cap applies only when
         # the person sets one, and the economic-cost cap is a preference, so neither is here.
         for name, value in (
@@ -1123,6 +1239,8 @@ class _Check:
             found.append(RouteQualification.CONDITIONAL_AWARD)
         if any(c.kind == "application" for c in self.conditions):
             found.append(RouteQualification.CONDITIONAL_APPLICATION)
+        if any(c.kind == "loan" for c in self.conditions):
+            found.append(RouteQualification.CONDITIONAL_LOAN)
         if self.monthly.readiness is None:
             found.append(RouteQualification.READINESS_NOT_ASSESSED)
         # Every qualification readiness carries, by name, the provisional matrix included: in

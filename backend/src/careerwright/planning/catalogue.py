@@ -13,6 +13,10 @@ network, no model.
   A person's eligibility for it has four statuses, kept apart from whether an award was
   actually approved. Only approved, confirmed, non-repayable support enters unconditional
   figures; a loan is information to verify and never a receipt or a discount (FUNDING-04).
+- **One loan changes, for L0** (spec section 22, the product owner's decision of 2026-11-01):
+  a tuition fee loan paid straight to the provider pays that fee, so the fee is not the
+  person's own spending or cash; it is a loan to repay later, never support, a grant, income
+  or a receipt. Every other loan, a maintenance loan included, stays information (FUNDING-06).
 - **Variants.** M0 selects at most two reviewed starts per concept: each is an offering with
   the payment plan, the work pattern and the support the person confirmed for it.
 - **Review state** is kept on every record: a proposed record is explorable but never in an
@@ -313,6 +317,51 @@ class Support(StrictModel):
         )
 
 
+class TuitionFeeLoan(StrictModel):
+    """A tuition fee loan paid straight to the provider, as the person states it for one
+    variant (spec section 22, 2026-11-01; FUNDING-06). It pays the variant's fees (never its
+    extra costs), after any support paid to the provider, up to its amount: what it pays is not
+    the person's payment, cash or direct spending, and the route carries it as a loan to repay
+    later. It is never support, a grant, income or a receipt, and Careerwright never chooses
+    it: the person states it. Its repayment is not modelled in L0: unknown, never 0.
+
+    Its statuses are the funding statuses (ADR 0013 decision 5): only a loan the person
+    confirms approved counts in every scenario; one not yet approved, for which they are or may
+    be eligible, makes the route conditional on it, beside the route where they pay the fee
+    (the no-award scenario). An unknown amount leaves the route unresolved, never £0."""
+
+    amount: Money | None = Field(description="Null: not known, never £0.")
+    eligibility: EligibilityStatus
+    application: AwardState
+    review_state: RecordState
+    cited: Citation
+
+    @model_validator(mode="after")
+    def _approved_only_if_eligible(self) -> Self:
+        if (
+            self.application is AwardState.APPROVED
+            and self.eligibility is not EligibilityStatus.CONFIRMED
+        ):
+            raise ValueError("an approved loan needs confirmed eligibility")
+        return self
+
+    @property
+    def confirmed(self) -> bool:
+        """Counts in every scenario, and so in unconditional figures."""
+        return self.application is AwardState.APPROVED
+
+    @property
+    def conditional(self) -> bool:
+        """Not yet approved, not refused, and the person is or may be eligible: the route rests
+        on its approval (the base and delay scenarios only)."""
+        return (
+            not self.confirmed
+            and self.application is not AwardState.REFUSED
+            and self.eligibility
+            in (EligibilityStatus.CONFIRMED, EligibilityStatus.POTENTIALLY_ELIGIBLE)
+        )
+
+
 class WorkPatternKind(StrEnum):
     RETAIN_WORK = "retain_work"  # "remain in the current job while studying" (OPTN-07)
     REDUCED_HOURS = "reduced_hours"
@@ -360,6 +409,11 @@ class Variant(StrictModel):
         description="The person confirmed that this variant's supports may be combined: "
         "neither excludes the other and together they stay within each one's eligible costs. "
         "Until then, more than one support leaves the route unresolved.",
+    )
+    tuition_fee_loan: TuitionFeeLoan | None = Field(
+        default=None,
+        description="A tuition fee loan paid straight to the provider, as the person stated "
+        "it: a loan to repay later, never support. Null: none stated.",
     )
     condition_statuses: dict[str, EligibilityStatus] = Field(
         default_factory=dict,

@@ -1393,14 +1393,15 @@ export type CommitmentKind = typeof CommitmentKind[keyof typeof CommitmentKind];
  * Condition
  *
  * What the route rests on that has not happened, with its blocking verification: an
- * offer to accept, an award to approve, or a place to win by applying in time (an
- * application the route itself does not hold, with no admission recorded).
+ * offer to accept, an award to approve, a place to win by applying in time (an application
+ * the route itself does not hold, with no admission recorded), or a tuition fee loan to be
+ * approved (never an award: a loan is never support).
  */
 export type Condition = {
     /**
      * Kind
      */
-    kind: 'offer' | 'award' | 'application';
+    kind: 'offer' | 'award' | 'application' | 'loan';
     /**
      * Variant Id
      */
@@ -1412,7 +1413,7 @@ export type Condition = {
     /**
      * Verification
      */
-    verification: 'confirm_offer_accepted' | 'verify_funding_award' | 'confirm_admission';
+    verification: 'confirm_offer_accepted' | 'verify_funding_award' | 'confirm_admission' | 'confirm_loan_approved';
 };
 
 /**
@@ -2659,7 +2660,8 @@ export const FindingCode = {
     REPAYMENTS_ABOVE_PAYMENT_CAP: 'repayments_above_payment_cap',
     JOB_TRANSITIONS: 'job_transitions',
     SCHEME_SHARED_UNCONFIRMED: 'scheme_shared_unconfirmed',
-    EXCLUSIVE_SCHEMES: 'exclusive_schemes'
+    EXCLUSIVE_SCHEMES: 'exclusive_schemes',
+    LOAN_AMOUNT_UNKNOWN: 'loan_amount_unknown'
 } as const;
 
 /**
@@ -3433,6 +3435,30 @@ export type LabelMatchOut = {
      * Isco Label
      */
     isco_label: string;
+};
+
+/**
+ * LoanToRepay
+ *
+ * What a tuition fee loan paid straight to the provider pays for a route (spec section
+ * 22): a loan the person repays later, never their payment, cash, support or a receipt. Facts
+ * only; the web words them (R11).
+ */
+export type LoanToRepay = {
+    /**
+     * Variant Id
+     */
+    variant_id: string;
+    /**
+     * Due
+     */
+    due: string | null;
+    amount: Money | null;
+    repayment?: Money | null;
+    /**
+     * Conditional
+     */
+    conditional: boolean;
 };
 
 /**
@@ -6821,6 +6847,7 @@ export const RouteQualification = {
     CONDITIONAL_OFFER: 'conditional_offer',
     CONDITIONAL_AWARD: 'conditional_award',
     CONDITIONAL_APPLICATION: 'conditional_application',
+    CONDITIONAL_LOAN: 'conditional_loan',
     READINESS_NOT_ASSESSED: 'readiness_not_assessed'
 } as const;
 
@@ -7372,6 +7399,10 @@ export type Schedule = {
      * Preferences
      */
     preferences: Array<Finding>;
+    /**
+     * Loans To Repay
+     */
+    loans_to_repay?: Array<LoanToRepay>;
     /**
      * Layer
      */
@@ -10078,6 +10109,49 @@ export const TrendState = { UNAVAILABLE: 'unavailable' } as const;
 export type TrendState = typeof TrendState[keyof typeof TrendState];
 
 /**
+ * TuitionFeeLoan
+ *
+ * A tuition fee loan paid straight to the provider, as the person states it for one
+ * variant (spec section 22, 2026-11-01; FUNDING-06). It pays the variant's fees (never its
+ * extra costs), after any support paid to the provider, up to its amount: what it pays is not
+ * the person's payment, cash or direct spending, and the route carries it as a loan to repay
+ * later. It is never support, a grant, income or a receipt, and Careerwright never chooses
+ * it: the person states it. Its repayment is not modelled in L0: unknown, never 0.
+ *
+ * Its statuses are the funding statuses (ADR 0013 decision 5): only a loan the person
+ * confirms approved counts in every scenario; one not yet approved, for which they are or may
+ * be eligible, makes the route conditional on it, beside the route where they pay the fee
+ * (the no-award scenario). An unknown amount leaves the route unresolved, never £0.
+ */
+export type TuitionFeeLoan = {
+    /**
+     * Null: not known, never £0.
+     */
+    amount: Money | null;
+    eligibility: EligibilityStatus;
+    application: AwardState;
+    review_state: RecordState;
+    cited: Citation;
+};
+
+/**
+ * TuitionFeeLoanInput
+ *
+ * A tuition fee loan paid straight to the provider, as the person states it for one option
+ * (spec section 22, 2026-11-01): its amount and its funding statuses (ADR 0013 decision 5).
+ * The rules of `planning.catalogue.TuitionFeeLoan`: an approval needs confirmed eligibility.
+ * Never support: a maintenance loan or any other loan stated as a support is refused.
+ */
+export type TuitionFeeLoanInput = {
+    /**
+     * Null: not known, never £0.
+     */
+    amount?: Money | null;
+    eligibility: EligibilityStatus;
+    application: AwardState;
+};
+
+/**
  * TurnOut
  *
  * One interview turn. `run` is authoritative for its state: `proposal` exists only when
@@ -10482,6 +10556,10 @@ export type Variant = {
      */
     stacking_confirmed?: boolean;
     /**
+     * A tuition fee loan paid straight to the provider, as the person stated it: a loan to repay later, never support. Null: none stated.
+     */
+    tuition_fee_loan?: TuitionFeeLoan | null;
+    /**
      * Condition Statuses
      *
      * The person's status for each of the offering's eligibility conditions, by the condition's field: only `confirmed` meets one.
@@ -10522,6 +10600,10 @@ export type VariantInputs = {
      * The supports may be combined: neither excludes the other and together they stay within each one's eligible costs.
      */
     stacking_confirmed?: boolean;
+    /**
+     * A tuition fee loan paid straight to the provider: a loan to repay later, never support. Null: none stated.
+     */
+    tuition_fee_loan?: TuitionFeeLoanInput | null;
     /**
      * Entry Requirements Met
      *
