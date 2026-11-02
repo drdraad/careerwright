@@ -1268,7 +1268,7 @@ describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, as a plain
     expect(screen.getByRole("button", { name: "Suggest again" })).toHaveClass("btn-primary");
   });
 
-  it("[PROF-04] removes a saved suggestion from the targets in place, with Undo, and Make this a target is bright again", async () => {
+  it("[PROF-07] removes a saved suggestion from the targets in place, with Undo, and Make this a target is bright again", async () => {
     // Session W2 (finding 2): the saved box has its own Remove, through the profile's save.
     // Removing a target leaves the slate current (the API's rule), so Suggest again stays quiet.
     const targets = (titles: string[]) => ({

@@ -106,7 +106,7 @@ function renderKnown() {
 
 const saves = (sent: Sent[]) => sent.filter((s) => s.method === "PUT");
 
-describe("[STATE-10][PROF-04] What we know's targets: Remove beside each, with Undo", () => {
+describe("[STATE-10][PROF-07] What we know's targets: Remove beside each, with Undo", () => {
   it("lists the targets once, near the top, each with its Remove", async () => {
     profileApi(at(4, document.target_titles));
     renderKnown();

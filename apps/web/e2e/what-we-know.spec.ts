@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 import { chosenTargetWorkspace, emulatorToken } from "./api";
 import { chapterUrl, inReach, saved, signIn, youView } from "./helpers";
 
-test("[STATE-10][PROF-04] a target is removed on its suggestion and in What we know, each with Undo, and the suggestions stay current", async ({
+test("[STATE-10][PROF-07] a target is removed on its suggestion and in What we know, each with Undo, and the suggestions stay current", async ({
   page,
 }) => {
   test.setTimeout(180_000);
@@ -66,7 +66,7 @@ for (const viewport of [
   { width: 1440, height: 900 },
   { width: 390, height: 844 },
 ]) {
-  test(`[UI-12] the answer form's Save stays in reach while the form is open, at ${viewport.width} px`, async ({
+  test(`[UI-06][UI-09] the answer form's Save stays in reach while the form is open, at ${viewport.width} px`, async ({
     browser,
   }) => {
     const context = await browser.newContext({ viewport, reducedMotion: "reduce" });
