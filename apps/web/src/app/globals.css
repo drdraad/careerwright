@@ -1092,6 +1092,11 @@
     scroll-padding-bottom: calc(var(--sheet-peek) + var(--space-16));
   }
 
+  /* The answer form's Save stays in reach above the open sheet too. */
+  .app[data-drawer="open"] .form-save {
+    bottom: var(--sheet-peek);
+  }
+
   /* The bottom sheet opens at a peek so the main task stays in view; "More" (or dragging the
      handle up) raises it to most of the screen, leaving a band of the page visible above. */
   .drawer {
@@ -1594,9 +1599,11 @@
     overflow: hidden;
   }
 
+  /* The label's column keeps a floor, so a long value wraps beside it and is never printed
+     over it, at any width (session W2, finding 1: with no floor it shrank to nothing). */
   .fact {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+    grid-template-columns: minmax(min(8rem, 40%), 1fr) minmax(0, auto);
     gap: var(--space-4) var(--space-12);
     padding: var(--space-8) var(--space-16);
     background: var(--surface-card);
@@ -1605,6 +1612,39 @@
 
   .fact dt {
     color: var(--fg-muted);
+    overflow-wrap: anywhere;
+  }
+
+  /* The answer form's Save and Discard stay in reach while the form is open (session W2,
+     finding 9): at the foot of the window as the form scrolls past, on an opaque card so
+     nothing scrolling under them shows through. */
+  .form-save {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    padding: var(--space-12) var(--space-16);
+    border: 1px solid var(--line-reading-hairline);
+    border-radius: var(--radius-control);
+    background: var(--surface-card);
+  }
+
+  /* A target with its Remove, as a row of What we know's list (Task W2F). */
+  .target-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0 var(--space-12);
+    padding: var(--space-4) var(--space-8) var(--space-4) var(--space-16);
+    background: var(--surface-card);
+    font-size: var(--type-14);
+  }
+
+  .target-title {
+    flex: 1 1 10rem;
+    min-width: 0;
+    font-weight: 600;
+    overflow-wrap: anywhere;
   }
 
   .fact dd {

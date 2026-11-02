@@ -1267,10 +1267,166 @@ describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, as a plain
     expect(await screen.findByText("Based on your earlier answers")).toBeVisible();
     expect(screen.getByRole("button", { name: "Suggest again" })).toHaveClass("btn-primary");
   });
+
+  it("[PROF-04] removes a saved suggestion from the targets in place, with Undo, and Make this a target is bright again", async () => {
+    // Session W2 (finding 2): the saved box has its own Remove, through the profile's save.
+    // Removing a target leaves the slate current (the API's rule), so Suggest again stays quiet.
+    const targets = (titles: string[]) => ({
+      state: "provided" as const,
+      value: titles,
+      source_ref_id: "s2",
+    });
+    const state = {
+      profile: {
+        ...profile,
+        version: 3,
+        document: { ...profile.document, target_titles: targets(["bicycle mechanic", "cook"]) },
+      } as ProfileOut,
+    };
+    const held = () => state.profile.document.target_titles.value ?? [];
+    const sent = fakeApi([
+      slateRoute,
+      {
+        method: "GET",
+        path: /\/sketch$/,
+        answer: { profile_version: 3, inputs: {}, not_asked: [], steps: [], targets: [] },
+      },
+      {
+        method: "GET",
+        path: /\/targets$/,
+        answer: () =>
+          held().includes("bicycle mechanic") ? storedAs("bicycle mechanic", "o1") : storedAs(),
+      },
+      {
+        method: "PUT",
+        path: /\/profile$/,
+        status: 201,
+        answer: () => {
+          state.profile = {
+            ...state.profile,
+            version: 4,
+            document: { ...state.profile.document, target_titles: targets(["cook"]) },
+          };
+          return { ...state.profile, support_note: null };
+        },
+      },
+      {
+        method: "POST",
+        path: /\/profile\/revert$/,
+        status: 201,
+        answer: () => {
+          state.profile = {
+            ...state.profile,
+            version: 5,
+            document: {
+              ...state.profile.document,
+              target_titles: targets(["bicycle mechanic", "cook"]),
+            },
+          };
+          return state.profile;
+        },
+      },
+    ]);
+    const { user, rerenderWith } = renderChoosing(state.profile);
+
+    const mechanic = await card();
+    await within(mechanic).findByRole("heading", { name: "Saved as one of your targets" });
+    await user.click(
+      within(mechanic).getByRole("button", { name: "Remove Bicycle mechanic from your targets" }),
+    );
+    await waitFor(() => expect(sent.some((s) => s.method === "PUT")).toBe(true));
+    expect(sent.find((s) => s.method === "PUT")?.body).toMatchObject({
+      expected_version: 3,
+      profile: { target_titles: { state: "provided", value: ["cook"] } },
+    });
+    rerenderWith(state.profile);
+
+    const removed = await within(mechanic).findByRole("heading", {
+      name: "Removed “bicycle mechanic” from your targets",
+    });
+    await waitFor(() => expect(removed).toHaveFocus());
+    const choose = await within(mechanic).findByRole("button", { name: /Make this a target/ });
+    expect(choose).toHaveClass("btn-primary");
+    expect(screen.queryByRole("button", { name: "Suggest again" })).toBeNull();
+
+    await user.click(
+      within(mechanic).getByRole("button", { name: "Undo removing “bicycle mechanic”" }),
+    );
+    await waitFor(() =>
+      expect(sent.find((s) => s.path.endsWith("/profile/revert"))?.body).toEqual({
+        expected_version: 4,
+        to_version: 3,
+      }),
+    );
+    rerenderWith(state.profile);
+    await waitFor(() =>
+      expect(
+        within(mechanic).getByRole("heading", {
+          name: "Undone: “bicycle mechanic” is one of your targets again",
+        }),
+      ).toHaveFocus(),
+    );
+    expect(
+      await within(mechanic).findByRole("heading", { name: "Saved as one of your targets" }),
+    ).toBeVisible();
+  });
+
+  it("says where to remove a target when there are already three", async () => {
+    const three = ["cook", "baker", "tailor"];
+    const stored: TargetRecordsOut = {
+      profile_version: 2,
+      targets: three.flatMap((title) => storedAs(title).targets),
+    };
+    fakeApi([slateRoute, { method: "GET", path: /\/targets$/, answer: stored }]);
+    const full: ProfileOut = {
+      ...profile,
+      document: {
+        ...profile.document,
+        target_titles: { state: "provided", value: three, source_ref_id: "s2" },
+      },
+    };
+    renderDirections(discovery, undefined, full);
+
+    const choose = await within(await card()).findByRole("button", { name: /Make this a target/ });
+    await waitFor(() => expect(choose).toHaveAttribute("aria-disabled", "true"));
+    expect(choose).toHaveAccessibleDescription(
+      "You have 3 targets, the most you can have. To add this one, remove one in What we know.",
+    );
+  });
+});
+
+describe("[REC1-05] an open suggestion: its title, what the work is and its kind of work told apart", () => {
+  it("heads ESCO's description What the work is, at reading size, with the kind of work under it, after the choice", async () => {
+    // Session W2 (finding 8): "Kind of work" read as a second title, and the description had
+    // no heading. The choice still comes right after the title (D-I3).
+    fakeApi([slateRoute]);
+    renderDirections();
+
+    const mechanic = await card();
+    const choose = within(mechanic).getByRole("button", { name: /Make this a target/ });
+    const heading = within(mechanic).getByText("What the work is");
+    const description = within(mechanic).getByText(
+      "Bicycle mechanics maintain and repair bicycles.",
+    );
+    const kind = within(mechanic).getByText("Kind of work: Machinery mechanics and repairers");
+    const why = within(mechanic).getByText("Why this could suit you");
+    const follows = (first: Node, then: Node) =>
+      (first.compareDocumentPosition(then) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    expect(heading).toHaveClass("section-title");
+    expect(
+      follows(choose, heading) &&
+        follows(heading, description) &&
+        follows(description, kind) &&
+        follows(kind, why),
+    ).toBe(true);
+    expect(description).not.toHaveClass("small"); // body size, never the 14 px of a note
+    // The kind of work no longer sits under the title, between it and the choice.
+    expect(within(mechanic).getAllByText(/^Kind of work:/)).toHaveLength(1);
+  });
 });
 
 /** Directions whose profile the test replaces after a choice, as the shell's query would. */
-function renderChoosing() {
+function renderChoosing(first: ProfileOut = profile) {
   const queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = (shown: ProfileOut) => (
     <QueryClientProvider client={queries}>
@@ -1279,6 +1435,6 @@ function renderChoosing() {
       </EvidenceProvider>
     </QueryClientProvider>
   );
-  const { rerender } = render(view(profile));
+  const { rerender } = render(view(first));
   return { user: userEvent.setup(), rerenderWith: (shown: ProfileOut) => rerender(view(shown)) };
 }

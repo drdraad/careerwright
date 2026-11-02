@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { AUTH_ORIGIN, FIXTURE_WORKSPACE, WEB_ORIGIN } from "./stack";
 
 const require = createRequire(import.meta.url);
@@ -135,6 +135,45 @@ export async function brightFills(page: Page): Promise<number> {
  *  to start, saving nothing, as a person who'd rather not say would. */
 export async function skipFirstQuestion(page: Page) {
   await page.getByRole("button", { name: "Skip for now" }).click();
+}
+
+/** Each `dt` whose painted text meets the painted text of the `dd` after it: a label printed
+ *  over its value (the visual checks, and the long-values story at each width). */
+export function overprintedLabels(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const textBoxes = (element: Element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return Array.from(range.getClientRects()).filter((box) => box.width > 0);
+    };
+    const meet = (a: DOMRect, b: DOMRect) =>
+      Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.5 &&
+      Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.5;
+    const found: string[] = [];
+    for (const label of document.querySelectorAll("dt")) {
+      const value = label.nextElementSibling;
+      if (value?.tagName !== "DD") continue;
+      const values = textBoxes(value);
+      if (textBoxes(label).some((box) => values.some((other) => meet(box, other)))) {
+        found.push(label.textContent ?? "");
+      }
+    }
+    return found;
+  });
+}
+
+/** In the window and on top at its centre: nothing covers it where it is now. */
+export function inReach(target: Locator): Promise<boolean> {
+  return target.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    return (
+      rect.top >= 0 &&
+      rect.bottom <= window.innerHeight &&
+      hit !== null &&
+      (hit === element || element.contains(hit))
+    );
+  });
 }
 
 /** Opens one of the You chapter's views (its tabs: Conversation, What we know, Suggestions). */

@@ -85,6 +85,13 @@ import { RequestFailure } from "./PageState";
 import { type ResearchTitle, RoleResearchList } from "./RoleResearch";
 import { TargetCoverageLine, TargetRequirements } from "./SketchCard";
 import { StatusBadge } from "./Status";
+import {
+  RemovalNotice,
+  RemoveButton,
+  type TargetRemoval,
+  targetTitles,
+  useTargetRemoval,
+} from "./TargetRemoval";
 
 const EVIDENCE = [
   "current_role",
@@ -302,15 +309,23 @@ function JoinedBy({ skills }: { skills: SharedSkillOut[] }) {
 }
 
 /** A suggestion that is one of the person's targets: said where it was chosen, with how far
- *  Careerwright can cover it and the skills ESCO lists for it (STATE-10; PROF-10). */
+ *  Careerwright can cover it and the skills ESCO lists for it (STATE-10; PROF-10), and a Remove
+ *  (Task W2F). */
 function TargetSaved({
   workspaceId,
   conceptId,
+  title,
   headingRef,
+  onRemove,
+  removeBlocked,
 }: {
   workspaceId: string;
   conceptId: string;
+  /** The suggestion's title, as its card shows it. */
+  title: string;
   headingRef: Ref<HTMLHeadingElement>;
+  onRemove(): void;
+  removeBlocked: string | undefined;
 }) {
   const sketch = useSketch(workspaceId);
   const headingId = useId();
@@ -319,10 +334,15 @@ function TargetSaved({
   );
   return (
     <section className="target-saved grid gap-8" aria-labelledby={headingId}>
-      <h5 id={headingId} className="status font-semibold" tabIndex={-1} ref={headingRef}>
-        <Glyph name="accept" />
-        <span>{SUGGESTION_WORDS.chosen}</span>
-      </h5>
+      <div className="flex flex-wrap items-center justify-between gap-8">
+        <h5 id={headingId} className="status font-semibold" tabIndex={-1} ref={headingRef}>
+          <Glyph name="accept" />
+          <span>{SUGGESTION_WORDS.chosen}</span>
+        </h5>
+        <div>
+          <RemoveButton title={title} onRemove={onRemove} busy={removeBlocked} />
+        </div>
+      </div>
       {sketch.data === undefined ? (
         sketch.error ? (
           <RequestFailure
@@ -363,6 +383,8 @@ function SuggestionCard({
   onExcludeTitle,
   onExcludeFamily,
   choosing,
+  removal,
+  onRemove,
 }: {
   workspaceId: string;
   suggestion: SuggestionOut;
@@ -382,6 +404,10 @@ function SuggestionCard({
   onExcludeTitle(): void;
   onExcludeFamily(): void;
   choosing: boolean;
+  /** Removing a target from the slate, and what it did on this card. */
+  removal: TargetRemoval;
+  /** Removes this suggestion's occupation from the targets. */
+  onRemove(): void;
 }) {
   const evidence = useEvidence();
   const title = sentence(suggestion.title);
@@ -420,17 +446,26 @@ function SuggestionCard({
           <Glyph name={open ? "expand" : "collapse"} />
         </button>
       </h4>
-      <p className="small muted">Kind of work: {suggestion.family.label}</p>
+      {/* A title to scan: its kind of work under it. Open, the kind of work moves under what
+          the work is, so nothing under the title reads as a second one (session W2, finding 8). */}
+      {!open && (
+        <p className="small muted">{SUGGESTION_WORDS.kindOfWork(suggestion.family.label)}</p>
+      )}
       {open && (
         <div id={body} className="grid gap-12">
           {/* The choice first, so its bright action is in view with a real slate; what the
               work is and why it could suit you follow (D-I3). Once chosen, the choice gives
-              way to the words that say so, with the skills ESCO lists for it (STATE-10). */}
+              way to the words that say so, with the skills ESCO lists for it and a Remove
+              (STATE-10; Task W2F); a removal says what it did here, with Undo. */}
+          <RemovalNotice removal={removal} where={suggestion.concept_id} level="h5" />
           {already && (
             <TargetSaved
               workspaceId={workspaceId}
               conceptId={suggestion.concept_id}
+              title={title}
               headingRef={saved}
+              onRemove={onRemove}
+              removeBlocked={removal.busy}
             />
           )}
           <div className="flex flex-wrap items-center gap-8">
@@ -440,7 +475,7 @@ function SuggestionCard({
                 onClick={onChoose}
                 disabledReason={
                   full
-                    ? `You have ${listLimit("target_titles")} targets: remove one first.`
+                    ? SUGGESTION_WORDS.full(listLimit("target_titles"))
                     : choosing
                       ? "Saving…"
                       : undefined
@@ -467,7 +502,11 @@ function SuggestionCard({
               Source <span className="sr-only">for {title}</span>
             </Button>
           </div>
-          <p className="small">{suggestion.workday}</p>
+          <div className="grid gap-4">
+            <p className="section-title">{SUGGESTION_WORDS.whatTheWorkIs}</p>
+            {suggestion.workday !== "" && <p>{suggestion.workday}</p>}
+            <p className="small muted">{SUGGESTION_WORDS.kindOfWork(suggestion.family.label)}</p>
+          </div>
           <div className="grid gap-8">
             <p className="section-title">Why this could suit you</p>
             <WrittenNote state={written} />
@@ -661,6 +700,7 @@ function Slate({
     discovery.run.data_mode === "live_assisted" || discovery.run.data_mode === "live_vacancy";
   const origin = useOrigin(workspaceId, live);
   const choose = useChooseTarget(workspaceId);
+  const removal = useTargetRemoval(profile);
   const notes = useNoteRequests(workspaceId, discovery.discovery_id);
   const explanation = discovery.explanation ?? null;
   const suggested = slate.data !== undefined && slate.data.suggestions.length > 0;
@@ -823,6 +863,16 @@ function Slate({
                     excludeFamilies: [...current.excludeFamilies, suggestion.family.code],
                   }))
                 }
+                removal={removal}
+                // Every title of the person's that names this occupation, by its stored record.
+                onRemove={() => {
+                  const held = targetTitles(profile);
+                  const titles = targets
+                    .filter((t) => t.concept_id === suggestion.concept_id)
+                    .map((t) => t.title)
+                    .filter((t) => held.includes(t));
+                  if (titles.length > 0) removal.remove(titles, suggestion.concept_id);
+                }}
               />
             ))}
           </section>
