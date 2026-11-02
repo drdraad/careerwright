@@ -1308,6 +1308,41 @@ pre-review only (R2).
 Register: closes BND1-02, STATE-09, STATE-10 and UI-12; the Task W2E parts of STATE-08 and
 UI-09; adds the world's requirement family.
 
+## Task W2F: the You chapter, fixed from session W2 (the product owner, 2 November 2026)
+
+**Preconditions:** session W2 held in part (2 November 2026: the product owner stopped it,
+"Cannot continue testing"; the findings and their causes are in
+`planning/session-w2-findings.md`). The product owner's yes, the same day: fix the You
+chapter before the Skills, Options and Routes screens (10B, 12bB, 14B), which wait for this
+task and a short re-test; add a place for what the person doesn't enjoy; make the world's
+role names clickable after those three screens (a later task, not this one).
+**Parallel:** three slices on disjoint files (A: Muse's turns, backend; B: the conversation
+and its review card; C: What we know, targets and suggestions). Not beside 10B, 12bB or 14B.
+
+Deliver, each as something the person sees:
+- **A (Muse's turns):** a "Tasks you don't enjoy" answer (spec section 4's "disliked tasks"):
+  proposed and confirmed like any task answer, shown in What we know, never a search or a
+  filter (kept out of discovery's answers), with its migration and the generated client. The
+  interviewer's instructions, as one new prompt version: one activity in the same words in
+  each task answer; a thing taken back is left out of the list it proposes; a money limit
+  hinted without a figure is asked for in pounds next; and what to do when the person wrote
+  before choosing how to start.
+- **B (the conversation):** Send waits until the person has chosen how to start, and until a
+  waiting review card is saved or "Keep none" (no reply's proposals are ever lost); the card
+  shows each list change as what it adds and what it removes against what is saved, with the
+  task answers' hints; its Save stays in the first screen with three or more changes; the
+  Meta key card leaves the conversation.
+- **C (What we know, targets and suggestions):** no answer's label is ever printed over its
+  value at any width; a Remove beside each target, in What we know and on a saved
+  suggestion, with Undo, where removing a target alone leaves the suggestions current; the
+  full-targets line says where to remove one; the answers form's Save stays in reach; a
+  suggestion's title, what the work is and its kind of work are easy to tell apart.
+
+Acceptance: each item has a test that reads what the person sees; a long-values state of What
+we know in the visual checks; one capped live check of the new prompt version on the test
+model (the controller's); `make check` and `make acceptance` pass. The visual part is an agent
+pre-review only (R2); the product owner's short re-test of Maya and Sam follows.
+
 ## Task 8: Sprint 3 — living opportunity map and the job corpus (S3.5) + Sprint 3 review
 
 **Preconditions:** Task 7c complete (the reviewed job values this task scores against;
