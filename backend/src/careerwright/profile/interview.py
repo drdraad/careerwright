@@ -387,13 +387,25 @@ def _inference_problems(output: InterviewTurnOutput, person: list[str]) -> list[
     return problems
 
 
+def trips_support_screen(update: ModelUpdate) -> bool:
+    """Whether a proposed change's words, its value or its reason, trip the support screen
+    (`careerwright.profile.safety.has_risk_stem`). Such a change is never proposed, so a
+    person's distress words are never offered back to them to save as an answer (Task W2F
+    review, important 1)."""
+    texts = (update.text or "", *(update.items or []), update.reason)
+    return any(has_risk_stem(text) for text in texts)
+
+
 def check_turn(
     output: InterviewTurnOutput, context: TurnInput, origin: ProposalOrigin
 ) -> tuple[InterviewProposal | None, list[str]]:
     """The validated proposal, or the problems that prevent it (never both). On a turn whose
     message triggers the support screen, any next question is dropped, never repaired: that
-    turn asks no career question (`careerwright.profile.safety`; recomputed, never stored)."""
+    turn asks no career question (`careerwright.profile.safety`; recomputed, never stored).
+    On any turn, a change whose words trip the support screen is dropped the same way
+    (`trips_support_screen`); the rest of the proposal is kept."""
     problems: list[str] = []
+    kept = [update for update in output.proposed_updates if not trips_support_screen(update)]
     question = None if has_risk_stem(context.messages[-1].text) else output.next_question
     if not _bounded(output.reply, MAX_REPLY):
         problems.append(f"reply: 1-{MAX_REPLY} characters")
@@ -416,9 +428,11 @@ def check_turn(
         problems.append("proposed_updates: at most one update per field")
     refs = {m.ref: m.message_id for m in context.messages}
     texts = {m.ref: m.text for m in context.messages}
-    problems += _inference_problems(output, list(texts.values()))
+    problems += _inference_problems(
+        output.model_copy(update={"proposed_updates": kept}), list(texts.values())
+    )
     changes: list[ProposedChange] = []
-    for index, update in enumerate(output.proposed_updates, start=1):
+    for update in kept:
         name = update.field.value
         cited = list(dict.fromkeys(update.message_refs))
         if not cited or len(cited) > MAX_REFS or any(ref not in refs for ref in cited):
@@ -440,7 +454,7 @@ def check_turn(
             continue
         changes.append(
             ProposedChange(
-                change_id=f"c{index}",
+                change_id=f"c{len(changes) + 1}",
                 field=update.field,
                 state=update.state,
                 value=_plain(checked.value),

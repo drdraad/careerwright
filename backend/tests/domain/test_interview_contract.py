@@ -662,6 +662,34 @@ def test_a_turn_whose_message_has_a_risk_stem_never_keeps_a_next_question() -> N
     assert kept.next_question == "How many hours a week could you study?"
 
 
+@pytest.mark.req("PROF-09")
+def test_words_that_trip_the_support_screen_are_never_proposed_as_an_answer() -> None:
+    # Task W2F review I1, the live path: whatever the model writes, a change whose value or
+    # reason trips the support screen is dropped, never repaired, so the person's distress
+    # words are never offered back to save; the rest of the turn is kept.
+    ctx = context("I work as a care assistant.", "I hate my job and I want to kill myself.")
+    out = output(
+        update("disliked_tasks", items=["my job and I want to kill myself"], message_refs=["m2"]),
+        update("current_role", text="care assistant"),
+        update(
+            "enjoyed_tasks",
+            items=["caring"],
+            basis="inferred",
+            message_refs=["m1", "m2"],
+            reason="You said you want to kill yourself, so caring may suit you.",
+        ),
+    )
+
+    proposal, found = check_turn(out, ctx, ProposalOrigin.MODEL)
+
+    assert found == []
+    assert proposal is not None
+    assert proposal.next_question is None  # a support turn asks nothing (the guard above)
+    assert [(c.change_id, c.field, c.value) for c in proposal.changes] == [
+        ("c1", ProfileField.CURRENT_ROLE, "care assistant")
+    ]
+
+
 def test_an_input_sealed_before_preferences_existed_still_opens() -> None:
     sealed = context("Hi").model_dump(mode="json")
     del sealed["entry_mode"], sealed["conversation_mode"]

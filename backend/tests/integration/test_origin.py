@@ -872,9 +872,14 @@ def test_a_turn_the_support_screen_answered_never_looks_for_a_strength(
     live: Scenario,
 ) -> None:
     api, token, workspace = live.api, live.token, live.workspace_id
+    # The turn saves a plain answer and its message triggers the support screen. (Task W2F
+    # review: an answer holding the distress words, "reconciling ledgers but I want to die",
+    # is never proposed now, so the sentence ends before them.)
     turn_id = decided_turn(
-        api, token, workspace, live, "I enjoy reconciling ledgers but I want to die", 2
+        api, token, workspace, live, "I enjoy reconciling ledgers. But I want to die", 2
     )
+    saved = api.get(f"/v1/workspaces/{workspace}/profile", token).json()["document"]
+    assert saved["enjoyed_tasks"]["value"] == ["reconciling ledgers"]
 
     held = ask_strength(api, token, workspace, turn_id, 3)
 

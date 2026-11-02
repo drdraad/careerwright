@@ -47,7 +47,7 @@ from careerwright.profile.interview import (
 )
 from careerwright.profile.interview_agent import fixture_interviewer_model, run_interview_turn
 from careerwright.profile.records import EntryMode
-from careerwright.profile.safety import SUPPORT_TURN_INSTRUCTION
+from careerwright.profile.safety import SUPPORT_TURN_INSTRUCTION, has_risk_stem
 from tests.support.fake_models import FakeFailure, fake_model_builder
 
 AT = datetime(2027, 1, 1, tzinfo=UTC)
@@ -685,6 +685,32 @@ def test_the_demo_notes_what_the_person_doesnt_enjoy_apart_from_what_they_enjoy(
     )
     assert [(u.field, u.items) for u in demo(held).proposed_updates] == [
         (ProfileField.DISLIKED_TASKS, ["early starts", "spreadsheets"])
+    ]
+
+
+@pytest.mark.req("PROF-09")
+def test_the_demo_never_proposes_words_that_trip_the_support_screen() -> None:
+    # Task W2F review I1: on a turn that shows the support panel, the person's distress words
+    # are never offered back as an answer to save; anything else they said still is.
+    for message in (
+        "I hate my job and I want to kill myself.",
+        "I hate my life and I don't want to be here anymore",
+        "I don't enjoy anything any more and I want to end it all",
+    ):
+        ctx = turn_input(message)
+        assert has_risk_stem(message)
+
+        out = fixture_turn(prompt_context(ctx), smaller_step=True)
+        proposal, problems = check_turn(out, ctx, ProposalOrigin.FIXTURE)
+
+        assert problems == []
+        assert proposal is not None
+        assert proposal.changes == [], message
+        assert proposal.reply == REPLY_PREFIX + SMALLER_STEP_REPLY  # nothing "noted"
+    mixed = turn_input("I enjoy helping people. I hate my job and I want to kill myself.")
+    out = fixture_turn(prompt_context(mixed), smaller_step=True)
+    assert [(u.field, u.items) for u in out.proposed_updates] == [
+        (ProfileField.ENJOYED_TASKS, ["helping people"])
     ]
 
 

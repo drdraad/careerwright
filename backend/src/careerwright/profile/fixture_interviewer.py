@@ -39,6 +39,7 @@ from careerwright.profile.interview import (
     ModelUpdate,
     ProfileField,
     PromptContext,
+    trips_support_screen,
 )
 from careerwright.profile.records import Basis, EntryMode
 
@@ -401,7 +402,9 @@ def _proposals(context: PromptContext, ref: str, text: str) -> list[ModelUpdate]
                     items=[task.strip() for task in tasks],
                 )
             )
-    return updates
+    # Words that trip the support screen are never offered back as an answer (Task W2F
+    # review): the same rule `check_turn` applies, so the reply never counts a dropped one.
+    return [update for update in updates if not trips_support_screen(update)]
 
 
 def _status(text: str) -> WorkStatus | None:
