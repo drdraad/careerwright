@@ -1448,7 +1448,9 @@ deleted after session W2 and stays in git history), and add session W2's outcome
 - from plan v1.6 (Task 6f), the person's qualifications as entry facts beside the
   requirements that name them: one marked expected is never counted as met, and one marked
   achieved follows the gate rules as they stand (ADR 0012: held but unverified stays
-  unresolved for a protected gate; nothing finds a person ineligible).
+  unresolved for a protected gate; nothing finds a person ineligible). One marked expected
+  reads "if you get your grades", the Options chapter's words (the product owner, 2 November
+  2026, for the demo video, `docs/demo/demo-video-script.md`).
 The controller's carried items for this task come in the dispatch.
 
 Sprint card: "Sprint 4 Build trustworthy skills and outcome assessment". Slice: the Skills
@@ -1471,7 +1473,8 @@ Acceptance (plan v1.5, beside the sprint card's): a target outside the option pa
 whose closest occupation is "None of these is my job", shows "not assessed yet, here's what
 it asks" and never a readiness result; a skill the person marked "not part of my job" is
 shown as such and is never evidence; from plan v1.6, a qualification marked expected is
-never met, and a person with no role sees no "usual in your role" panel; `make check` and
+never met and reads "if you get your grades", and a person with no role sees no "usual in
+your role" panel; `make check` and
 `make acceptance` pass.
 
 Register (plan v1.5): MAP1-01, MAP1-06, ASSESS-02, ASSESS-03 and RDY1-03; the Task 10 parts
