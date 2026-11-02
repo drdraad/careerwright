@@ -5,7 +5,8 @@ contract, with its synthetic origin retained).
 It reads the same prompt context a live model reads and answers the same InterviewTurn
 schema, from a few fixed patterns in the person's latest message: English city names from
 the list, "N hours", "£N" (a monthly amount if the sentence says month), "I am a ...",
-"I enjoy ...", "I want to be a ..." (a target), "rather not say" about money, and a message
+"I enjoy ...", "I don't enjoy ..." or "I hate ..." (a dislike, Task W2F), "I want to be a ..."
+(a target), "rather not say" about money, and a message
 that is only "Skip", "Unknown" or "Prefer not to say", which answers the question in front of
 the person. Its output passes the same validation and is stored with origin `fixture`; its
 reply says it is the demo interviewer. It is a stand-in for exercising the product offline,
@@ -87,6 +88,11 @@ _ROLE = re.compile(
     r"\bI(?:'m| am| work as) (?:a|an) ([A-Za-z][A-Za-z -]{2,60}?)(?=[.,;!?]| in | at | and |$)"
 )
 _ENJOY = re.compile(r"\bI (?:really )?(?:enjoy|love|like) ([^.,;!?]{3,80})", re.IGNORECASE)
+# What the person doesn't enjoy (Task W2F): its own answer, never an enjoyed task.
+_DISLIKE = re.compile(
+    r"\bI (?:hate|dislike|(?:don't|do not) (?:really )?(?:enjoy|like)) ([^.,;!?]{3,80})",
+    re.IGNORECASE,
+)
 _TARGET = re.compile(
     r"\bI want to be (?:a|an) ([A-Za-z][A-Za-z -]{2,60}?)(?=[.,;!?]| in | at | and |$)",
     re.IGNORECASE,
@@ -369,6 +375,19 @@ def _proposals(context: PromptContext, ref: str, text: str) -> list[ModelUpdate]
                     ref,
                     "You said you enjoy this.",
                     items=[task.strip() for task in tasks],
+                )
+            )
+    if dislike := _DISLIKE.search(text):
+        held = _listed(context, ProfileField.DISLIKED_TASKS)
+        task = dislike.group(1).strip()
+        disliked = held if task.casefold() in {h.casefold() for h in held} else [*held, task]
+        if len(disliked) <= MAX_TASKS:
+            updates.append(
+                _update(
+                    ProfileField.DISLIKED_TASKS,
+                    ref,
+                    "You said you don't enjoy this.",
+                    items=disliked,
                 )
             )
     if done := _DONE.search(text):

@@ -26,9 +26,10 @@ const profile: ProfileOut = {
   created_by: null,
   created_at: "2027-01-01T00:00:00Z",
   document: {
-    schema_version: "4",
+    schema_version: "5",
     work_status: unasked,
     qualifications: unasked,
+    disliked_tasks: unasked,
     preferred_name: unasked,
     current_role: unasked,
     cities: unasked,

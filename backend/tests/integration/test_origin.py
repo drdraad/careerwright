@@ -637,6 +637,58 @@ def test_what_the_person_is_doing_now_and_an_expected_qualification_round_trip_b
     assert saved["qualifications"]["value"] == [{"name": "GCSE maths", "status": "achieved"}]
 
 
+@pytest.mark.req("REC1-04", "REC1-03", "PROF-07")
+def test_the_tasks_the_person_doesnt_enjoy_round_trip_both_ways_and_never_start_a_discovery(
+    infra: Infra, api: ApiClient, demo_api: ApiClient, ada: str, tmp_path: Path
+) -> None:
+    # Task W2F: a dislike through the same command as a direct edit (PUT /profile) and as a
+    # confirmed demo proposal; on its own it is no answer that describes work, so no discovery
+    # starts from it (it is never a search).
+    workspace = demo_api.write(
+        "POST",
+        "/v1/workspaces",
+        ada,
+        {"name": "Tasks not enjoyed (synthetic)", "data_mode": "demo", "synthetic": True},
+    ).json()["workspace_id"]
+    scenario = make_scenario(infra, api, ada, tmp_path)
+    decided_turn(demo_api, ada, workspace, scenario, "I don't enjoy filling in forms.", 0)
+    after = demo_api.get(f"/v1/workspaces/{workspace}/profile", ada).json()
+    document = after["document"]
+    assert document["disliked_tasks"]["value"] == ["filling in forms"]
+    assert document["enjoyed_tasks"]["state"] == "unasked"
+    refused = demo_api.write(
+        "POST",
+        f"/v1/workspaces/{workspace}/discoveries",
+        ada,
+        {"expected_profile_version": after["version"]},
+    )
+    assert (refused.status_code, refused.json()["error"]["code"]) == (
+        422,
+        "INSUFFICIENT_EVIDENCE",
+    )
+    # The same answer changed directly: one more task, through the same command.
+    edited = demo_api.write(
+        "PUT",
+        f"/v1/workspaces/{workspace}/profile",
+        ada,
+        {
+            "expected_version": after["version"],
+            "profile": {
+                **as_input(document),
+                "disliked_tasks": {
+                    "state": "provided",
+                    "value": ["filling in forms", "early starts"],
+                },
+            },
+        },
+    )
+    assert edited.status_code == 201, edited.text
+    assert edited.json()["document"]["disliked_tasks"]["value"] == [
+        "filling in forms",
+        "early starts",
+    ]
+
+
 def run_strength(
     api: ApiClient, token: str, workspace: str, scenario: Scenario, turn_id: str, version: int
 ) -> dict[str, Any]:

@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from careerwright.profile.discovery import (
+    EVIDENCE_FIELDS,
     INSTRUCTIONS,
     MAX_HYPOTHESES,
     MAX_PROMPT_BYTES,
@@ -151,6 +152,23 @@ def test_the_evidence_is_the_confirmed_answers_that_describe_work_and_nothing_el
     prompt = render_prompt(context())
     assert "Leeds" not in prompt
     assert "12" not in prompt
+
+
+@pytest.mark.req("REC1-03")
+def test_tasks_the_person_doesnt_enjoy_inform_only_and_never_reach_discovery() -> None:
+    # Task W2F: what the person doesn't enjoy is never a search, a filter or a ranking input.
+    # Discovery, the slate, its written explanation and the strength all read `evidence_of`.
+    disliking = document(
+        enjoyed_tasks=["repairing physical objects"], disliked_tasks=["filling in forms"]
+    )
+    only_dislikes = document(disliked_tasks=["filling in forms"])
+
+    assert ProfileField.DISLIKED_TASKS not in EVIDENCE_FIELDS
+    assert [(item.field, item.text) for item in evidence_of(disliking)] == [
+        (ProfileField.ENJOYED_TASKS, "repairing physical objects")
+    ]
+    assert "filling in forms" not in render_prompt(context(disliking))
+    assert evidence_of(only_dislikes) == []  # so no discovery starts from dislikes alone
 
 
 @pytest.mark.req("DIV1-02", "DIV1-10", "TEST1-10")

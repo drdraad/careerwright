@@ -3228,7 +3228,7 @@ export const DecideTurnSchema = {
                 type: 'string'
             },
             type: 'array',
-            maxItems: 14,
+            maxItems: 15,
             title: 'Accept'
         },
         confirm_hard_constraints: {
@@ -3236,7 +3236,7 @@ export const DecideTurnSchema = {
                 $ref: '#/components/schemas/ProfileField'
             },
             type: 'array',
-            maxItems: 14,
+            maxItems: 15,
             title: 'Confirm Hard Constraints'
         },
         edits: {
@@ -3244,7 +3244,7 @@ export const DecideTurnSchema = {
                 $ref: '#/components/schemas/FieldEdit'
             },
             type: 'array',
-            maxItems: 14,
+            maxItems: 15,
             title: 'Edits',
             description: 'The person\'s own answers for fields this turn proposed, saved instead of those proposals (as direct entries) in the same version as the accepted ones.'
         }
@@ -10860,9 +10860,9 @@ export const ProfileDocumentSchema = {
     properties: {
         schema_version: {
             type: 'string',
-            const: '4',
+            const: '5',
             title: 'Schema Version',
-            default: '4'
+            default: '5'
         },
         preferred_name: {
             $ref: '#/components/schemas/TextField'
@@ -10905,6 +10905,9 @@ export const ProfileDocumentSchema = {
         },
         qualifications: {
             $ref: '#/components/schemas/QualificationListField'
+        },
+        disliked_tasks: {
+            $ref: '#/components/schemas/TextListField'
         }
     },
     additionalProperties: false,
@@ -10923,7 +10926,8 @@ export const ProfileDocumentSchema = {
         'work_style',
         'minimum_salary',
         'work_status',
-        'qualifications'
+        'qualifications',
+        'disliked_tasks'
     ],
     title: 'ProfileDocument',
     description: 'A stored profile version\'s content: each field with the source that established it.'
@@ -10945,7 +10949,8 @@ export const ProfileFieldSchema = {
         'work_style',
         'minimum_salary',
         'work_status',
-        'qualifications'
+        'qualifications',
+        'disliked_tasks'
     ],
     title: 'ProfileField',
     description: 'The only names a proposal may use: the profile\'s own fields.'
@@ -11003,6 +11008,10 @@ export const ProfileInputSchema = {
         qualifications: {
             $ref: '#/components/schemas/QualificationListInput',
             description: 'Qualifications the person has or is taking (optional), at most 8, each achieved or expected. An expected one is never counted as achieved.'
+        },
+        disliked_tasks: {
+            $ref: '#/components/schemas/TaskListInput',
+            description: 'Tasks the person doesn\'t enjoy or finds draining (optional), at most 8. It informs the conversation and is never a search, a filter or a ranking input.'
         }
     },
     additionalProperties: false,
@@ -11021,7 +11030,8 @@ export const ProfileInputSchema = {
         'work_style',
         'minimum_salary',
         'work_status',
-        'qualifications'
+        'qualifications',
+        'disliked_tasks'
     ],
     title: 'ProfileInput',
     description: 'What a client submits: states and values only.'

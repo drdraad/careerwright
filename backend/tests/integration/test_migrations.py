@@ -622,13 +622,13 @@ def test_0036_records_uk_titles_and_takes_another_nursing_field_off_the_adult_pa
 def test_0040_gives_every_stored_profile_both_new_answers_not_yet_asked(infra: Infra) -> None:
     # Task 6f: a version 3 document (and a version 1 one) stored before 0040 becomes version 4
     # with what the person is doing now and their qualifications not yet asked; every answer
-    # it held keeps its state, value and source.
+    # it held keeps its state, value and source. (Migrated to 0040 only: 0046 makes version 5.)
     database = f"careerwright_schema_4_{uuid.uuid4().hex[:8]}"
     infra.create_database(database)
     engine = migrator_engine(infra, database)
     source = str(uuid.uuid4())
     held = {"state": "provided", "value": "Baker", "source_ref_id": source}
-    later = ("work_status", "qualifications")
+    later = ("work_status", "qualifications", "disliked_tasks")
     version_3 = {
         "schema_version": "3",
         **{name: {"state": "unasked"} for name in ProfileInput.model_fields if name not in later},
@@ -675,7 +675,7 @@ def test_0040_gives_every_stored_profile_both_new_answers_not_yet_asked(infra: I
                         "document": json.dumps(document),
                     },
                 )
-        migrate_app(engine)
+        migrate_app(engine, "0040")
         with system_transaction(engine) as tx:
             first = profile_store.profile_version(tx, workspace, 1)
             second = profile_store.profile_version(tx, workspace, 2)
@@ -700,6 +700,98 @@ def test_0040_gives_every_stored_profile_both_new_answers_not_yet_asked(infra: I
     assert second is not None
     assert second.document.current_role.value == "Baker"
     assert first.document.enjoyed_tasks.state is FieldState.UNASKED
+
+
+@pytest.mark.req("REC1-04")
+def test_0046_gives_every_stored_profile_the_tasks_the_person_doesnt_enjoy_not_yet_asked(
+    infra: Infra,
+) -> None:
+    # Task W2F: a version 4 document (and a version 1 one) stored before 0046 becomes version 5
+    # with the tasks the person doesn't enjoy not yet asked; every answer it held keeps its
+    # state, value and source.
+    database = f"careerwright_schema_5_{uuid.uuid4().hex[:8]}"
+    infra.create_database(database)
+    engine = migrator_engine(infra, database)
+    held = {
+        "state": "provided",
+        "value": [{"name": "A-level biology", "status": "expected"}],
+        "source_ref_id": str(uuid.uuid4()),
+    }
+    version_4 = {
+        "schema_version": "4",
+        **{
+            name: {"state": "unasked"}
+            for name in ProfileInput.model_fields
+            if name != "disliked_tasks"
+        },
+        "qualifications": held,
+    }
+    version_1 = {
+        "schema_version": "1",
+        **{
+            name: {"state": "unasked"}
+            for name in (
+                "preferred_name",
+                "current_role",
+                "cities",
+                "target_titles",
+                "weekly_study_hours",
+                "direct_spend_cap",
+                "monthly_payment_cap",
+            )
+        },
+    }
+    try:
+        migrate_app(engine, "0045")
+        owner = INVITED_ACTORS[0]
+        with engine.begin() as tx:
+            identity_store.upsert_actor(tx, owner.actor_id, owner.email, owner.display_name)
+            workspace = identity_store.insert_workspace(
+                tx,
+                workspace_id=uuid.uuid4(),
+                owner_actor_id=owner.actor_id,
+                name="Saved before schema 5 (synthetic)",
+                data_mode=DataMode.DEMO,
+                synthetic=True,
+            ).workspace_id
+            for version, document in ((1, version_1), (2, version_4)):
+                tx.exec_driver_sql(
+                    "INSERT INTO careerwright.profile_versions (workspace_id, version, "
+                    "schema_version, document) VALUES (%(ws)s, %(version)s, %(schema)s, "
+                    "%(document)s::jsonb)",
+                    {
+                        "ws": workspace,
+                        "version": version,
+                        "schema": document["schema_version"],
+                        "document": json.dumps(document),
+                    },
+                )
+        migrate_app(engine)
+        with system_transaction(engine) as tx:
+            first = profile_store.profile_version(tx, workspace, 1)
+            second = profile_store.profile_version(tx, workspace, 2)
+    finally:
+        engine.dispose()
+
+    rows = infra.query(
+        "SELECT version, schema_version, document FROM careerwright.profile_versions "
+        "WHERE workspace_id = %s ORDER BY version",
+        (workspace,),
+        database=database,
+    )
+    for row in rows:
+        assert row["schema_version"] == "5"
+        document = row["document"]
+        assert isinstance(document, dict)
+        assert document["schema_version"] == "5"
+        assert document["disliked_tasks"] == {"state": "unasked"}
+        assert document["work_status"] == {"state": "unasked"}
+    assert rows[1]["document"]["qualifications"] == held  # kept exactly, with its source
+    assert first is not None
+    assert second is not None
+    assert first.document.disliked_tasks.state is FieldState.UNASKED
+    assert second.document.disliked_tasks.state is FieldState.UNASKED
+    assert second.document.qualifications.value is not None
 
 
 def add_discovery_then_a_choice(tx: sa.Connection, keyring: Keyring) -> tuple[uuid.UUID, uuid.UUID]:

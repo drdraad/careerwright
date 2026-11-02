@@ -109,6 +109,7 @@ class ProfileField(StrEnum):
     MINIMUM_SALARY = "minimum_salary"
     WORK_STATUS = "work_status"
     QUALIFICATIONS = "qualifications"
+    DISLIKED_TASKS = "disliked_tasks"
 
 
 class AnsweredState(StrEnum):

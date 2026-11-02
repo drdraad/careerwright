@@ -175,6 +175,32 @@ def test_a_list_is_stated_when_its_new_items_appear_and_held_items_need_no_quote
     assert basis_of(invented, ctx) == {"cities": Basis.INFERRED}
 
 
+@pytest.mark.req("REC1-04", "PROF-04")
+def test_what_the_person_doesnt_enjoy_is_proposed_as_its_own_list_and_never_a_hard_limit() -> None:
+    # Task W2F: proposed and confirmed like the other task answers.
+    ctx = context("I enjoy helping people, but I hate spreadsheets.")
+
+    proposal, found = check_turn(
+        output(
+            update("enjoyed_tasks", items=["helping people"]),
+            update("disliked_tasks", items=["spreadsheets"]),
+        ),
+        ctx,
+        ProposalOrigin.MODEL,
+    )
+
+    assert found == []
+    assert proposal is not None
+    by_field = {c.field: c for c in proposal.changes}
+    disliked = by_field[ProfileField.DISLIKED_TASKS]
+    assert (disliked.value, disliked.basis, disliked.hard_constraint) == (
+        ["spreadsheets"],
+        Basis.STATED,
+        False,
+    )
+    assert by_field[ProfileField.ENJOYED_TASKS].value == ["helping people"]
+
+
 @pytest.mark.req("PROF-01", "STATE-08")
 def test_an_answer_without_a_value_to_quote_is_shown_as_inferred() -> None:
     ctx = context("I'd rather not say what I can spend.")

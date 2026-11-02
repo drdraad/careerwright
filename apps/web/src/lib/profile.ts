@@ -274,6 +274,7 @@ export function inputFrom(draft: ProfileDraft): DraftResult {
     minimum_salary: readSalary(draft.minimum_salary),
     work_status: readWorkStatus(draft.work_status),
     qualifications: readQualifications(draft.qualifications, listLimit("qualifications")),
+    disliked_tasks: list("disliked_tasks"),
   };
   const problems: Partial<Record<ProfileFieldName, FieldProblem>> = {};
   for (const name of Object.keys(read) as ProfileFieldName[]) {
@@ -294,7 +295,8 @@ export function inputFrom(draft: ProfileDraft): DraftResult {
     !read.work_style.ok ||
     !read.minimum_salary.ok ||
     !read.work_status.ok ||
-    !read.qualifications.ok
+    !read.qualifications.ok ||
+    !read.disliked_tasks.ok
   ) {
     return { ok: false, problems };
   }
@@ -313,6 +315,7 @@ export function inputFrom(draft: ProfileDraft): DraftResult {
     minimum_salary: read.minimum_salary.input,
     work_status: read.work_status.input,
     qualifications: read.qualifications.input,
+    disliked_tasks: read.disliked_tasks.input,
   };
   return { ok: true, input };
 }

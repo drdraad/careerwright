@@ -30,9 +30,10 @@ import { YouChapter } from "./YouChapter";
 const WS = "w-you";
 const unasked = { state: "unasked" as const, value: null, source_ref_id: null };
 const answers: ProfileDocument = {
-  schema_version: "4",
+  schema_version: "5",
   work_status: unasked,
   qualifications: unasked,
+  disliked_tasks: unasked,
   preferred_name: unasked,
   current_role: unasked,
   cities: unasked,

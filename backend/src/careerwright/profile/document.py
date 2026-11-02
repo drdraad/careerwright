@@ -19,8 +19,12 @@ minimum inputs: what the person is doing now (their work or study status, one of
 their qualifications, each achieved or expected, so an expected one is never read as achieved.
 It also adds one answer for the current role alone, "I haven't had a job yet"
 (`no_job_yet`): an answer, never a job title, Skipped or Unknown. Nothing asks for or infers
-the person's age. Older documents read as version 4 with the later fields unasked (migration
-0040 also rewrote the stored ones).
+the person's age. Schema version 5 (Task W2F, the product owner's yes of 2026-11-02) adds the
+tasks the person doesn't enjoy (spec section 4's "disliked tasks"), kept apart from the three
+task answers above: it informs the conversation and is never a search, a filter or a ranking
+input (`careerwright.profile.discovery.EVIDENCE_FIELDS` leaves it out). Older documents read
+as version 5 with the later fields unasked (migrations 0040 and 0046 also rewrote the stored
+ones).
 Cities must be on the finite English list and are stored by its name for the city.
 """
 
@@ -40,7 +44,7 @@ from careerwright.money import Money
 MAX_CITIES = 3
 MAX_TARGETS = 3
 MAX_TASKS = 8
-PROFILE_SCHEMA_VERSION: Literal["4"] = "4"
+PROFILE_SCHEMA_VERSION: Literal["5"] = "5"
 
 TextValue = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
 HoursValue = Annotated[float, Field(ge=0, le=168)]
@@ -263,6 +267,12 @@ class ProfileInput(BaseModel):
             "achieved or expected. An expected one is never counted as achieved."
         )
     )
+    disliked_tasks: TaskListInput = Field(
+        description=(
+            f"Tasks the person doesn't enjoy or finds draining (optional), at most {MAX_TASKS}. "
+            "It informs the conversation and is never a search, a filter or a ranking input."
+        )
+    )
 
 
 class ProfileDocument(BaseModel):
@@ -270,7 +280,7 @@ class ProfileDocument(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: Literal["4"] = PROFILE_SCHEMA_VERSION
+    schema_version: Literal["5"] = PROFILE_SCHEMA_VERSION
     preferred_name: TextField
     current_role: TextField
     cities: TextListField
@@ -285,12 +295,14 @@ class ProfileDocument(BaseModel):
     minimum_salary: SalaryField
     work_status: WorkStatusField
     qualifications: QualificationListField
+    disliked_tasks: TextListField
 
     @model_validator(mode="before")
     @classmethod
     def _read_older_versions(cls, data: Any) -> Any:
-        """Version 1 had no interest or capability fields, version 2 no work style and
-        version 3 no work status or qualifications: they were never asked."""
+        """Version 1 had no interest or capability fields, version 2 no work style, version 3
+        no work status or qualifications and version 4 no disliked tasks: they were never
+        asked."""
         version = data.get("schema_version") if isinstance(data, dict) else None
         later = _ADDED_AFTER.get(version) if isinstance(version, str) else None
         if later is None:
@@ -307,10 +319,12 @@ FIELD_NAMES = tuple(ProfileInput.model_fields)
 VERSION_2_FIELDS = ("enjoyed_tasks", "confident_tasks", "evidenced_tasks")
 VERSION_3_FIELDS = ("work_style", "minimum_salary")
 VERSION_4_FIELDS = ("work_status", "qualifications")
+VERSION_5_FIELDS = ("disliked_tasks",)
 _ADDED_AFTER: Mapping[str, tuple[str, ...]] = {
-    "1": (*VERSION_2_FIELDS, *VERSION_3_FIELDS, *VERSION_4_FIELDS),
-    "2": (*VERSION_3_FIELDS, *VERSION_4_FIELDS),
-    "3": VERSION_4_FIELDS,
+    "1": (*VERSION_2_FIELDS, *VERSION_3_FIELDS, *VERSION_4_FIELDS, *VERSION_5_FIELDS),
+    "2": (*VERSION_3_FIELDS, *VERSION_4_FIELDS, *VERSION_5_FIELDS),
+    "3": (*VERSION_4_FIELDS, *VERSION_5_FIELDS),
+    "4": VERSION_5_FIELDS,
 }
 
 
@@ -350,6 +364,8 @@ FIELD_SPECS: Mapping[str, FieldSpec] = {
     # Task 6f (spec section 3's minimum inputs): optional, never limits.
     "work_status": FieldSpec(FieldKind.WORK_STATUS),
     "qualifications": FieldSpec(FieldKind.QUALIFICATIONS, MAX_TASKS),
+    # Task W2F (spec section 4's "disliked tasks"): optional, informs only, never a limit.
+    "disliked_tasks": FieldSpec(FieldKind.LIST, MAX_TASKS),
 }
 HARD_CONSTRAINTS = frozenset(name for name, spec in FIELD_SPECS.items() if spec.hard_constraint)
 # The one field that takes "I haven't had a job yet".
