@@ -1502,6 +1502,13 @@
     margin-top: var(--space-16);
   }
 
+  /* "Add seniority or industry for …" names the whole title, so it wraps: a long title never
+     makes the page wider than a phone (the long-values visual state, Task W2F). */
+  .title-details-opener .btn {
+    white-space: normal;
+    text-align: start;
+  }
+
   /* A demo question's one-tap replies: quiet, and wrapping rather than crowding. */
   .example-replies {
     display: flex;
