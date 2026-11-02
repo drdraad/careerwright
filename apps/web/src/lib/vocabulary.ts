@@ -521,6 +521,7 @@ export const CARD_HINTED: ReadonlySet<ProfileFieldName> = new Set([
   "enjoyed_tasks",
   "confident_tasks",
   "evidenced_tasks",
+  "disliked_tasks", // Task W2F slice A
 ]);
 
 /** Why a model run ended without a result, in the person's words (failure classes). */
