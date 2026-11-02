@@ -61,6 +61,7 @@ from tests.support.planning import (
     person,
     readiness_of,
     repayments_beside_an_unknown,
+    supplied_costs,
     support,
     tuition_loan,
     undated_relief,
@@ -427,6 +428,7 @@ def test_the_oracle_reads_a_tuition_fee_loan_in_every_state() -> None:
 @example(monthly=repayments_beside_an_unknown())  # review 12a, Important 3
 @example(monthly=loan_statuses())  # Task 12c: the tuition fee loan in every state
 @example(monthly=grant_beside_loan())  # review 12c, Critical 1
+@example(monthly=supplied_costs())  # review 12bA, Important 1
 @given(monthly=INSTANCES)
 def test_the_search_finds_exactly_the_oracle_s_feasible_schedules_objectives_and_layers(
     monthly: MonthlyInput,
@@ -472,6 +474,7 @@ def test_the_rank_stage_s_layers_equal_iterative_peeling_on_every_complete_searc
 @SLOW
 @example(monthly=loan_statuses())
 @example(monthly=grant_beside_loan())  # review 12c, Critical 1
+@example(monthly=supplied_costs())  # review 12bA, Important 1
 @given(monthly=INSTANCES)
 def test_the_independent_checker_agrees_with_the_route_checker_on_every_candidate(
     monthly: MonthlyInput,

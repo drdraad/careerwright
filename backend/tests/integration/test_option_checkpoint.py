@@ -151,9 +151,23 @@ def test_a_figure_for_a_fact_the_page_states_or_an_option_not_theirs_is_refused(
         {"offering_figures": [{"offering_id": "offering:C01#full_time", "weekly_hours": 3}]},
     )
     left_out = write(api, ada, workspace_id, 0, {"excluded_variants": ["offering:nowhere"]})
+    # C10 states £295 and leaves its exam fee out: a whole below £295 has no honest place
+    # (review 12bA, Important 1).
+    below = write(
+        api,
+        ada,
+        workspace_id,
+        0,
+        {
+            "offering_figures": [
+                {"offering_id": "offering:C10", "cost": {"minor_units": 20000, "currency": "GBP"}}
+            ]
+        },
+    )
 
     for response, field, reason in (
         (stated, "offering_figures", "not_missing"),
+        (below, "offering_figures", "below_stated_cost"),
         (unknown, "offering_figures", "not_an_option"),  # not one of this target's options
         (left_out, "excluded_variants", "not_an_option"),
     ):

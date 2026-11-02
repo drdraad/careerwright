@@ -46,6 +46,7 @@ from careerwright.planning.compiler import (
     WorkRights,
     compile_input,
 )
+from careerwright.planning.figures import OfferingFigures, with_figures
 from tests.support.capability import (
     FIXTURES,
     fixture,
@@ -572,6 +573,58 @@ def grant_beside_loan() -> MonthlyInput:
     inputs = person(horizon=3, opening=1_000_000, direct_cap=100_000, monthly_cap=1_000_000)
     readiness = readiness_of({"offering:course": (ROW,)})
     return compile_input(inputs, catalogue_of(*options), readiness=readiness)
+
+
+SCHEDULE_COST = 333_672  # review 12bA, Important 1: the person's £3,336.72 for C04
+
+
+def supplied_costs() -> MonthlyInput:
+    """Review 12bA, Important 1, as a constructed case shaped like pack 0.4.0's C04 and C10: the
+    person supplies a whole cost for two dated courses. "stated" is paid in full at £2,995 or by
+    instalments "from £69.52 a month" with no count; "part-stated" is £295 with its exam fee
+    not stated. Their £3,336.72 can't be placed in a stated schedule, so the instalments stay
+    unknown (never one payment in the first month); their £400 for "part-stated" fills only its
+    unstated part. A £3,000 payment cap would break a £3,336.72 lump."""
+    stated_concept, stated, _ = option("stated", finish=month_end(START, 3))
+    plans = [
+        PaymentPlan(
+            plan_id="pay-in-full",
+            payments=[Payment(kind="fee", amount=gbp(299_500), month_offset=0, cited=CONSTRUCTED)],
+        ),
+        PaymentPlan(
+            plan_id="instalments",
+            recurring=Recurring(amount=gbp(6952), at_least=True, count=None, cited=CONSTRUCTED),
+        ),
+    ]
+    stated = stated.model_copy(update={"payment_plans": plans})
+    variants = [
+        Variant(variant_id=f"stated~{p.plan_id}", offering_id=stated.offering_id, plan_id=p.plan_id)
+        for p in plans
+    ]
+    part = option(
+        "part-stated",
+        finish=month_end(START, 3),
+        payments=((0, 29_500),),
+        unknown_cost="the exam fee is not stated",
+    )
+    figures = {
+        stated.offering_id: OfferingFigures(
+            offering_id=stated.offering_id, cost=gbp(SCHEDULE_COST)
+        ),
+        part[1].offering_id: OfferingFigures(offering_id=part[1].offering_id, cost=gbp(40_000)),
+    }
+    catalogue = catalogue_of(part).model_copy(
+        update={
+            "concepts": [stated_concept, part[0]],
+            "offerings": [
+                with_figures(o, figures[o.offering_id], CONSTRUCTED) for o in (stated, part[1])
+            ],
+            "variants": [*variants, part[2]],
+        }
+    )
+    inputs = person(horizon=3, opening=1_000_000, direct_cap=1_000_000, monthly_cap=300_000)
+    readiness = readiness_of({stated.offering_id: (ROW,), part[1].offering_id: (ROW,)})
+    return compile_input(inputs, catalogue, readiness=readiness)
 
 
 def month_start(first: date, months: int) -> date:

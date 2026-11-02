@@ -4905,7 +4905,7 @@ export type OfferingFigures = {
      */
     weekly_hours?: number | null;
     /**
-     * The whole of what the person will pay for it, due in its first month.
+     * The whole of what the person will pay for it: it fills only what a payment plan leaves unstated, the rest of the whole due in its first month.
      */
     cost?: Money | null;
 };
@@ -5761,6 +5761,10 @@ export type PaymentPlan = {
      * Unknown
      */
     unknown?: string | null;
+    /**
+     * Supplied Cost
+     */
+    supplied_cost?: boolean;
 };
 
 /**

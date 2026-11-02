@@ -441,10 +441,18 @@ Backend and API only; the Options chapter's screens are Task 12b's second half (
    empty by default so every stored document keeps its meaning:
    - `offering_figures`: the person's own figures for facts an offering lacks (a start, given
      or chosen from the intake months its page states; a finish; weekly hours; a cost, the
-     whole of what they pay, due in the first month, session 2's D12 rule). A figure fills only
-     a missing fact: one for a stated fact is refused (`not_missing`) and, kept from before a
-     newer pack stated it, never applied. A supplied start with the page's one exact length
-     gives the finish. Each supplied fact is named on the offering (`Offering.supplied`).
+     whole of what they pay). A figure fills only a missing fact: one for a stated fact is
+     refused (`not_missing`) and, kept from before a newer pack stated it, never applied. A
+     supplied start with the page's one exact length gives the finish. A supplied date or
+     hours is named on the offering (`Offering.supplied`). A supplied cost fills only what a
+     payment plan leaves unstated, in the plan's own shape (review 12bA, Important 1): the
+     page's payments stay and the rest of the whole is one payment in the first month
+     (session 2's D12 rule for a total with no stated schedule). A plan that states a
+     schedule (C04's "from £69.52 a month") is never recast as one payment
+     (`stated_schedule`), and a whole below the page's payments has no place
+     (`below_stated_cost`): such a plan stays unknown, and a cost no plan can take is refused
+     with that reason. The plan it fills is marked (`PaymentPlan.supplied_cost`), so only a
+     variant paying by that plan rests on it; a sibling plan the page prices does not.
    - `excluded_variants`: the options the person leaves out of the search (the rest retained).
    - `own_options`: the options they add (ADR 0011's Task 12b amendment), stamped like an
      outcome decision: unchanged, it keeps who added it and when; changed, it is dated again.
