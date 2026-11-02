@@ -6,8 +6,9 @@
   and were confirmed by the product owner on 2026-10-28 (H-11 below), the hard-constraint
   set with a salary floor added (implemented in Task 6, ADR 0007).
 - Date: 2026-10-28
-- Amended: 2026-10-31, the product owner's approval of the audit (the last section):
-  decision 5's provisional concepts for the role space (ADR 0015).
+- Amended: 2026-10-31, the product owner's approval of the audit: decision 5's provisional
+  concepts for the role space (ADR 0015); 2026-11-01, Task 6f; 2026-11-02, Task W2F (the
+  last section): the tasks the person doesn't enjoy and `interview-turn-6`.
 - Requirements: TAX1-01, TAX1-04, DIV1-01, DIV1-03, REC1-04, BND1-04, PROF-01..07,
   MODEL-01..04, STATE-08, TEST1-10; spec sections 3-5, 16 and 18; ADR 0002, ADR 0004
   decisions 5, 7 and 9
@@ -380,3 +381,26 @@ asks for or infers age.
   product owner settles the words at session W2), and the demo interviewer asks an unsure
   person next "What do you enjoy doing, at school, at work or in your own time?". No live
   call was made for this version: Task 6e runs the capped live check (R5).
+
+## Amendment, 2026-11-02 (the product owner's yes after session W2; Task W2F, Muse's turns)
+
+- **"Tasks you don't enjoy"** (`disliked_tasks`; spec section 4's "disliked tasks"): a
+  fourth task answer, optional, at most 8, kept apart from the three of decision 6 and never
+  a hard constraint. The model proposes it and the person confirms it through the one write
+  path, like any answer (decisions 7 and 11). It informs the conversation only: discovery's
+  answer set (`EVIDENCE_FIELDS`, which the slate, its written explanation and the strength
+  also read) leaves it out, so it is never a search, a filter or a ranking input, and
+  dislikes alone start no discovery. Saved answers schema version 5; migration 0046 adds it
+  not yet asked in place (the exception above). The demo interviewer reads "I don't enjoy
+  ...", "I don't like ..." and "I hate ...". Like any answer but a chosen target, changing
+  it marks a slate as made on earlier answers, though no suggestion reads it.
+- **`interview-turn-6`** (session W2's findings 4 to 7): the instructions add the new
+  answer ("Keep these four apart"); one activity takes the same words in each task answer it
+  belongs to; a list proposal leaves out anything the person takes back; a money limit
+  hinted without a figure ("no pay cut", "nothing too expensive") is asked for in pounds as
+  the next question, before any other, and no money value is proposed or invented without
+  the person's figure; and with no start chosen (entry null), the interviewer never asks how
+  they want to start but uses what they wrote. The safety and no-inference rules are
+  unchanged. Evaluation cases INT-18 (a dislike and a take-back) and INT-19 (Sam's hinted pay
+  cut, no start chosen) carry the rules; no live call was made here: the controller runs the
+  capped live check (R5).
