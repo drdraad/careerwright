@@ -429,3 +429,50 @@ the economic cost, the search, the oracle) is shared. The loan to repay names it
 so does a family's financing (`advanced_learner_loan:<application>`). Migration 0044's CHECK
 allows only the two kinds. The pruning rules are unchanged (`sound-pruning-5`). A maintenance
 loan and every other loan stay refused as support.
+
+## Amendment, 2026-11-01 (Task 12b, backend half): the review checkpoint's facts and answers
+
+Backend and API only; the Options chapter's screens are Task 12b's second half (12bB).
+
+1. **Where the checkpoint's answers live: the planning inputs.** Every answer the checkpoint
+   takes is part of the person's one planning-inputs document, through its one command (an
+   expected version and an `Idempotency-Key`, `run_idempotent`), so no new table, workflow or
+   run kind (the infrastructure is frozen for L0), and no migration. Three new lists, each
+   empty by default so every stored document keeps its meaning:
+   - `offering_figures`: the person's own figures for facts an offering lacks (a start, given
+     or chosen from the intake months its page states; a finish; weekly hours; a cost, the
+     whole of what they pay, due in the first month, session 2's D12 rule). A figure fills only
+     a missing fact: one for a stated fact is refused (`not_missing`) and, kept from before a
+     newer pack stated it, never applied. A supplied start with the page's one exact length
+     gives the finish. Each supplied fact is named on the offering (`Offering.supplied`).
+   - `excluded_variants`: the options the person leaves out of the search (the rest retained).
+   - `own_options`: the options they add (ADR 0011's Task 12b amendment), stamped like an
+     outcome decision: unchanged, it keeps who added it and when; changed, it is dated again.
+2. **Qualified, never unqualified.** A route through a variant with a supplied fact carries
+   `supplied_figures`; one through an option the person added carries `own_options` (beside
+   `proposed_records`). Neither is ever "affordable and feasible" unqualified (OPTN-09).
+3. **"If you get your grades"** (plan v1.6): a new unresolved finding,
+   `entry_requirements_expected`, for a variant whose stated entry requirement only
+   qualifications the person expects name (ADR 0012's Task 12b line), even if they answered
+   "yes": met only once they record the result. Their own "no" stays its own finding.
+4. **The checkpoint** (`GET .../planning/checkpoint`, facts only): per target, each option's
+   missing facts (`start_date`, `finish_date`, `cost`, `weekly_hours`, `entry_confirmation`,
+   `eligibility_confirmation`), supplied facts, stated intakes, entry requirements with the
+   person's qualifications, eligibility conditions with their status, age rules (never applied:
+   the person's age is never asked), planned outcomes with the person's decision, and whether
+   it is left out; each scheme's age rules; how many options are reviewed (none: the web says
+   so and offers "add an option yourself"); and the scope against the M0 bounds (over 24
+   concepts or two starts, `retain_variants` with the counts). Beside them: what a solve still
+   needs, the two caps, `payment_cap_basis` (`payments_and_debt_repayments`: session 2's D15
+   yes, the checker's `P_m + R_m <= M_m`), the profile's work status, the baseline and
+   continuation, and `not_working` (the person's own "0 hours, £0").
+5. **Someone not working:** the baseline may be `staying_in_education`; a continuation of 0
+   hours and £0 is a stated figure, never an unknown read as zero.
+6. **Pasted text** for an added option has its own command (`POST .../planning/option-texts`,
+   answered with its ID and hash only, never the words, since a receipt is kept in plaintext)
+   and is read back with `GET .../planning/option-texts/{text_id}`, in the person's workspace
+   only.
+
+Known limits: a figure is the person's statement and is not reviewed; Careerwright does not
+read a date or an amount from pasted words (a new language rule, R11), so figures are typed,
+each optionally citing its span.

@@ -7601,6 +7601,13 @@ export const OptionFactsSchema = {
             type: 'array',
             title: 'Age Rules'
         },
+        outcomes: {
+            items: {
+                $ref: '#/components/schemas/OutcomeFacts'
+            },
+            type: 'array',
+            title: 'Outcomes'
+        },
         left_out: {
             type: 'boolean',
             title: 'Left Out'
@@ -7624,6 +7631,7 @@ export const OptionFactsSchema = {
         'entry_expected',
         'eligibility_conditions',
         'age_rules',
+        'outcomes',
         'left_out'
     ],
     title: 'OptionFacts'
@@ -8002,6 +8010,67 @@ export const OutcomeDecisionInputSchema = {
     ],
     title: 'OutcomeDecisionInput',
     description: 'Accept a provisional outcome mapping as a modelling assumption, or override it.'
+} as const;
+
+export const OutcomeFactsSchema = {
+    properties: {
+        outcome_id: {
+            type: 'string',
+            title: 'Outcome Id'
+        },
+        skill_id: {
+            type: 'string',
+            title: 'Skill Id'
+        },
+        outcome_type: {
+            $ref: '#/components/schemas/OutcomeType'
+        },
+        level_on_completion: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Level On Completion'
+        },
+        evidence_kind: {
+            $ref: '#/components/schemas/EvidenceKind'
+        },
+        review_state: {
+            $ref: '#/components/schemas/OutcomeReview'
+        },
+        decision: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: [
+                        'accept',
+                        'override'
+                    ]
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Decision'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'outcome_id',
+        'skill_id',
+        'outcome_type',
+        'level_on_completion',
+        'evidence_kind',
+        'review_state',
+        'decision'
+    ],
+    title: 'OutcomeFacts',
+    description: 'A planned outcome of the option (OUT-1), with the person\'s decision on a provisional\nmapping: accept it as their assumption or override it, through the planning inputs\'\ncommand (ADR 0012 decision 11). Null: no decision yet.'
 } as const;
 
 export const OutcomeReviewSchema = {

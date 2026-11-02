@@ -8,8 +8,9 @@ For each target, what the person reviews before a route search:
   the route search still lacks for it (`figures.MissingFact`), the ones they supplied as their
   own figures, the intake months its page states, its entry requirements with the person's
   qualifications that name each (Task 6f: an expected one is never met), its fee's eligibility
-  conditions with their status, each age rule beside it, and whether it is left out of the
-  search.
+  conditions with their status, each age rule beside it, its planned outcomes with the
+  person's decision on each provisional mapping (accept or override, Task 12a's command), and
+  whether it is left out of the search.
 - **Each scheme** (funding instrument) with its review state and its age rules beside it. The
   person's age is never asked or inferred (spec section 3; Task 6f), so no age rule is ever
   applied: each is shown, `applied: false`.
@@ -26,6 +27,12 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, JsonValue
 
+from careerwright.capability.outcomes import (
+    EvidenceKind,
+    OutcomeReview,
+    OutcomeType,
+    PlannedOutcome,
+)
 from careerwright.capability.skills import (
     EntryFact,
     EntryStanding,
@@ -80,6 +87,20 @@ class ConditionFact(StrictModel):
     status: EligibilityStatus | None
 
 
+class OutcomeFacts(StrictModel):
+    """A planned outcome of the option (OUT-1), with the person's decision on a provisional
+    mapping: accept it as their assumption or override it, through the planning inputs'
+    command (ADR 0012 decision 11). Null: no decision yet."""
+
+    outcome_id: str
+    skill_id: str
+    outcome_type: OutcomeType
+    level_on_completion: int | None
+    evidence_kind: EvidenceKind
+    review_state: OutcomeReview
+    decision: Literal["accept", "override"] | None
+
+
 class OptionFacts(StrictModel):
     variant_id: str
     offering_id: str
@@ -96,6 +117,7 @@ class OptionFacts(StrictModel):
     entry_expected: bool  # met only if they get the grades they expect: never met
     eligibility_conditions: list[ConditionFact]
     age_rules: list[AgeRule]
+    outcomes: list[OutcomeFacts]
     left_out: bool  # the person left it out of the route search
 
 
@@ -236,6 +258,8 @@ def target_checkpoint(
     qualifications: Sequence[PersonQualification],
     keys: Mapping[str, str],
     limits: M0SearchLimits,
+    outcomes: Sequence[PlannedOutcome] = (),
+    decisions: Mapping[str, Literal["accept", "override"]] | None = None,
 ) -> TargetCheckpoint:
     """One target's checkpoint. `answered`: its catalogue with the person's answers, figures
     and expected entry in it (`inputs.with_answers`), every option kept; `retained`: the same
@@ -276,6 +300,19 @@ def target_checkpoint(
                         for c in offering.eligibility_conditions
                     ],
                     age_rules=_age_rules(offering.eligibility_conditions),
+                    outcomes=[
+                        OutcomeFacts(
+                            outcome_id=o.outcome_id,
+                            skill_id=o.skill_id,
+                            outcome_type=o.outcome_type,
+                            level_on_completion=o.level_on_completion,
+                            evidence_kind=o.evidence_kind,
+                            review_state=o.review_state,
+                            decision=(decisions or {}).get(o.outcome_id),
+                        )
+                        for o in outcomes
+                        if o.offering_id == (offering.outcomes_from or offering.offering_id)
+                    ],
                     left_out=variant.variant_id in left_out,
                 )
             )

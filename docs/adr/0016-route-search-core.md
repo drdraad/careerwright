@@ -432,3 +432,18 @@ payments, and the route carries it as a loan to repay. `PRUNING_VERSION` is now
   what the loans pay included.
 - The solve workflow's step sequence is unchanged, so the DBOS `application_version` stays
   `careerwright-l0-1`.
+
+## Amendment, 2026-11-01 (Task 12b, backend half): expected entry, classed; scope with counts
+
+- `entry_requirements_expected` (ADR 0013's Task 12b amendment) is computed from the variant
+  alone (its concept's entry requirements and the person's qualifications), so it joins rule
+  2's own unresolved findings: a variant with it is set aside with its reasons. The pruning
+  version is `sound-pruning-6`.
+- A route resting on a figure the person supplied, or on an option they added, carries the
+  qualification `supplied_figures` or `own_options`; nothing about the search changes.
+- Never truncated silently: `check_scope` still refuses a catalogue over the M0 bounds (24
+  concepts, two starts each) and now names its size beside the bound (`size`); the checkpoint
+  asks the person to retain options (`retain_variants`, with the counts), and the solve reads
+  only the options they kept (`excluded_variants`).
+- The solve workflow's step sequence is unchanged: `application_version` stays
+  `careerwright-l0-1`.

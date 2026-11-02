@@ -369,3 +369,20 @@ reviewed.
   year: 13 January 2027 is the product owner's answer to Q115, named in the claim's note.
 - **Consumers:** Task 12b pins 0.4.0. No capability reference is written for it here, so
   the capability model's pin (0.2.0 with reference 0.2.0) is unchanged.
+
+## Amendment, 2026-11-01 (Task 12b, backend half): 0.4.0 pinned; options the person adds
+
+- **The app reads 0.4.0.** The capability model and planning pin the reviewed school-leaver
+  pack 0.4.0 (`capability.commands.PACK_VERSION`), loaded only through `load_pack`. The
+  capability reference 0.2.0 is carried to it unchanged (ADR 0012's Task 12b amendment line).
+- **An offering's stated intakes and its one exact length** are read as planning facts: the
+  intake months an option's page lists (`intakes_stated`) are offered for the person to choose
+  as a start, and one exact length in weeks, months or years gives a finish from a start the
+  person supplies. A typical, open or ranged length gives none.
+- **"Add an option yourself"** (S5.7) writes the same planning contract, never into the pack: a
+  concept, one dated offering and its variant (`own:<the person's name for it>`), all
+  `proposed`, dated by when the person added it, citing their pasted text (its ID and hash, and
+  for words they chose, the span in UTF-16 units and its excerpt) or "typed by the person". It
+  is stored in the person's planning inputs (ADR 0013's Task 12b amendment); the pasted text is
+  kept as Task 7 keeps a pasted posting (route `pasted_text`, contact details removed, sealed),
+  and joins no job, example or coverage count. A route through it is always qualified.
