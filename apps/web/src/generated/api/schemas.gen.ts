@@ -7388,7 +7388,7 @@ export const OfferingFiguresSchema = {
                     type: 'null'
                 }
             ],
-            description: 'The whole of what the person will pay for it, due in its first month.'
+            description: 'The whole of what the person will pay for it: it fills only what a payment plan leaves unstated, the rest of the whole due in its first month.'
         }
     },
     additionalProperties: false,
@@ -8933,6 +8933,11 @@ export const PaymentPlanSchema = {
                 }
             ],
             title: 'Unknown'
+        },
+        supplied_cost: {
+            type: 'boolean',
+            title: 'Supplied Cost',
+            default: false
         }
     },
     additionalProperties: false,

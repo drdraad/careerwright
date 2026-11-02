@@ -28,14 +28,25 @@ from careerwright.planning.catalogue import (
     RecordState,
     SuppliedFact,
 )
-from careerwright.planning.checker import FindingCode, FindingKind, RouteQualification, check_route
+from careerwright.planning.checker import (
+    Feasibility,
+    FindingCode,
+    FindingKind,
+    RouteQualification,
+    check_route,
+)
 from careerwright.planning.checkpoint import (
     entry_requirements,
     expected_entry,
     scope,
     target_checkpoint,
 )
-from careerwright.planning.compiler import PlanningInputs, ReadinessBasis, compile_input
+from careerwright.planning.compiler import (
+    MonthlyInput,
+    PlanningInputs,
+    ReadinessBasis,
+    compile_input,
+)
 from careerwright.planning.figures import (
     MissingFact,
     OfferingFigures,
@@ -71,7 +82,7 @@ from careerwright.planning.pack import pack_catalogue
 from careerwright.planning.search import M0SearchLimits, Outcome, SearchResult, search_routes
 from careerwright.profile.document import QualificationStatus
 from tests.support.capability import self_report
-from tests.support.planning import catalogue_of, option
+from tests.support.planning import SCHEDULE_COST, catalogue_of, option, supplied_costs
 
 DATA = committed_data()  # the reviewed school-leaver pack 0.4.0, reference 0.2.0 (Task 12b)
 TARGET = "data-quality-analyst-manchester"
@@ -136,6 +147,13 @@ def search(
 ) -> SearchResult:
     """The data target's route search on P01's figures; `ready`: synthetic evidence at each
     required row's level, so readiness is reached from the start."""
+    return search_routes(compiled(inputs, ready=ready, catalogue=catalogue))
+
+
+def compiled(
+    inputs: PlanningInputsIn, *, ready: bool, catalogue: Catalogue | None = None
+) -> MonthlyInput:
+    """The data target's monthly input on P01's figures, as `search` reads it."""
     target = next(t for t in DATA.pack.targets if t.target_id == TARGET)
     matrix = build_matrix(
         target.title,
@@ -168,7 +186,7 @@ def search(
         synthetic=True,
         version=1,
     )
-    return search_routes(compile_input(prepared.inputs, prepared.catalogue, readiness=basis))
+    return compile_input(prepared.inputs, prepared.catalogue, readiness=basis)
 
 
 # --- the facts the route search lacks ----------------------------------------------------
@@ -212,13 +230,14 @@ def test_a_supplied_figure_fills_only_a_missing_fact_and_is_labelled_the_person_
 
     assert (filled.start, filled.finish) == (date(2027, 1, 4), date(2027, 3, 14))  # 10 weeks
     assert filled.weekly_hours == 9
-    assert filled.supplied == [
+    [plan] = filled.payment_plans
+    # The cost is the plan's: a route paying by it rests on it (review 12bA, Important 1).
+    assert filled.supplied_for(plan) == [
         SuppliedFact.START_DATE,
         SuppliedFact.WEEKLY_HOURS,
         SuppliedFact.COST,
     ]  # the finish is the page's length from their start: not their figure
-    [plan] = filled.payment_plans
-    assert plan.unknown is None
+    assert (plan.plan_id, plan.unknown, plan.supplied_cost) == ("as-stated", None, True)
     assert [(p.kind, p.amount, p.month_offset, p.cited) for p in plan.payments] == [
         ("fee", gbp(0), 0, CITED)
     ]
@@ -259,6 +278,114 @@ def test_a_stated_intake_is_chosen_only_from_the_months_its_page_states() -> Non
     # C06 states one year: the chosen intake gives its finish.
     filled = with_figures(c06, OfferingFigures(offering_id="offering:C06", start=stated), CITED)
     assert filled.finish == date(2027, 2, 28)
+
+
+C04 = "offering:C04"
+C04_FIGURES = OfferingFigures(
+    offering_id=C04,
+    start=SuppliedStart(on=date(2027, 1, 4), basis=StartBasis.OWN_FIGURE),
+    finish=date(2027, 12, 17),
+    weekly_hours=10,
+    cost=gbp(SCHEDULE_COST),
+)
+
+
+@pytest.mark.req("OPTN-13", "OPTN-09")
+def test_a_supplied_cost_never_recasts_a_stated_instalment_plan() -> None:
+    # Review 12bA, Important 1, on pack 0.4.0: C04 is £2,995 paid in full (the page's), or by
+    # instalments "from £69.52 a month" with no count. The person's £3,336.72 has no honest
+    # place in that monthly schedule: refused at the write, and a stored one changes no plan.
+    c04 = next(o for o in data_target().offerings if o.offering_id == C04)
+    cost_only = OfferingFigures(offering_id=C04, cost=gbp(SCHEDULE_COST))
+    assert refused(c04, cost_only) == "stated_schedule"
+    assert refused(c04, C04_FIGURES) == "stated_schedule"
+
+    filled = with_figures(c04, C04_FIGURES, CITED)
+
+    assert filled.payment_plans == c04.payment_plans  # each plan keeps its shape and its name
+    assert filled.supplied == [
+        SuppliedFact.START_DATE,
+        SuppliedFact.FINISH_DATE,
+        SuppliedFact.WEEKLY_HOURS,
+    ]
+    # In the search: the instalments stay "from £69.52 a month", unknown, never one payment in
+    # the first month that P01's £1,500 payment cap would break.
+    monthly = compiled(p01(offering_figures=[C04_FIGURES]), ready=True)
+    variants = {v.variant_id: v for v in monthly.variants}
+    instalments = variants[f"{C04}~instalments"]
+    assert instalments.payments == []
+    assert instalments.recurring is not None
+    assert instalments.recurring.amount == gbp(6952)
+    checked = check_route(monthly, [f"{C04}~instalments"])
+    codes = {f.code for f in checked.findings}
+    assert FindingCode.COST_UNKNOWN in codes
+    assert FindingCode.MONTHLY_PAYMENT_CAP not in codes
+    # Paid in full at the page's £2,995, the route rests on their dates and hours, never on a
+    # figure for its cost; the checkpoint says the same.
+    assert SuppliedFact.COST not in variants[f"{C04}~pay-in-full"].supplied
+    assert [p.amount_minor for p in variants[f"{C04}~pay-in-full"].payments] == [299_500]
+    answered = with_answers(data_target(), p01(offering_figures=[C04_FIGURES]), CITED)
+    found = target_checkpoint(
+        target_title="Data quality analyst",
+        pack_target_id=TARGET,
+        note=None,
+        answered=answered,
+        retained=answered,
+        left_out=frozenset(),
+        qualifications=[],
+        keys={},
+        limits=M0SearchLimits(),
+    )
+    options = {o.variant_id: o for o in found.options}
+    for plan in ("pay-in-full", "instalments"):
+        assert SuppliedFact.COST not in options[f"{C04}~{plan}"].supplied
+    assert MissingFact.COST in options[f"{C04}~instalments"].missing
+
+
+@pytest.mark.req("OPTN-13", "OPTN-09")
+def test_a_supplied_cost_fills_only_the_unstated_part_of_a_plan() -> None:
+    # Pack 0.4.0's C10: £295 stated, its exam fee not. The person's whole £400 keeps the page's
+    # £295 and fills the £105 left, in the first month; a whole below what the page states
+    # can't be placed, so the plan stays unknown.
+    c10 = next(
+        o
+        for o in pack_catalogue(DATA.pack, "it-support-technician-bristol").offerings
+        if o.offering_id == "offering:C10"
+    )
+    [stated] = c10.payment_plans
+    whole = OfferingFigures(offering_id="offering:C10", cost=gbp(40_000))
+    below = OfferingFigures(offering_id="offering:C10", cost=gbp(20_000))
+
+    assert refused(c10, whole) is None
+    assert refused(c10, below) == "below_stated_cost"
+    [plan] = with_figures(c10, whole, CITED).payment_plans
+    assert (plan.plan_id, plan.unknown, plan.supplied_cost) == ("pay-in-full", None, True)
+    assert [(p.kind, p.amount, p.month_offset, p.cited) for p in plan.payments] == [
+        ("fee", gbp(29_500), 0, stated.payments[0].cited),
+        ("extra", gbp(10_500), 0, CITED),
+    ]
+    assert with_figures(c10, below, CITED).payment_plans == [stated]
+
+
+@pytest.mark.req("OPTN-09", "OPTN-13")
+def test_only_a_route_using_a_supplied_cost_rests_on_it() -> None:
+    # The checker case: dated courses, so only the cost can be the person's figure.
+    monthly = supplied_costs()
+    variants = {v.variant_id: v for v in monthly.variants}
+
+    in_full = check_route(monthly, ["stated~pay-in-full"])
+    instalments = check_route(monthly, ["stated~instalments"])
+    part = check_route(monthly, ["part-stated"])
+
+    assert variants["stated~pay-in-full"].supplied == []
+    assert in_full.feasibility is Feasibility.FEASIBLE
+    assert RouteQualification.SUPPLIED_FIGURES not in in_full.qualifications
+    assert instalments.feasibility is Feasibility.UNRESOLVED  # never broken by a lump
+    assert [f.code for f in instalments.findings if f.kind is FindingKind.VIOLATION] == []
+    assert variants["part-stated"].supplied == [SuppliedFact.COST]
+    assert [p.amount_minor for p in variants["part-stated"].payments] == [29_500, 10_500]
+    assert part.feasibility is Feasibility.FEASIBLE
+    assert RouteQualification.SUPPLIED_FIGURES in part.qualifications
 
 
 def test_figures_supply_something_and_never_a_finish_before_their_start() -> None:

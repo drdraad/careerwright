@@ -149,6 +149,9 @@ class PaymentPlan(StrictModel):
     payments: list[Payment] = Field(default_factory=list)
     recurring: Recurring | None = None
     unknown: str | None = None
+    # Task 12b: its unstated part is the person's own figure (`planning.figures`), so a route
+    # on this plan, and only on this plan, rests on it.
+    supplied_cost: bool = False
 
 
 class Session(StrictModel):
@@ -226,8 +229,14 @@ class Offering(StrictModel):
     # its finish. The intake months its page states, which the person may choose as its start.
     duration: Duration | None = None
     stated_intakes: list[date] = Field(default_factory=list)
-    # The facts the person supplied for it as their own figures (`planning.inputs`).
+    # The facts of its own the person supplied as their figures (`planning.inputs`): dates and
+    # hours. A supplied cost belongs to the plan it fills (`PaymentPlan.supplied_cost`).
     supplied: list[SuppliedFact] = Field(default_factory=list)
+
+    def supplied_for(self, plan: PaymentPlan | None) -> list[SuppliedFact]:
+        """What a route on this offering paid by `plan` rests on of the person's figures."""
+        cost = [SuppliedFact.COST] if plan is not None and plan.supplied_cost else []
+        return [*self.supplied, *cost]
 
     def plan(self, plan_id: str | None) -> PaymentPlan | None:
         return next((p for p in self.payment_plans if p.plan_id == plan_id), None)

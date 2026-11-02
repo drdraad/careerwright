@@ -380,7 +380,7 @@ def compile_input(
                 entry_expected=bool(concept.entry_requirements)
                 and variant.entry_expected
                 and variant.entry_requirements_met is not False,
-                supplied=offering.supplied,
+                supplied=offering.supplied_for(plan),
                 added_by_person=concept.added_by_person,
             )
         )

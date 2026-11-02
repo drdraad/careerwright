@@ -49,7 +49,7 @@ from careerwright.planning.catalogue import (
     RecordState,
     SuppliedFact,
 )
-from careerwright.planning.figures import MissingFact, variant_missing
+from careerwright.planning.figures import MissingFact, variant_missing, variant_plan
 from careerwright.planning.search import M0SearchLimits
 from careerwright.profile.document import QualificationStatus
 
@@ -285,7 +285,7 @@ def target_checkpoint(
                     as_of=offering.as_of or concept.as_of,
                     added_by_person=concept.added_by_person,
                     missing=variant_missing(concept, offering, variant),
-                    supplied=list(offering.supplied),
+                    supplied=offering.supplied_for(variant_plan(offering, variant)),
                     stated_intakes=list(offering.stated_intakes),
                     entry_requirements=entry_requirements(concept, qualifications, keys),
                     entry_requirements_met=variant.entry_requirements_met,

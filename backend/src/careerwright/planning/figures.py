@@ -6,16 +6,21 @@ start date, a finish, a cost or weekly hours (Task 13a). The person may supply e
 offering as their own figure, or choose one of the intake months its page states as its start.
 A figure only fills a fact the offering lacks: a stated, cited fact always wins, so a figure
 never overrides a page. A supplied start with the page's one exact length gives the finish.
-Every supplied fact is named on the offering (`Offering.supplied`), so a route resting on one
-is qualified, never an unqualified "affordable and feasible" (OPTN-09).
+Every supplied date or hours is named on the offering (`Offering.supplied`), so a route resting
+on one is qualified, never an unqualified "affordable and feasible" (OPTN-09).
 
-A supplied cost is the whole of what the person will pay for the offering, due in its first
-month, the rule for a total with no stated schedule (session 2, D12 yes).
+A supplied cost is the whole of what the person will pay for the offering. It fills only what a
+payment plan leaves unstated, in the plan's own shape: the payments the page states stay, and
+the rest of the whole is one payment in the first month, the rule for a total with no stated
+schedule (session 2, D12 yes). A plan that states a schedule ("from £69.52 a month") is never
+recast as one payment, and a whole below what the page states has no honest place: such a plan
+stays unknown (review 12bA, Important 1). The plan it fills is marked (`supplied_cost`), so
+only a route paying that way rests on the figure; a sibling plan the page prices does not.
 """
 
 from datetime import date
 from enum import StrEnum
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -72,7 +77,8 @@ class OfferingFigures(StrictModel):
     weekly_hours: Hours | None = None
     cost: Money | None = Field(
         default=None,
-        description="The whole of what the person will pay for it, due in its first month.",
+        description="The whole of what the person will pay for it: it fills only what a "
+        "payment plan leaves unstated, the rest of the whole due in its first month.",
     )
 
     @model_validator(mode="after")
@@ -93,6 +99,44 @@ def cost_known(plan: PaymentPlan) -> bool:
     )
 
 
+def unplaceable(plan: PaymentPlan, whole: Money) -> str | None:
+    """Why a supplied whole cost has no honest place in a plan, or None: a plan whose cost is
+    known, a stated schedule, or a whole below the payments the page states."""
+    if cost_known(plan):
+        return "not_missing"
+    if plan.recurring is not None:
+        return "stated_schedule"
+    if whole.minor_units < sum(p.amount.minor_units for p in plan.payments):
+        return "below_stated_cost"
+    return None
+
+
+def _filled(plan: PaymentPlan, whole: Money, cited: Citation) -> PaymentPlan:
+    """The plan with the rest of the person's whole in its first month: a fee where the page
+    states none, otherwise an extra beside the page's fee."""
+    stated = sum(p.amount.minor_units for p in plan.payments)
+    kind: Literal["fee", "extra"] = (
+        "extra" if any(p.kind == "fee" for p in plan.payments) else "fee"
+    )
+    rest = Payment(
+        kind=kind,
+        amount=Money(minor_units=whole.minor_units - stated, currency=whole.currency),
+        month_offset=WHOLE_FEE_DUE,
+        cited=cited,
+    )
+    return plan.model_copy(
+        update={"payments": [*plan.payments, rest], "unknown": None, "supplied_cost": True}
+    )
+
+
+def variant_plan(offering: Offering, variant: Variant) -> PaymentPlan | None:
+    """The payment plan a variant pays by: the one it names, or the offering's only one."""
+    plan = offering.plan(variant.plan_id) if variant.plan_id is not None else None
+    if plan is None and len(offering.payment_plans) == 1:
+        plan = offering.payment_plans[0]
+    return plan
+
+
 def offering_missing(offering: Offering) -> list[MissingFact]:
     """The offering's own facts the search lacks, apart from any one payment plan's cost."""
     found = []
@@ -110,9 +154,7 @@ def variant_missing(
 ) -> list[MissingFact]:
     """Every fact the route search lacks for one option, in the order a person meets them."""
     found = offering_missing(offering)
-    plan = offering.plan(variant.plan_id) if variant.plan_id is not None else None
-    if plan is None and len(offering.payment_plans) == 1:
-        plan = offering.payment_plans[0]
+    plan = variant_plan(offering, variant)
     if plan is None or not cost_known(plan):
         found.append(MissingFact.COST)
     if concept.entry_requirements and variant.entry_requirements_met is None:
@@ -129,7 +171,8 @@ def variant_missing(
 
 def refused(offering: Offering, figures: OfferingFigures) -> str | None:
     """Why figures cannot stand for this offering, or None: a figure for a fact the offering
-    states, or a stated intake its page does not list."""
+    states, a stated intake its page does not list, or a cost no plan has an honest place for
+    (`unplaceable`; the first plan's reason)."""
     start = figures.start
     if start is not None and offering.start is not None:
         return "not_missing"
@@ -140,17 +183,21 @@ def refused(offering: Offering, figures: OfferingFigures) -> str | None:
         return "not_missing"
     if figures.weekly_hours is not None and offering.weekly_hours is not None:
         return "not_missing"
-    plans = offering.payment_plans
-    if figures.cost is not None and plans and all(cost_known(p) for p in plans):
-        return "not_missing"
+    whole = figures.cost
+    if whole is not None and offering.payment_plans:
+        reasons = [unplaceable(p, whole) for p in offering.payment_plans]
+        if None not in reasons:
+            unknown = [r for r in reasons if r != "not_missing"]
+            return unknown[0] if unknown else "not_missing"
     return None
 
 
 def with_figures(offering: Offering, figures: OfferingFigures, cited: Citation) -> Offering:
-    """The offering with the person's figures in each fact it lacks, each named in
-    `supplied`. A figure for a fact the offering states is left out: the page wins (a stored
-    figure kept from before a newer pack stated the fact). Dates that would not fit (a finish
-    before the start) stay unknown."""
+    """The offering with the person's figures in each fact it lacks: dates and hours named in
+    `supplied`, a cost in each plan it has an honest place in, marked `supplied_cost`. A figure
+    for a fact the offering states is left out: the page wins (a stored figure kept from before
+    a newer pack stated the fact). Dates that would not fit (a finish before the start) stay
+    unknown."""
     supplied = list(offering.supplied)
     unknown = dict(offering.unknown)
     start, finish = offering.start, offering.finish
@@ -175,13 +222,11 @@ def with_figures(offering: Offering, figures: OfferingFigures, cited: Citation) 
         supplied.append(SuppliedFact.WEEKLY_HOURS)
         unknown.pop("weekly_hours", None)
     plans = list(offering.payment_plans)
-    if figures.cost is not None and not (plans and all(cost_known(p) for p in plans)):
-        whole = Payment(kind="fee", amount=figures.cost, month_offset=WHOLE_FEE_DUE, cited=cited)
+    whole = figures.cost
+    if whole is not None:
         plans = [
-            p if cost_known(p) else PaymentPlan(plan_id=p.plan_id, label=p.label, payments=[whole])
-            for p in plans
-        ] or [PaymentPlan(plan_id="as-stated", payments=[whole])]
-        supplied.append(SuppliedFact.COST)
+            p if unplaceable(p, whole) is not None else _filled(p, whole, cited) for p in plans
+        ] or [_filled(PaymentPlan(plan_id="own-figure"), whole, cited)]
     return offering.model_copy(
         update={
             "start": start,
