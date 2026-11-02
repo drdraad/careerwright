@@ -45,7 +45,7 @@ function DetailsForm({
   return (
     <div className="grid gap-8">
       <p className="small">{TITLE_DETAILS.given(details.seniority, details.industry)}</p>
-      <div>
+      <div className="title-details-opener">
         <Button
           ref={opener}
           variant="quiet"
