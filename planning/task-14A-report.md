@@ -242,3 +242,47 @@ None.
 **Reasoning:** One Important truth defect: the new "longer than the model" lead can hide a real
 no-route caused by the person's own limits. Everything else named in the dispatch holds; no
 second review is needed after the fix unless the controller wants one.
+
+## Fix round 1
+
+**Important 1 (truth), fixed.** Before, "longer than the model" led whenever nothing fitted and
+any option took longer than 24 months. Now it leads only when length is the whole reason:
+- some option is longer than the model;
+- the starting position breaks no limit;
+- no option is set aside for a breach of its own;
+- no checked route is "not feasible";
+- no part of the search was cut for a breach.
+
+Otherwise the bounded model's no-route leads, with its `NO_ROUTE_IN_BOUNDED_MODEL` code and the
+checker's violations. The long options are still listed beside it, in `longer_than_model`.
+
+- Code: `backend/src/careerwright/planning/comparison.py` (`_lead`, new `_only_length`; the
+  `Lead` comment). ADR 0016 decision 25's ruling now says the same.
+- Tests, both failing first (RED: the lead was `longer_than_model` with a null code), now
+  passing, in `backend/tests/domain/test_route_comparison.py`:
+  - `test_a_limit_that_rules_out_the_shorter_course_keeps_no_route_beside_a_long_degree`: the
+    reviewer's case, a two-month £5,000 course against a £1,000 spending cap beside a 36-month
+    degree. No route leads with its code, the cap breach is named on the course, and the degree
+    is listed beside.
+  - `test_a_starting_breach_keeps_no_route_beside_a_long_degree`: repayments already above the
+    monthly payment cap. No route leads, the breach is named, and the degree is listed beside.
+  - The existing degree-only test still leads with "longer than the model".
+- Rebased onto `claude/confident-ramanujan-ux3saw` (d3b4601).
+- `env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY make check` (Node 24): passed. Backend 2231
+  passed, 9 skipped; Vitest 473 passed.
+- Focused integration run under the lock, with the build shim:
+  `pytest -m integration tests/integration/test_route_solves.py -k "routes_chapter or p01 or finds_routes"`:
+  3 passed. No integration file changed in this round.
+- `make acceptance`: not run; the controller runs acceptance. Live calls: none.
+- The Minors are left for the final review. None had to be touched for this fix.
+
+**The three proposed deferrals, in plain words.** These are proposals only. They are not
+approved; the product owner is deciding.
+1. **Finding things out, or waiting, as steps of their own.** Careerwright won't yet plan
+   things like "spend a month looking into courses" or "wait for a reply" as separate steps.
+   Months spent waiting for a course to start are already counted and shown.
+2. **Looking for a job before an offer.** For a job along the way, Careerwright won't yet plan
+   the time and cost of searching and applying before the offer. It shows the offer as
+   something still to happen, with the kind of job and the pay after you accept.
+3. **Experience you gain on the way.** Careerwright won't yet count skills you pick up at a job
+   or course beyond what that option says it teaches.
