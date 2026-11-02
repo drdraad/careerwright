@@ -7,6 +7,7 @@ from fastapi.routing import APIRoute
 
 from careerwright.api import (
     routes_capability,
+    routes_comparison,
     routes_credentials,
     routes_discovery,
     routes_events,
@@ -59,6 +60,7 @@ def _routes() -> FastAPI:
         routes_reference,
         routes_capability,
         routes_planning,
+        routes_comparison,
         routes_taxonomy,
         routes_events,
         routes_export,

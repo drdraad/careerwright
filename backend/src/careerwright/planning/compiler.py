@@ -229,6 +229,12 @@ class CompiledVariant(StrictModel):
     entry_expected: bool = False
     supplied: list[SuppliedFact] = Field(default_factory=list)  # the person's own figures
     added_by_person: bool = False  # an option the person added themselves (S5.7)
+    # Task 14: what a step card names, as the catalogue states it when the solve is asked for
+    # (a snapshot sealed before reads with none): the concept's title and provider, and the
+    # retrieval date of the offering's evidence, else its concept's (never "current", R9).
+    title: str | None = None
+    provider: str | None = None
+    as_of: date | None = None
 
     @property
     def conditional_offer(self) -> bool:
@@ -382,6 +388,9 @@ def compile_input(
                 and variant.entry_requirements_met is not False,
                 supplied=offering.supplied_for(plan),
                 added_by_person=concept.added_by_person,
+                title=concept.title,
+                provider=concept.provider,
+                as_of=offering.as_of or concept.as_of,
             )
         )
     exclusions = {

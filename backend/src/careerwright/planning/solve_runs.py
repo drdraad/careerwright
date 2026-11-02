@@ -49,6 +49,7 @@ from careerwright.identity.keyring import SealedValue
 from careerwright.identity.records import EventKind, Run, RunKind
 from careerwright.identity.runs import input_context, output_context
 from careerwright.planning import store
+from careerwright.planning.compiler import MonthlyInput
 from careerwright.planning.search import (
     RankLimitReachedError,
     SearchCancelledError,
@@ -56,7 +57,12 @@ from careerwright.planning.search import (
     rank_archive,
     search_archive,
 )
-from careerwright.planning.solve_records import AttemptOutcome, SolveSnapshot, SolveStage
+from careerwright.planning.solve_records import (
+    AttemptOutcome,
+    SolveOutput,
+    SolveSnapshot,
+    SolveStage,
+)
 from careerwright.vocabulary import WorkState
 
 SOLVE_MAX_ATTEMPTS = 3  # executions of one solve, its restarts after a crash included
@@ -187,9 +193,12 @@ def _ranking(rt: SolveRuntime, ready: _Ready) -> None:
         store.set_solve_stage(tx, ready.attempt_id, SolveStage.RANKING)
 
 
-def _store(rt: SolveRuntime, ready: _Ready, result: SearchResult) -> SolveEnd:
+def _store(
+    rt: SolveRuntime, ready: _Ready, result: SearchResult, monthly: MonthlyInput
+) -> SolveEnd:
     run, keyring = ready.run, rt.activity.keyring
-    body = result.model_dump_json().encode()
+    # The input beside the result (Task 14): a chosen route's details are rechecked on it.
+    body = SolveOutput(result=result, monthly=monthly).sealed_text()
     with run_transaction(rt.activity.engine, run.run_id) as tx:
         if run_store.authorised_workspace(tx) != run.workspace_id:  # revoked while it ran
             store.finish_solve_attempt(tx, ready.attempt_id, AttemptOutcome.FAILED)
@@ -234,7 +243,7 @@ def _solve(rt: SolveRuntime, ready: _Ready, stop: Callable[[], bool]) -> SolveEn
         # Classified inside the handler, acted on outside it: nothing rides along as context.
         label, ended = classify_failure(error).label, AttemptOutcome.FAILED
     if ended is None:
-        return _store(rt, ready, result)
+        return _store(rt, ready, result, snapshot.monthly)
     _finish(rt, ready, ended)
     if ended is AttemptOutcome.CANCELLED:
         return SolveEnd("cancelled", cancelled())

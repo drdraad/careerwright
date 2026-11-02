@@ -145,9 +145,12 @@ def install_crash_point(point: str) -> None:
         store_result = solve_runs._store
 
         def store_then_die(
-            rt: SolveRuntime, ready: solve_runs._Ready, result: route_search.SearchResult
+            rt: SolveRuntime,
+            ready: solve_runs._Ready,
+            result: route_search.SearchResult,
+            monthly: MonthlyInput,
         ) -> solve_runs.SolveEnd:
-            store_result(rt, ready, result)
+            store_result(rt, ready, result, monthly)
             _kill()
             raise AssertionError("unreachable")
 

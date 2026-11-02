@@ -20,7 +20,12 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from careerwright.planning.compiler import MonthlyInput
-from careerwright.planning.search import ALGORITHM_VERSION, PRUNING_VERSION, M0SearchLimits
+from careerwright.planning.search import (
+    ALGORITHM_VERSION,
+    PRUNING_VERSION,
+    M0SearchLimits,
+    SearchResult,
+)
 
 SOLVE_DIGITS = 16
 
@@ -59,6 +64,30 @@ class SolveSnapshot(BaseModel):
         """What is sealed into the run. Derived fields (a matrix row's `required`) are left out:
         reading derives them again, and the closed models refuse them as input."""
         return self.model_dump_json(exclude_computed_fields=True).encode()
+
+
+class SolveOutput(BaseModel):
+    """A route solve's sealed output (Task 14): its ranked result and the monthly input it was
+    computed from, so a chosen route's ledgers, steps and stress scenarios are `check_route`
+    on exactly that input. The API opens a run's output, never its sealed input."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    result: SearchResult
+    monthly: MonthlyInput
+
+    def sealed_text(self) -> bytes:
+        """Derived fields are left out, as the snapshot's are: reading derives them again."""
+        return self.model_dump_json(exclude_computed_fields=True).encode()
+
+
+def read_output(body: bytes) -> tuple[SearchResult, MonthlyInput | None]:
+    """A stored output's result, and its monthly input. An output stored before Task 14 is the
+    bare result, with no input beside it: the caller says so, never a guessed input."""
+    if "monthly" in json.loads(body):
+        output = SolveOutput.model_validate_json(body)
+        return output.result, output.monthly
+    return SearchResult.model_validate_json(body), None
 
 
 def solve_identity(monthly: MonthlyInput, limits: M0SearchLimits, rank_seconds: int) -> str:

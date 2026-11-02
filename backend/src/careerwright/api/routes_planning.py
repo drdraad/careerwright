@@ -38,6 +38,7 @@ from careerwright.planning.commands import (
     target_catalogues,
     write_inputs,
 )
+from careerwright.planning.comparison import ResultCode, result_code
 from careerwright.planning.inputs import (
     BaselineInput,
     ContinuationInput,
@@ -46,7 +47,7 @@ from careerwright.planning.inputs import (
 )
 from careerwright.planning.option_texts import PasteOptionText, option_text, paste_option_text
 from careerwright.planning.pack import TargetOptions
-from careerwright.planning.search import M0SearchLimits, Outcome, SearchCoverage, SearchResult
+from careerwright.planning.search import M0SearchLimits, SearchResult
 from careerwright.planning.solve_records import SolveStage
 from careerwright.planning.solves import SolveRequest, SolveView, request_solve, solve_view
 from careerwright.profile.document import WorkStatus
@@ -304,20 +305,6 @@ def get_option_text(
 
 
 # Route solves (Task 13b).
-
-ResultCode = Literal["SOLVE_LIMIT_REACHED", "NO_ROUTE_IN_BOUNDED_MODEL"]
-
-
-def result_code(result: SearchResult) -> ResultCode | None:
-    """Spec section 18's codes for what a result is, as facts the web words, never as an
-    error: a search a limit stopped (its stop reason, instance size and narrowings beside it;
-    truncation is the normal state, never infeasibility) or a complete one that proves no
-    route in the bounded model and catalogue."""
-    if result.coverage is SearchCoverage.BUDGET_TRUNCATED:
-        return "SOLVE_LIMIT_REACHED"
-    if result.outcome is Outcome.NO_ROUTE_IN_BOUNDED_MODEL:
-        return "NO_ROUTE_IN_BOUNDED_MODEL"
-    return None
 
 
 class SolveOut(BaseModel):

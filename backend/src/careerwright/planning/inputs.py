@@ -440,7 +440,13 @@ class SpendingCaps:
 
 
 def needs(stated: StatedInputs, caps: SpendingCaps) -> list[Need]:
-    """Every input still to state, in the order a person meets them, with its effect."""
+    """Every input still to state, in the order a person meets them, with its effect.
+
+    The solve's stage checks (API-05, Task 14) block a solve too: a budget-qualified solve
+    needs both confirmed limits, and an economic one its baseline (its horizon is part of
+    every request). Without them every route would only be unresolved, so the person is told
+    what to state before anything runs."""
+    economic = stated.objective_basis == "economic"
     blocking = [
         (NeededInput.OBJECTIVE_BASIS, stated.objective_basis is None),
         (NeededInput.CONTINUATION, stated.continuation is None),
@@ -449,12 +455,13 @@ def needs(stated: StatedInputs, caps: SpendingCaps) -> list[Need]:
         (NeededInput.COMMITMENTS, stated.commitments is None),
         (NeededInput.EXISTING_DEBTS, stated.existing_debts is None),
         (NeededInput.SCENARIO_DELAY_MONTHS, stated.scenario_delay_months is None),
-    ]
-    # The economic comparison and a deficit cap read the baseline; direct spending does not.
-    baseline_read = stated.objective_basis == "economic" or stated.monthly_deficit_cap is not None
-    unresolved = [
         (NeededInput.DIRECT_SPEND_CAP, caps.direct_spend_cap is None),
         (NeededInput.MONTHLY_PAYMENT_CAP, caps.monthly_payment_cap is None),
+        (NeededInput.BASELINE, economic and stated.baseline is None),
+    ]
+    # A deficit cap under direct spending reads the baseline too, but is no economic solve.
+    baseline_read = not economic and stated.monthly_deficit_cap is not None
+    unresolved = [
         (NeededInput.RESERVE, stated.reserve is None),
         (NeededInput.WEEKLY_AVAILABILITY, stated.weekly_availability is None),
         (NeededInput.BASELINE, baseline_read and stated.baseline is None),
