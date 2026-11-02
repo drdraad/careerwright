@@ -13,10 +13,8 @@ architectural), and continue. Stop and report BLOCKED only for a genuine blocker
 ## Your job
 1. Implement the slice the brief names, completely, to a production standard. Use TDD
    for domain logic (failing test first). Keep files focused; one responsibility each.
-2. Verify by execution. Run the focused tests while iterating, and
-   `env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY make check` (Node 24 on PATH:
-   `export PATH=/opt/node24/bin:$PATH;`) after each change and once before your final
-   commit. The controller runs `make acceptance` once per batch; report it as "not run: the
+2. Verify by execution. Run the focused tests while iterating, and `make check` after each
+   change and once before your final commit. The controller runs `make acceptance` once per batch; report it as "not run: the
    controller runs acceptance". Test output should be clean (no stray warnings).
 3. Commit coherent increments on the branch your dispatch names (messages end with
    `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`). Never push.
@@ -27,12 +25,13 @@ architectural), and continue. Stop and report BLOCKED only for a genuine blocker
 ## This machine and parallel work (from 2026-10-31, the product owner: "Where subagent work can be done
 ## cleanly in parallel, do so but coordinate well to avoid them causing conflicts")
 Up to four implementers may run at once (R12–R17 in the sprint tasks file, today's rules):
-one in the main tree, up to three in worktrees, on disjoint files. This machine is a Linux
-cloud container; its note is `planning/env-cloud.md`. Your dispatch says which tree is yours:
-- **The main tree** (`/home/user/careerwright`, integration branch
+one in the main tree, up to three in worktrees, on disjoint files. This machine is the
+product owner's Mac (Environment facts in the sprint tasks file). Your dispatch says which
+tree is yours:
+- **The main tree** (`/Users/darianraad/Code/careerwright`, integration branch
   `claude/confident-ramanujan-ux3saw`): commit with a pathspec (`git commit -- <paths>`),
   never `git add -A` or `git commit -a`; another agent's files may be changing beside yours.
-- **A worktree** (`/home/user/careerwright-wt/<id>`, branch `wt-<id>`; both are in your
+- **A worktree** (`/Users/darianraad/Code/careerwright-wt/<id>`, branch `wt-<id>`; both are in your
   dispatch): work and commit only there. Before your final report, rebase your branch onto
   the current `claude/confident-ramanujan-ux3saw`
   (`git rebase claude/confident-ramanujan-ux3saw`; the worktree shares the repository). On a
@@ -43,27 +42,22 @@ cloud container; its note is `planning/env-cloud.md`. Your dispatch says which t
   yourself.
 - **Shared files:** `docs/requirements-register.md` and `docs/plan/*` change only in your
   last commit, after the rebase, and only the rows or lines your work closes.
-- **Checks (R16 and R17, the product owner's speed rules):** run
-  `env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY make check` after each change (the
-  container exports both Adzuna variables and one test reads the process environment; never
-  print either value). The controller runs `make acceptance` once per batch of integrated
+- **Checks (R16 and R17, the product owner's speed rules):** run `make check` after each
+  change. The controller runs `make acceptance` once per batch of integrated
   pieces or halves. A flaky failure is re-run once; a second failure is reported as a
   finding.
-- **Docker and the network:** never start Docker, pull or build images; the controller does
-  (`planning/cloud-build-images.sh`). Make no web requests and no live calls: the controller
+- **Docker and the network:** never start Docker, pull or build images; the controller does.
+  Make no web requests and no live calls: the controller
   makes every one.
 - **One full acceptance run at a time** (its Compose projects and ports are fixed). If your
   dispatch asks you for a focused stack or integration test run, or for `make acceptance`,
-  take the lock first: `mkdir /home/user/careerwright/.superpowers/acceptance.lock`
+  take the lock first: `mkdir /Users/darianraad/Code/careerwright/.superpowers/acceptance.lock`
   (it fails if another agent holds it). Remove it with `rmdir` the moment your run ends,
   pass or fail. Take and release it in one guarded command, so you can only ever remove a
   lock you took: `mkdir <lock> && { make acceptance; rc=$?; rmdir <lock>; exit $rc; }`.
   Never chain a run after a failed `mkdir` with `;`. Never remove a lock you didn't take,
   and never recreate one. The same applies to any focused stack or integration test run. If the lock is held, do other work and try again later; if it is still
   held at the end, report "make acceptance not run: lock held" and the controller runs it.
-  The acceptance journeys run on the machine's own Chromium:
-  `CAREERWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium`; never reinstall Playwright's
-  browsers here.
 - Never stop, reset or remove another project's containers or volumes, and never run
   `make stop` (it stops the product owner's stack).
 
