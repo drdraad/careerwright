@@ -652,10 +652,12 @@ def test_the_routes_chapter_reads_a_solve_s_comparison_pages_and_a_chosen_route(
     worker.stop()
 
     compared = person.api.get(f"{base}/comparison", person.token)
-    pages = person.api.get(f"{base}/schedules?limit=1", person.token).json()
+    # Query parameters as `params`: httpx replaces a query string in the path with them.
+    pages = person.api.get(f"{base}/schedules", person.token, limit=1).json()
     rest = person.api.get(
-        f"{base}/schedules?limit=200&cursor={pages['next_cursor']}", person.token
+        f"{base}/schedules", person.token, limit=200, cursor=pages["next_cursor"]
     ).json()
+    assert pages["next_cursor"] is not None  # more than one schedule: the empty route and C01
     index = next(i["index"] for i in [*pages["items"], *rest["items"]] if i["route"])
     detail = person.api.get(f"{base}/schedules/{index}", person.token)
     person.state(stated(opening_cash=gbp(900000)))  # a later edit
