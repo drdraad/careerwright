@@ -71,7 +71,7 @@ Sam's job title isn't on any of Careerwright's lists, so it's the one to researc
 What to do:
 
 1. At the first question, type "Client onboarding assistant" and choose **Use my own words**.
-2. Tell it what Sam enjoys, then ask for suggestions.
+2. Choose **Help me explore**. Then tell it what Sam enjoys, and ask for suggestions.
 3. Under the suggestions, find **Titles no list holds**. Click **Research this role** beside
    "Client onboarding assistant". It shows what it may cost first.
 4. Wait for the result. Open **The pages Careerwright read** to see each quote and its date.
