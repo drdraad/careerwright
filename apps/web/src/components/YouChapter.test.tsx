@@ -912,6 +912,7 @@ describe("[STATE-06] the card says what a list change does, and what each task a
         told("enjoyed_tasks", ["helping at Brownies", "fixing machines"], "c5"),
         told("confident_tasks", ["leading a group"], "c6"),
         told("evidenced_tasks", ["helping at Brownies"], "c7"),
+        told("disliked_tasks", ["filling in forms"], "c8"), // Task W2F slice A
       ],
     };
     const savedTasks: ProfileOut = {
@@ -927,7 +928,7 @@ describe("[STATE-06] the card says what a list change does, and what each task a
     };
     fakeApi(routes({ preferences: prefs("unsure"), turns: [turn("complete", tasks)] }));
     renderYou(savedTasks);
-    const tray = await screen.findByRole("region", { name: /To review: 3 changes/ });
+    const tray = await screen.findByRole("region", { name: /To review: 4 changes/ });
     const card = (value: string) => {
       const found = within(tray).getByText(value).closest(".proposal");
       if (!(found instanceof HTMLElement)) throw new Error(`no proposal for ${value}`);
@@ -950,6 +951,12 @@ describe("[STATE-06] the card says what a list change does, and what each task a
     expect(
       done.getByText(
         "Things you have done and could point to, such as work, a course or a reference.",
+      ),
+    ).toBeVisible();
+    const disliked = card("Tasks you don't enjoy: filling in forms");
+    expect(
+      disliked.getByText(
+        "Optional: work you find draining, even if you're good at it. It never rules work out.",
       ),
     ).toBeVisible();
   });
