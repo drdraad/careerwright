@@ -36,21 +36,20 @@ list. Append new events at the end, one line each ("Ruling: what — why — cos
 | Acceptance fix | complete | fd4f939, 61597ee |
 | 10A (Skills backend) | complete, integrated | dbc1bd1..d011472, b24668e, 81010d3; draft-checklist readiness 93c1e0e..51c03eb |
 | e2e fix | complete | 53ca60d, c2f1cc9 |
-| 7f (school-leaver pack) | first half complete (integrated 5420d35); second half running | 276c79d..bb438fc; session record 5ff2a18, answers 292e9e8 |
+| 7f (school-leaver pack) | complete, integrated (pack 0.4.0) | 276c79d..bb438fc; session record 5ff2a18, answers 292e9e8; second half e7b0916, ac16d6e (932cfc1) |
 | School-leaver pack session | held: an AI check counted as the product owner's review (their ruling); the six rows sent back answered | `docs/reviews/school-leaver-pack-session.md` |
-| Lean clean-up (documents) | running | f4b129a.. |
-| 10B (Skills screens) | waits for session W2 (backend half done as 10A) | — |
-| 12b, 14, 15 | wait (order: `planning/controller-state.md`) | — |
+| Lean clean-up (documents) | complete | f4b129a..103463a |
+| 12bA (Options backend) | complete, integrated | d9dbf8e..79bce14, fix 5dd0534 |
+| 14A (Routes backend) | complete, integrated | 85ce831..bd4aaf2, fix aa807b9 |
+| 10B, 12bB, 14B (screens halves) | wait for session W2 | — |
+| 15 | waits (order: `planning/controller-state.md`) | — |
 | 7e, 8, M, 16, 17 | wait (order: `planning/controller-state.md`) | — |
 | Session W2 | not yet held (package: Task 6e) | — |
 | End-to-end session | after Task 15 | — |
 
 ## Running now
-- Acceptance run 10 (the controller, on 51c03eb and after).
-- The lean clean-up (documents only, main tree).
-- Task 7f's second half (worktree wt-7f from 292e9e8, `planning/task-7f-second-half-dispatch.md`):
-  publishes pack 0.3.0 from the session record.
-- Next: session W2.
+- Back on the Mac (2026-11-02). Next: session W2 with the product owner, then 10B, 12bB and
+  14B in parallel.
 
 ## Open questions for the product owner
 - None left on the school-leaver pack: the six rows sent back (Q75, Q95, Q104, Q110, Q115 and
@@ -138,3 +137,6 @@ Task 14A: implementer DONE_WITH_CONCERNS — wt-14a 85ce831, 150c2cc, bd4aaf2 (r
 Task 14A review: needs fixes — 0 Critical / 1 Important / 8 Minor. I1 truth: 'longer than the model' leads whenever a complete search finds no route and any option exceeds 24 months, nulling the no-route code (reproduced: a two-month course over the spending cap beside a 36-month degree hides the no-route and the breach; same with a starting breach); comparison.py:651, :532. Fix round sent to the original implementer (resumed a8603641204743dfc, ~362k).
 Task 14A fix round 1: implementer DONE — aa807b9 (rebased onto d3b4601): 'longer than the model' leads only when length is the whole reason (no starting breach, no option set aside for a breach, nothing checked not feasible, no subtree pruned for a breach); otherwise no-route leads with its violations and the long options beside it; ADR 0016 decision 25; the reviewer's case and the starting-breach case RED then GREEN. Controller check: diff read (_only_length), make check on aa807b9 exit 0 (2,231 / Vitest 473). INTEGRATED: fast-forward to aa807b9. Acceptance run 12 next. Three proposed deferrals (PLN-01, OPTN-04, OUT1-08) await the PO.
 Acceptance run 12 (aa807b9: Task 14A in, the world fixes in): exit 0 — pytest 472 passed; Storybook build passed; Playwright 62 passed, 0 failed. The first fully clean acceptance on this Linux host, no re-runs. Task 14A: complete.
+Back on the Mac (2026-11-02): contracts, Environment facts and controller state name the Mac's paths again (b6515c7); memory already matched planning/claude-memory; make setup exit 0 (datasets present and hash-verified, images built).
+Acceptance run 13 (the Mac, Docker Desktop, on b6515c7): exit 0 — pytest 472 passed; Storybook build passed; Playwright 62 passed, 0 failed. The containers' root-start-then-drop-privileges change (ADR 0004 amendment) works on Docker Desktop. Owed check done: Sam's title is on no list against the full ESCO release and the UK index (test_evaluation.py, in this run; its fixture fails without the datasets, so it ran).
+PO answers (2026-11-02): yes to all three proposed L0 deferrals — PLN-01 (finding things out and waiting as actions), OPTN-04 (job search and review before an offer), OUT1-08 (experience beyond an offering's stated outcomes). Recorded: plan section 1's L0 deferrals, ADR 0016, register rows PLN-01, PLN-04, OPTN-04, OUT1-08, VIS2-08.
