@@ -215,6 +215,7 @@ test.describe("moving", () => {
     await expect(pause).toHaveAttribute("aria-pressed", "true");
     await expect(world(page)).toHaveAttribute("data-motion", "still");
     await pause.click();
+    await expect(pause).toHaveAttribute("aria-pressed", "false");
     await expect(world(page)).toHaveAttribute("data-motion", "running");
 
     const sound = page.getByRole("button", { name: /^Sound/ });
@@ -606,10 +607,25 @@ async function modePage(browser: Browser, viewport: (typeof VIEWPORTS)[number], 
   return page;
 }
 
-/** Opens a chapter in a mode, lets travel finish (600 ms) and the names settle. */
-async function open(page: Page, url: string, chapter: string, mode: Mode) {
+/**
+ * Opens a chapter in a mode, waits until it has loaded (its heading shows while it still loads,
+ * and the panel's size, which decides where names fit, changes when it has), then lets travel
+ * finish (600 ms) and the names settle. With `targets`, it also waits until the world names
+ * each of them (shown in sight or not): the world has the person's targets.
+ */
+async function open(
+  page: Page,
+  url: string,
+  chapter: string,
+  mode: Mode,
+  targets: readonly string[] = [],
+) {
   await page.goto(url);
   await expect(page.getByRole("heading", { level: 1, name: chapter })).toBeVisible();
+  await expect(page.locator("main .skeleton").filter({ visible: true })).toHaveCount(0);
+  for (const name of targets) {
+    await expect(words(page).getByText(name, { exact: true })).toBeAttached();
+  }
   await expect(world(page)).toHaveAttribute(
     "data-world-mode",
     mode === "moving" || mode === "paused" ? "moving" : "still",
@@ -634,7 +650,7 @@ for (const viewport of VIEWPORTS) {
       const seen = new Map<Mode, Awaited<ReturnType<typeof inSight>>>();
       for (const mode of MODES) {
         const page = pages.get(mode) as Page;
-        await open(page, url, chapter, mode);
+        await open(page, url, chapter, mode, LONG_TARGETS);
         seen.set(mode, await inSight(page));
       }
       const moving = seen.get("moving");
