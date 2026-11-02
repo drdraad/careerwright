@@ -149,3 +149,4 @@ Session W2 live notes (PO, Sam): ESCO job suggestions too hard to read (title an
 Session W2 live notes (PO, after stopping): the role lights on the right-hand side (the world) can't be interacted with; would like click or right-click to see a summary of the role or remove it.
 Session W2 investigated (two read-only agents; controller spot-checked Conversation.tsx:408, the .fact grid, and viewed the overlap screenshot): planning/session-w2-findings.md (10 findings with causes, fixes and sizes).
 PO answers (2026-11-02): yes, fix the You chapter first (Task W2F, card added; 10B, 12bB and 14B wait for it and a short re-test); yes, a "Tasks you don't enjoy" answer (schema change); clickable world role names: yes, after the three screens.
+Dispatched (2026-11-02): Task W2F slices A (worktree w2fa, Muse's turns), B (worktree w2fb, the conversation), C (main tree, What we know/targets/suggestions); task-W2F-{A,B,C}-dispatch.md.
