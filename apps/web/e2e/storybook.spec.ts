@@ -109,3 +109,39 @@ test("[UI-06][UI-09] the answer form's Save stays in reach while the form is ope
     await page.close();
   }
 });
+
+test("[UI-06] tabbing through the open answer form, the Save bar never covers the focused control (WCAG 2.2 2.4.11; Task W2F review, Important 1)", async ({
+  browser,
+}) => {
+  for (const viewport of WIDTHS) {
+    const page = await browser.newPage({ viewport });
+    await page.goto(`${origin}/iframe.html?id=what-we-know--answer-form-open&viewMode=story`);
+    await expect(page.getByRole("button", { name: "Save changes" })).toBeVisible();
+    // Laid out in its own fonts first, so nothing moves after a stop is measured.
+    await page.evaluate(() => document.fonts.ready);
+    await page.locator("#edit-answers form :is(button, select, input)").first().focus();
+    // Forward through the form, stop by stop, until focus reaches the bar itself.
+    const covered: string[] = [];
+    let stops = 0;
+    for (; stops < 200; stops += 1) {
+      const focused = await page.evaluate(() => {
+        const element = document.activeElement;
+        const bar = document.querySelector(".form-save");
+        if (element === null || bar === null || bar.contains(element)) return null;
+        if (element.closest("form") === null) return null;
+        const box = element.getBoundingClientRect();
+        const under = bar.getBoundingClientRect();
+        return {
+          name: element.getAttribute("aria-label") ?? element.textContent ?? element.tagName,
+          covered: box.bottom > under.top && box.top < under.bottom,
+        };
+      });
+      if (focused === null) break;
+      if (focused.covered) covered.push(focused.name.trim());
+      await page.keyboard.press("Tab");
+    }
+    expect(stops, `${viewport.width} px: stops tabbed`).toBeGreaterThan(30);
+    expect(covered, `${viewport.width} px: focused controls under the Save bar`).toEqual([]);
+    await page.close();
+  }
+});

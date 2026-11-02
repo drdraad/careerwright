@@ -1092,9 +1092,16 @@
     scroll-padding-bottom: calc(var(--sheet-peek) + var(--space-16));
   }
 
-  /* The answer form's Save stays in reach above the open sheet too. */
+  /* The answer form's Save stays in reach above the open sheet too, and what is focused stops
+     above both. */
   .app[data-drawer="open"] .form-save {
     bottom: var(--sheet-peek);
+  }
+
+  html:has(.app[data-drawer="open"] .form-save) {
+    scroll-padding-bottom: calc(
+      var(--sheet-peek) + var(--form-save-height, 0px) + var(--space-16)
+    );
   }
 
   /* The bottom sheet opens at a peek so the main task stays in view; "More" (or dragging the
@@ -1626,6 +1633,12 @@
     border: 1px solid var(--line-reading-hairline);
     border-radius: var(--radius-control);
     background: var(--surface-card);
+  }
+
+  /* So whatever is focused or scrolled into view stops above the bar, never under it (WCAG 2.2
+     2.4.11; the review of Task W2F, Important 1). The form measures the bar's height. */
+  html:has(.form-save) {
+    scroll-padding-bottom: calc(var(--form-save-height, 0px) + var(--space-16));
   }
 
   /* A target with its Remove, as a row of What we know's list (Task W2F). */

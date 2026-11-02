@@ -84,6 +84,24 @@ export function ProfileEditor({
   const idPrefix = useId();
   const notice = useRef<HTMLDivElement>(null);
   const saveButton = useRef<HTMLButtonElement>(null);
+  const saveBar = useRef<HTMLDivElement>(null);
+
+  // The Save bar stays at the foot of the window, so whatever is focused or scrolled into view
+  // must stop above it, never under it (WCAG 2.2 2.4.11): the window's scroll padding keeps
+  // the bar's height clear (`--form-save-height`, globals.css), as it changes when it wraps.
+  useEffect(() => {
+    const bar = saveBar.current;
+    if (bar === null) return;
+    const root = document.documentElement;
+    const measure = new ResizeObserver(() =>
+      root.style.setProperty("--form-save-height", `${bar.offsetHeight}px`),
+    );
+    measure.observe(bar);
+    return () => {
+      measure.disconnect();
+      root.style.removeProperty("--form-save-height");
+    };
+  }, []);
 
   // A refused save moves focus to its notice, which is announced.
   useEffect(() => {
@@ -334,7 +352,7 @@ export function ProfileEditor({
       )}
       {/* Kept in view at the foot of the window while the form is open (session W2, finding 9:
           Save was some 3,400 px down). */}
-      <div className="form-save flex flex-wrap items-center gap-12">
+      <div ref={saveBar} className="form-save flex flex-wrap items-center gap-12">
         <Button
           ref={saveButton}
           type="submit"
