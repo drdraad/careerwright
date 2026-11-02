@@ -124,3 +124,125 @@ Other files touched: `evidence/acquisition.py` (`_reference_url` made public as
 ## Paths a reviewer can skip
 
 `apps/web/src/generated/**` (regenerated client).
+
+## Review
+
+Reviewer: the one independent reviewer for 12bA (R16, R17). Read: env-cloud, the reviewer
+contract, the brief's Task 12b card, the carried items, the dispatch, this report (as
+unverified claims) and the package `review-b22194a..79bce14.diff` in four passes (API and
+capability; planning sources; domain tests; integration tests, ADRs and register). Worktree
+head checked: `79bce14`. Read-only apart from this section. No suites re-run; four focused
+read-only Python checks on the committed packs (below). No web, no live calls, no Docker.
+
+### Spec Compliance
+- ❌ Issues found: one (I1, `planning/figures.py:178`). Everything else the dispatch asks for
+  is present.
+- ⚠️ Cannot verify from diff: `make acceptance` and the web and e2e journeys on pack 0.4.0
+  (the controller runs them); the payment cap's question words, the "if you get your grades",
+  "loan to repay" and "not working: 0 hours, £0" sentences, the plain line for a target with no
+  reviewed options, and "pin" beside "exclude" (all 12bB); session 2's outcome record, the
+  funding corpus and `docs/reviews/sprint-5.md` (12bB).
+
+Checked, risk by risk:
+1. **Reference 0.2.0 carried to 0.4.0.** The check is real: `load_reference` re-runs every
+   rubric, gate and target check against 0.4.0 and refuses unless `carried_changes` finds
+   targets, skill rows, skill requirements and postings equal; only 0.2.0 to 0.4.0 is allowed
+   (0.3.0 refused, tested). I compared the parsed packs myself: those four parts are equal, and
+   so are the 18 outcomes; none of 0.2.0's 464 claims or 33 sources changed (0.4.0 only adds
+   claims and sources, one option, one offering (C11) and six funding instruments). So it is
+   honest that nothing new needs a reference. The guard is not complete for later versions
+   (M1).
+2. **Supplied figures.** They are labelled per offering (`supplied`), carried to the compiled
+   variant and turned into the `supplied_figures` qualification. The verdict reads
+   `affordable_and_feasible_with_qualifications`, never unqualified (domain test). A figure for
+   a fact the page states is refused (`not_missing`) and never applied. Without the facts,
+   each set-aside option names `dates_unknown`, `cost_unknown` and `workload_unknown`, never
+   "no route" (domain and API). `NO_ROUTE_IN_BOUNDED_MODEL`'s coverage rule is untouched. But
+   a supplied cost changes an instalment plan's shape (I1).
+3. **"Add an option yourself".** The option is `proposed`, dated (re-dated when changed) and
+   cites its text ID, hash and UTF-16 span, or "typed by the person". It sits beside the pack,
+   and its routes carry `own_options` and `proposed_records`. Words come from typing or spans;
+   figures are always typed. No model and no run kind. The pasted text is redacted, sealed and
+   read back only in its own workspace (the function joins on the owner, and the store query
+   filters on `workspace_id` and `pasted_text`), and it is left out of the source-outcome
+   counts (`route <> 'pasted_text'`).
+4. **Carried items.** Stacking (`stacking_unconfirmed`), repayments
+   (`repayments_above_payment_cap`), the explicit "no" (`entry_requirements_not_met`) and the
+   ledgers' null month rows were all done by 12a and are tested there. The checkpoint adds
+   `payment_cap_basis` and each option's outcomes with the decision (tested). Done.
+5. **School leavers.** `staying_in_education` is in; `not_working` is derived only from a
+   stated 0 hours and £0. An expected qualification is never met, even after a "yes", and the
+   person's own "no" wins (tested). Age rules are shown with `applied: false`; no code reads an
+   age. The fee loans are 12c's command, unchanged.
+6. **Truncation.** `scope.code = retain_variants` with the counts. Exclusions are stored, and
+   `check_scope` now gives `size` beside `limit`. Lists over their caps are refused with a 422,
+   never cut.
+7. **Writes.** Both writes go through `run_idempotent` with an `Idempotency-Key`; the inputs
+   write has its expected version. The pasted-text receipt holds the ID and hash only. Errors
+   carry field and reason codes. No migration and no new table.
+8. **R11.** The API serves codes and numbers. There are two new composed reason strings (M3).
+9. **P01's synthetic evidence.** It is labelled ("Synthetic evidence ...", synthetic
+   workspace). The test proves what the card asks: with the figures, a computed C01 route
+   qualified `supplied_figures`; without them, the missing facts named.
+10. **Tests written after the code.** They mostly assert real behaviour and would catch
+    removing the qualification, letting a figure override the page, or meeting an expected
+    entry. Gaps are in M4.
+
+### Strengths
+- The figure model is conservative: a figure only fills a gap, the page wins, and a stored
+  figure is ignored once a newer pack states the fact.
+- The reference carry is checked in code at load, not just asserted in an ADR.
+- Spans reuse 10A's UTF-16 rule, including the emoji boundary case, in both domain and API
+  tests.
+
+### Issues
+#### Critical
+None.
+
+#### Important
+- **I1 (truth). `backend/src/careerwright/planning/figures.py:178-184` (with `compiler.py:383`,
+  `figures.py:144`).** A supplied cost turns a stated instalment plan into one payment in month
+  0, and keeps the plan's "instalments" ID and label. I checked this on pack 0.4.0: C04's
+  `instalments` plan ("from £69.52/month", count unknown) plus a supplied £3,336.72 becomes one
+  £3,336.72 payment at offset 0. `refused` accepts this because not every plan's cost is known.
+  D12's rule is for "a total with no stated schedule"; this plan states a monthly schedule.
+  The person would see the instalments route broken by their monthly payment cap ("not
+  feasible in this monthly model") when real instalments might fit. That is exactly the
+  question the carried item names for C04 ("whether the fee falls as a single payment").
+  Second effect: `supplied` is set on the offering, so the sibling `pay-in-full` variant, whose
+  £2,995 the page states, is also qualified `supplied_figures` though it rests on no figure.
+  Fix: key a supplied cost to the plan (the variant) and refuse it where the plan states a
+  schedule, or keep the stated monthly amount and supply only the count or total. Then put
+  `supplied` on the variant, not the offering. Add a test on C04.
+
+#### Minor
+- **M1 (list). `capability/reference.py:303`.** `carried_changes` compares four parts, not
+  the `outcomes` (rubric levels) nor the claims and sources those parts cite. Everything is
+  identical today (checked), so the carry is honest now; a future `CARRIED_TO` entry would
+  not be fully guarded. Add `outcomes`, and the cited claims and sources.
+- **M2 (truth, conservative).** On an offering whose page fee is an eligible learner's (C01),
+  a supplied cost is still treated as that fee: `eligibility_confirmation` stays missing and
+  the route stays unresolved (`checker.py:727`). Someone who is not eligible and gives their own
+  price can never get a computed route. Never falsely feasible. Question for the product
+  owner's session: does a supplied whole cost replace the eligible-learner condition?
+- **M3 (list). `figures.py:171` and `own_options.py:57`.** "the dates given do not fit" and
+  "not given yet" are composed reason strings, not codes. This follows pack.py's existing
+  reasons, but R11 prefers codes.
+- **M4 (list).** No API-level test that a solve applies expected entry: the wiring at
+  `solves.py:136` is right by reading, but nothing fails if it is dropped. The first
+  checkpoint integration test gives an expected GCSE and asserts nothing about it.
+  `excluded_variants` reaching a real solve is tested only at the domain level.
+- **M5 (list). `planning/option_texts.py:52`.** No cap on how many option texts a workspace
+  may paste (exemplars have three). This affects storage only.
+- **M6 (list). `own_options.py:172-180`.** If an option's text were ever missing, every
+  options, checkpoint and solve read for the workspace would return INTERNAL_ERROR. Today no
+  path removes these texts, so this holds; worth a test or a note if one is added.
+
+### Assessment
+**Task quality:** Needs fixes
+**Reasoning:** The facts, commands, own options, the reference carry and P01's acceptance are
+sound and honestly qualified. One truth defect needs fixing before the Options chapter shows
+C04: a supplied cost recasts a stated instalment plan as a lump in month 0 and
+over-qualifies the page-priced variant.
+
+Counts: Critical 0, Important 1, Minor 6.
