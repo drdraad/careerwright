@@ -32,7 +32,7 @@ from careerwright.profile.document import (
     empty_profile,
     input_type,
 )
-from careerwright.profile.exploration import changed_only_by_choices, release_note
+from careerwright.profile.exploration import release_note, stays_current
 from careerwright.profile.fixture_discovery import fixture_queries, prompt_context
 from careerwright.profile.interview import ProfileField, ProposalOrigin
 from careerwright.profile.slate_facts import ReleaseChanged
@@ -91,15 +91,51 @@ def test_a_slate_stays_current_while_only_targets_chosen_from_it_change() -> Non
     second = answered(first, chose_again, target_titles=["logistics manager", "statistician"])
     choices = frozenset({chose, chose_again})
 
-    assert changed_only_by_choices([pinned], choices)  # nothing changed since
-    assert changed_only_by_choices([pinned, first, second], choices)
+    assert stays_current([pinned], choices)  # nothing changed since
+    assert stays_current([pinned, first, second], choices)
     # Any other change, or a target the person typed in, means the answers changed.
-    assert not changed_only_by_choices(
-        [pinned, first, answered(first, typed, cities=["York"])], choices
-    )
-    assert not changed_only_by_choices(
+    assert not stays_current([pinned, first, answered(first, typed, cities=["York"])], choices)
+    assert not stays_current(
         [pinned, answered(pinned, typed, target_titles=["statistician"])], choices
     )
+
+
+def unanswered(doc: Any, source: uuid.UUID, name: str, state: str) -> Any:
+    """The next document: this field answered `state` (Unknown, Skipped…), citing `source`."""
+    update = (input_type(name).model_validate({"state": state}), source)
+    return apply_updates(doc, {name: update})[0]
+
+
+@pytest.mark.req("STATE-10")
+def test_removing_a_target_or_putting_one_back_leaves_a_slate_current() -> None:
+    # Session W2 (finding 2): removing a target asks the slate nothing new, so it never becomes
+    # "based on your earlier answers" with Suggest again (paid) as the bright action. Removing
+    # the last leaves the target roles Unknown (Task W2F's ruling); Undo puts back what was.
+    pinned = document(current_role="warehouse supervisor", target_titles=["zoo keeper", "vet"])
+    chose, removed_by, undone_by, typed = (uuid.uuid4() for _ in range(4))
+    choices = frozenset({chose})
+    one_left = answered(pinned, removed_by, target_titles=["vet"])
+    none_left = unanswered(one_left, removed_by, "target_titles", "unknown")
+    put_back = answered(none_left, undone_by, target_titles=["zoo keeper", "vet"])
+
+    assert stays_current([pinned, one_left], choices)
+    assert stays_current([pinned, one_left, none_left], choices)
+    assert stays_current([pinned, one_left, none_left, put_back], choices)
+    # A suggestion made a target, removed, then typed back is still one this slate suggested;
+    # undoing the choice leaves the targets as the slate found them.
+    chosen = answered(pinned, chose, target_titles=["zoo keeper", "vet", "statistician"])
+    dropped = answered(chosen, removed_by, target_titles=["zoo keeper", "vet"])
+    retyped = answered(dropped, typed, target_titles=["zoo keeper", "vet", "statistician"])
+    assert stays_current([pinned, chosen, dropped, retyped], choices)
+    assert stays_current(
+        [pinned, chosen, answered(chosen, undone_by, target_titles=["zoo keeper", "vet"])], choices
+    )
+    # A target the slate wasn't made with, typed in after a removal, is still a change; so is
+    # any other answer changed beside a removal.
+    assert not stays_current(
+        [pinned, one_left, answered(one_left, typed, target_titles=["vet", "astronaut"])], choices
+    )
+    assert not stays_current([pinned, answered(one_left, removed_by, cities=["York"])], choices)
 
 
 @pytest.mark.req("REC1-01", "DIV1-10")

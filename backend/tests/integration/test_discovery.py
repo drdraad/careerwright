@@ -442,6 +442,50 @@ def test_a_target_chosen_from_the_slate_leaves_it_current_and_any_other_change_d
     assert not current()  # another answer changed: based on earlier answers
 
 
+@pytest.mark.req("STATE-10")
+def test_removing_a_target_through_the_profile_save_or_undoing_it_leaves_the_slate_current(
+    scenario: Scenario,
+) -> None:
+    # Session W2 (finding 2): Remove in What we know and on a saved suggestion is the profile's
+    # own save, and its Undo the profile's revert; neither makes Suggest again (paid) the
+    # bright action. Removing the last target leaves the target roles Unknown (Task W2F).
+    discovery_id = discover(scenario)["discovery_id"]
+    first, second = slate(scenario, discovery_id)["suggestions"][:2]
+    profile_path = f"{base(scenario)}/profile"
+
+    def current() -> bool:
+        found = scenario.api.get(f"{base(scenario)}/discoveries/{discovery_id}", scenario.token)
+        assert found.status_code == 200, found.text
+        return bool(found.json()["current"])
+
+    def targets(version: int, answer: dict[str, Any]) -> None:
+        body = {"expected_version": version, "profile": {**ANSWERS, "target_titles": answer}}
+        put = scenario.api.write("PUT", profile_path, scenario.token, body)
+        assert put.status_code == 201, put.text
+
+    for version, chosen in ((2, first), (3, second)):
+        body = {
+            "expected_version": version,
+            "concept_id": chosen["concept_id"],
+            "discovery_id": discovery_id,
+        }
+        made = scenario.api.write("POST", f"{base(scenario)}/targets", scenario.token, body)
+        assert made.status_code == 201, made.text
+
+    targets(4, {"state": "provided", "value": [first["title"]]})  # one removed
+    assert current()
+    targets(5, {"state": "unknown"})  # the last removed
+    assert current()
+    undone = scenario.api.write(
+        "POST", f"{profile_path}/revert", scenario.token, {"expected_version": 6, "to_version": 5}
+    )
+    assert undone.status_code == 201, undone.text
+    assert scenario.profile()["document"]["target_titles"]["value"] == [first["title"]]
+    assert current()
+    targets(7, {"state": "provided", "value": [first["title"], "Astronaut"]})  # typed in
+    assert not current()
+
+
 @pytest.mark.req("DIV1-06", "DIV1-03")
 def test_a_role_esco_does_not_list_is_reported_never_searched_by_its_words(
     scenario: Scenario,
