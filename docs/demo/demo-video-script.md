@@ -73,7 +73,8 @@ working life to be like?"
 
 Muse replies in its own words. Beside the reply, a review card lists what it picked up: in
 education, three A-levels **marked "expected"**, and what she enjoys. Confirm buttons in leaf
-green.
+green. Maya saves what's right (or chooses "Keep none"); only then does Muse's next question
+appear. She does the same after each message below.
 
 **Message 2: she answers Muse's follow-up question, then wanders off topic**
 > *(whatever Muse asked; Maya answers it honestly, then adds)* "my mum says I should do medicine
@@ -118,8 +119,9 @@ it.
 
 ## 5. A job that isn't on any list (1:45–2:10)
 
-**On screen:** Maya types a job title she heard about at a careers fair that isn't on the
-official lists. Under "Titles no list holds", she clicks **"Research this role"**. The cost
+**On screen:** Maya adds a job title she heard about at a careers fair, one that isn't on the
+official lists, to her target roles (at most three; she can remove one first). Under "Titles
+no list holds", she clicks **"Research this role"**. The cost
 appears first, a few pence. A note says the search sends only the title and "England", and
 nothing about her. Muse searches the web, live. Pages come back, each with its website and
 date, and the title is checked on each.
@@ -142,10 +144,12 @@ A quick montage to show Muse's range: same app, a completely different starting 
 
 **On screen:** a second workspace, labelled made up: Sam, 34, works in customer onboarding at a
 software company and wants out of the office. Three fast cuts, each a live Muse reply:
-1. Sam types his job title in his own words; Careerwright keeps it exactly as he wrote it.
+1. Sam types his job title in his own words; Careerwright keeps it exactly as he wrote it. He
+   chooses "Help me explore".
 2. He writes: "good with people, hate spreadsheets, would retrain if it didn't mean a pay cut
    for three years". Muse picks out the limit and asks what "a pay cut" means to him in pounds.
-   The review card shows a money limit waiting for his confirmation.
+   He answers with a figure, and the review card shows a money limit waiting for his
+   confirmation. (Muse never proposes a figure he didn't give.)
 3. His suggestions on the horizon look nothing like Maya's.
 
 **Voiceover:**
@@ -181,8 +185,11 @@ software company and wants out of the office. Three fast cuts, each a live Muse 
 ## 8. The close (3:05–3:25)
 
 **On screen:** back to the world. Maya's light, her chosen destination glowing ahead, a
-sea-glass trail between them with its first gate lit. The camera pulls back slowly. The poster
-returns.
+sea-glass trail between them made solid, with its next step glowing at its start. The camera
+pulls back slowly. The poster returns.
+
+> *Film note: this is the Plan screen's world, built after Routes. Film it once that's ready. A
+> gate on the trail stays a gate (a condition still to meet); it never lights up as if passed.*
 
 **Voiceover:**
 > Meta's Muse to listen, adapt and search.
