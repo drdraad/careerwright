@@ -530,6 +530,33 @@ def test_each_scheme_s_age_rule_is_beside_it_and_never_applied() -> None:
     assert found.label.dated == date(2026, 11, 1)
 
 
+@pytest.mark.req("OUT1-09", "OUT1-04")
+def test_each_option_shows_its_planned_outcomes_with_the_person_s_decision_on_each() -> None:
+    catalogue = data_target()
+    found = target_checkpoint(
+        target_title="Data quality analyst",
+        pack_target_id=TARGET,
+        note=None,
+        answered=catalogue,
+        retained=catalogue,
+        left_out=frozenset(),
+        qualifications=[],
+        keys={},
+        limits=M0SearchLimits(),
+        outcomes=DATA.outcomes,
+        decisions={"outcome:C01.1": "accept"},
+    )
+
+    # Both ways of taking C01 carry the course's outcomes (`Offering.outcomes_from`).
+    for variant_id in (FULL_TIME, "offering:C01#part_time"):
+        c01 = next(o for o in found.options if o.variant_id == variant_id)
+        assert [(o.outcome_id, o.review_state.value, o.decision) for o in c01.outcomes] == [
+            ("outcome:C01.1", "proposed", "accept"),
+            ("outcome:C01.2", "proposed", None),
+            ("outcome:C01.3", "proposed", None),
+        ]
+
+
 # --- never truncate silently --------------------------------------------------------------
 
 

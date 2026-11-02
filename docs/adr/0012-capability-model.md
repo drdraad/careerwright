@@ -469,3 +469,15 @@ its rules on protected gates, unknown and readiness (decisions 4, 5 and 7) are u
     insufficient coverage stays `not_assessed` (`no_rubric`, `insufficient_coverage`), never
     ready; the reason `rubrics_not_reviewed` is no longer given and is removed. P05's
     "apply now" now shows in Skills, labelled draft.
+- **Amendment line, Task 12b (2026-11-01): reference 0.2.0 carried to pack 0.4.0; entry facts
+  on options** (backend; screens in 12bB). Pack 0.4.0 adds school-leaver courses and funding
+  only: its targets, skill rows, requirements and postings are 0.2.0's, so no 0.4.0 reference
+  is written and nothing is invented. `reference.CARRIED_TO` names the carry (0.2.0 to 0.4.0
+  only), `check_reference` accepts it, and `load_reference` refuses it unless
+  `carried_changes` finds the four capability parts identical to the reference's own pack.
+  The reference keeps `pack_version` 0.2.0 and its pinned bytes. An option's stated entry
+  requirements read the person's qualifications by the Skills chapter's rule (`names`): an
+  expected one stands `expected_not_met`, and a requirement only expected qualifications name
+  leaves a route through it unresolved (`entry_requirements_expected`), never met, until the
+  person records the result as achieved. An achieved one is shown beside it; the person's own
+  entry answer still decides (no word match confirms entry).

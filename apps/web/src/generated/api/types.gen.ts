@@ -5029,6 +5029,10 @@ export type OptionFacts = {
      */
     age_rules: Array<AgeRule>;
     /**
+     * Outcomes
+     */
+    outcomes: Array<OutcomeFacts>;
+    /**
      * Left Out
      */
     left_out: boolean;
@@ -5209,6 +5213,35 @@ export type OutcomeDecisionInput = {
      * Reason
      */
     reason?: string | null;
+};
+
+/**
+ * OutcomeFacts
+ *
+ * A planned outcome of the option (OUT-1), with the person's decision on a provisional
+ * mapping: accept it as their assumption or override it, through the planning inputs'
+ * command (ADR 0012 decision 11). Null: no decision yet.
+ */
+export type OutcomeFacts = {
+    /**
+     * Outcome Id
+     */
+    outcome_id: string;
+    /**
+     * Skill Id
+     */
+    skill_id: string;
+    outcome_type: OutcomeType;
+    /**
+     * Level On Completion
+     */
+    level_on_completion: number | null;
+    evidence_kind: EvidenceKind;
+    review_state: OutcomeReview;
+    /**
+     * Decision
+     */
+    decision: 'accept' | 'override' | null;
 };
 
 /**

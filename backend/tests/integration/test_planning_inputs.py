@@ -171,7 +171,11 @@ def test_every_input_round_trips_through_its_command_and_a_stale_version_is_refu
     ] == expected.pop("outcome_decisions")
     assert decisions[0]["recorded_by"] == ADA_ID
     # Task 12b's answers, none given here: each an empty list, an answer's absence.
-    unanswered = {"offering_figures": [], "excluded_variants": [], "own_options": []}
+    unanswered: dict[str, list[Any]] = {
+        "offering_figures": [],
+        "excluded_variants": [],
+        "own_options": [],
+    }
     assert stored["inputs"] == {**expected, **unanswered, "schema_version": "1"}
     # The caps are the profile's answers, beside the inputs; what a solve needs is named.
     assert (stored["direct_spend_cap"], stored["monthly_payment_cap"]) == (gbp(150000), None)

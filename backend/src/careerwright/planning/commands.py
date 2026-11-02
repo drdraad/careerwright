@@ -295,6 +295,8 @@ def checkpoint_view(
                 qualifications=qualifications,
                 keys=keys,
                 limits=M0SearchLimits(),
+                outcomes=data.outcomes,
+                decisions={d.outcome_id: d.decision for d in document.outcome_decisions},
             )
         )
     status = profile.work_status

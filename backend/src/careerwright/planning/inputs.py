@@ -23,6 +23,10 @@ answer: "no debts" is `[]`, not asked is null.
   position: its application gate is verified and its offer accepted.
 - **Outcome decisions** (ADR 0012 decision 11): accepting a provisional mapping makes it the
   person's assumption; an override stands beside the provider's record, never replacing it.
+- **The checkpoint's answers** (Task 12b; ADR 0013's Task 12b amendment): the person's own
+  figures for facts an offering lacks (`planning.figures`), the options they leave out of the
+  search, and the options they add themselves (`planning.own_options`), each stored here so one
+  expected version and one command cover every answer the checkpoint takes.
 """
 
 import uuid
