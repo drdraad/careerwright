@@ -255,6 +255,11 @@ class DiscoveryView:
     current: bool = True
 
 
+# Answers no suggestion reads: what the person doesn't enjoy informs the conversation only
+# (Task W2F; `discovery.EVIDENCE_FIELDS` leaves it out), so a change to it asks nothing new.
+_UNREAD_BY_SUGGESTIONS = frozenset({ProfileField.DISLIKED_TASKS.value})
+
+
 def stays_current(documents: Sequence[ProfileDocument], choices: Collection[uuid.UUID]) -> bool:
     """Whether a discovery made from the first profile version (the one it pinned; oldest
     first) is still made from the current answers: each later version changed only its
@@ -262,14 +267,15 @@ def stays_current(documents: Sequence[ProfileDocument], choices: Collection[uuid
     citing one of `choices`) or a title the pinned version or such a choice held. Choosing a
     suggestion confirms it (Task W2E), and removing a target, the last one included, or
     putting one back asks the slate nothing new (Task W2F): none makes it "based on earlier
-    answers" (STATE-10; ADR 0007's amendments). Any other change, a new target typed in
-    included, means the answers changed."""
+    answers" (STATE-10; ADR 0007's amendments). Nor does a change to an answer no suggestion
+    reads (`_UNREAD_BY_SUGGESTIONS`). Any other change, a new target typed in included, means
+    the answers changed."""
     held = set(_provided(documents[0], ProfileField.TARGET_TITLES)) if documents else set()
     for before, after in pairwise(documents):
         if any(
             getattr(before, name) != getattr(after, name)
             for name in FIELD_NAMES
-            if name != "target_titles"
+            if name != "target_titles" and name not in _UNREAD_BY_SUGGESTIONS
         ):
             return False
         titles = _provided(after, ProfileField.TARGET_TITLES)

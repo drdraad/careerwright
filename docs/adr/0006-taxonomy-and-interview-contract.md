@@ -392,8 +392,9 @@ asks for or infers age.
   also read) leaves it out, so it is never a search, a filter or a ranking input, and
   dislikes alone start no discovery. Saved answers schema version 5; migration 0046 adds it
   not yet asked in place (the exception above). The demo interviewer reads "I don't enjoy
-  ...", "I don't like ..." and "I hate ...". Like any answer but a chosen target, changing
-  it marks a slate as made on earlier answers, though no suggestion reads it.
+  ...", "I don't like ..." and "I hate ...". Since no suggestion reads it, a change to it
+  alone leaves the suggestions current (`exploration.stays_current`), and removing a target
+  saves it as stored.
 - **`interview-turn-6`** (session W2's findings 4 to 7): the instructions add the new
   answer ("Keep these four apart"); one activity takes the same words in each task answer it
   belongs to; a list proposal leaves out anything the person takes back; a money limit
