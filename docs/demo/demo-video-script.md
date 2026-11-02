@@ -1,10 +1,15 @@
 # Careerwright: demo video script
 
-About 3 minutes. One happy path, told through Maya: 17, in Year 13, never had a job, unsure
-what she wants. Maya is made up, so the video labels her that way.
+About 3½ minutes. One happy path, told through Maya: 17, in Year 13, never had a job, unsure
+what she wants. A short montage then shows the same app with someone very different. Maya and
+the second person are made up, and the video labels them that way.
 
-The thread running through it: **Meta's Muse models do the listening, the searching and the
-reading. Careerwright's own code checks every word and does every sum. You make every choice.**
+**Every model moment is a real, live call to Meta's Muse.** Nothing is pre-written: Muse's
+replies, suggestions and searches are whatever it says on the day. The script gives what the
+person types and what the voiceover says; Muse's words on screen are its own.
+
+The thread running through it: **Meta's Muse listens, adapts, searches and explains.
+Careerwright's own code checks every word and does every sum. You make every choice.**
 
 ---
 
@@ -27,156 +32,198 @@ flashy. Make a still version for reduced motion: the poster fades in on its own.
 
 ---
 
-## 1. The problem (0:10–0:25)
+## 1. The problem (0:10–0:22)
 
-**On screen:** the title poster dissolves to Maya's desk: a laptop, A-level notes, a Brownies
-rota on the wall.
+**On screen:** the poster dissolves to Maya's desk: a laptop, A-level notes, a Brownies rota on
+the wall.
 
 **Voiceover:**
 > Most careers sites start with a form: "What's your current job?"
-> But Maya is 17. She's never had one.
+> Maya is 17. She's never had one.
 > So what does she type?
 
 ---
 
-## 2. Starting without a job (0:25–0:45)
+## 2. Starting without a job (0:22–0:35)
 
-**On screen:** the app opens on the You chapter. The world is dark except for a dim point of
-light. The first question: "Do you have a role in mind, or would you like to explore?" Beside
-"Skip for now" sits **"I haven't had a job yet"**. Maya clicks it.
-
-Her light ignites, and the first trails reach out.
+**On screen:** the You chapter. The world is dark except for a dim point of light. The first
+question: "Do you have a role in mind, or would you like to explore?" Beside "Skip for now"
+sits **"I haven't had a job yet"**. Maya clicks it. Her light ignites, and the first trails
+reach out.
 
 **Voiceover:**
 > Careerwright starts with her, not her CV.
 > One click, and the world answers.
 
-**Caption:** "Maya is made up. Every screen is the real app."
+**Caption:** "Maya is made up. Every screen is the real app, with live calls to Meta's Muse."
 
 ---
 
-## 3. A conversation, powered by Meta's Muse (0:45–1:15)
+## 3. Talking the way she'd talk (0:35–1:15)
+
+This scene shows Muse coping with real, messy conversation. Maya types three messages, in her
+own voice. Muse's replies are live.
 
 **On screen:** Maya chooses "Help me explore". The question appears: "What would you like your
-working life to be like?" She types:
+working life to be like?"
 
-> "I'm in Year 13 doing biology, chemistry and psychology. I've never had a job but I help run
-> a Brownies group."
+**Message 1: everything at once, the way people actually write**
+> "im in year 13 doing bio, chem and psych. never had a job but i help run a brownies group on
+> tuesdays and honestly thats the best bit of my week"
 
-A reply arrives. Beside it, a review card lists what Careerwright picked up: what she's doing
-now (in education), her A-levels **marked "expected"**, and what she enjoys. Each item has a
-Confirm button in leaf green. She confirms them.
+Muse replies in its own words. Beside the reply, a review card lists what it picked up: in
+education, three A-levels **marked "expected"**, and what she enjoys. Confirm buttons in leaf
+green.
+
+**Message 2: she answers Muse's follow-up question, then wanders off topic**
+> *(whatever Muse asked; Maya answers it honestly, then adds)* "my mum says I should do medicine
+> but I'm not sure I want to be stuck in a hospital all day"
+
+**Message 3: she changes her mind**
+> "actually scratch that, I do like the science, I just want to be with people more than
+> machines"
+
+Muse adjusts: its next proposal reflects what she now says, not what she said before. Maya
+confirms what's right and leaves the rest.
 
 **Voiceover:**
-> Behind the conversation is Muse, Meta's model. It's good at listening, so Maya can talk the
-> way she would to a person.
-> But Muse doesn't get to decide anything. It only proposes.
-> Maya confirms each fact herself, and her A-levels stay "expected" until she has her grades.
+> Behind the conversation is Muse, Meta's model, running live.
+> Maya doesn't fill in a form. She talks: typos, tangents, changing her mind.
+> Muse keeps up. It picks out what matters and asks a sensible next question.
+> But Muse never decides anything. It proposes, and Maya confirms each fact herself.
+> Her A-levels stay "expected" until she has her grades.
 
-**Caption, small:** "Conversation by Meta's Muse Wonder. Every fact confirmed by you."
+**Caption, small:** "Live conversation: Meta's Muse Wonder. Every fact confirmed by you."
 
 ---
 
-## 4. Suggestions she can trust (1:15–1:45)
+## 4. Suggestions, explained in her own words (1:15–1:45)
 
-**On screen:** the Suggestions view. A short list of roles, each shown as a ring on the
-horizon. She opens one. Under "Why this could suit you", a sentence quotes her own words:
-"I help run a Brownies group". A small note says the quotation was checked against what she
-said.
+**On screen:** the Suggestions view. Careerwright runs a live discovery: Muse proposes searches
+and title ideas from her answers, and the shortlist appears as rings on the horizon. She opens
+one. Under "Why this could suit you", Muse's explanation quotes her own words, such as "the best
+bit of my week". A small note says the quotation was checked against what she said.
 
 She clicks **"Make this a target"**. The ring fills into a warm disc, and a trail grows towards
 it.
 
 **Voiceover:**
-> Muse reads Maya's answers and suggests where they could lead.
-> But the shortlist itself is built by Careerwright's own code, from official job lists.
-> And when Muse explains a suggestion, every quote is checked word for word against what Maya
-> actually said.
-> No invented praise. No made-up facts.
+> Muse reads everything Maya said and suggests where it could lead, including roles she'd never
+> have searched for.
+> Careerwright's own code builds the shortlist from official job lists, so nothing is invented.
+> And when Muse explains a suggestion, every quote is checked word for word against Maya's own
+> answers.
 
 ---
 
-## 5. A job that isn't on any list (1:45–2:05)
+## 5. A job that isn't on any list (1:45–2:10)
 
-**On screen:** Maya types a job title she heard about that isn't on the official lists. Under
-"Titles no list holds", she clicks **"Research this role"**. A note says the search sends only
-the title and "England", and nothing about her. Pages come back, each shown with its website
-and date.
+**On screen:** Maya types a job title she heard about at a careers fair that isn't on the
+official lists. Under "Titles no list holds", she clicks **"Research this role"**. The cost
+appears first, a few pence. A note says the search sends only the title and "England", and
+nothing about her. Muse searches the web, live. Pages come back, each with its website and
+date, and the title is checked on each.
 
 **Voiceover:**
 > Real jobs don't always fit the official lists.
-> So Muse searches the web, sending only the job title.
-> Careerwright then reads the pages and checks the exact title appears on two independent
-> sites before calling it found.
+> So Muse searches the web, live, sending only the job title.
+> Careerwright reads the pages and checks the exact title appears on two independent sites
+> before calling it found.
 > If it can't check, it says so. It never pretends.
 
-> *Film note: this needs a live workspace with a Meta key. If the role isn't found on two
-> sites, keep that take: "Not yet found in independent sources" is the honest answer, and it
-> makes the point.*
+> *Film note: the result depends on the live web. "Found" makes a satisfying take, but if it
+> comes back "Not yet found in independent sources", keep it: that honesty is the point.*
 
 ---
 
-## 6. Skills, options and money (2:05–2:35)
+## 6. Same app, a different person (2:10–2:35)
+
+A quick montage to show Muse's range: same app, a completely different starting point.
+
+**On screen:** a second workspace, labelled made up: Sam, 34, works in customer onboarding at a
+software company and wants out of the office. Three fast cuts, each a live Muse reply:
+1. Sam types his job title in his own words; Careerwright keeps it exactly as he wrote it.
+2. He writes: "good with people, hate spreadsheets, would retrain if it didn't mean a pay cut
+   for three years". Muse picks out the limit and asks what "a pay cut" means to him in pounds.
+   The review card shows a money limit waiting for his confirmation.
+3. His suggestions on the horizon look nothing like Maya's.
+
+**Voiceover:**
+> Same app, a completely different life.
+> Muse picks up what matters to Sam, including a limit he didn't spell out, and checks it with
+> him before it counts.
+
+---
+
+## 7. Skills, options and money (2:35–3:05)
 
 > *Film note: these screens are being built now and follow session W2. Film this part once
-> they're ready. Every figure on screen must come from the app, not the script.*
+> they're ready. Every figure on screen must come from the app, never the script.*
 
-**On screen, three quick cuts:**
+**On screen, back with Maya, three quick cuts:**
 1. **Skills:** what her target role asks for, what she can already show, and an entry
    requirement that reads "if you get your grades".
 2. **Options:** a degree with its fee shown as a **loan paid straight to the university, repaid
-   later**, not money from her pocket. Beside it, an apprenticeship and a T Level. A missing
-   fact is named plainly, with a box for her to fill it in.
-3. **Routes:** a chart of time against cost. She picks one route, and a monthly money table
-   opens beneath it.
+   later**, not money from her pocket. Beside it, an apprenticeship and a T Level. A missing fact
+   is named plainly, with a box for her to fill it in.
+3. **Routes:** a chart of time against cost. She picks one, and a monthly money table opens
+   beneath it.
 
 **Voiceover:**
 > Here's the part no model touches.
-> Readiness, money and routes are worked out by Careerwright's own code, month by month,
-> against Maya's own limits.
+> Readiness, money and routes are worked out by Careerwright's own code, month by month, against
+> Maya's own limits.
 > A tuition fee loan shows as a loan to repay, not her money. A missing fact is named, never
 > guessed.
 
 ---
 
-## 7. The close (2:35–2:55)
+## 8. The close (3:05–3:25)
 
 **On screen:** back to the world. Maya's light, her chosen destination glowing ahead, a
-sea-glass trail between them with its first gate lit. The camera pulls back slowly. The
-poster from the opening returns.
+sea-glass trail between them with its first gate lit. The camera pulls back slowly. The poster
+returns.
 
 **Voiceover:**
-> Meta's Muse to listen and search.
+> Meta's Muse to listen, adapt and search.
 > Careerwright to check every word and every pound.
 > Maya to decide.
 > Her future's larger than she thought. And she's started moving towards it.
 
 **End card:** "Careerwright" and the line "Your future is larger than you think. Start moving
-towards it."
+towards it." Small, below: "Powered by Meta's Muse."
 
 ---
 
 ## Production notes
 
-- **Where Meta's models are used, so the claims stay true:**
-  - **Muse Wonder** runs the live conversation in this demo, started with `make session`.
-  - **Muse Spark** is the app's everyday model: it suggests searches and title ideas, writes
-    "Why this could suit you" from checked quotes, searches the web for role research, and
-    quotes values from pages.
-  - Code decides everything that matters: readiness, money, routes and rankings. Say "Meta's
-    Muse", never "AI decides".
-- **Two ways to film, and which scenes each covers:**
-  - **Demo workspace (offline, no key, free):** covers scenes 2 to 4. Its conversation uses a
-    pre-written fixture interviewer, so it doesn't show Muse. Use it for rehearsal, or caption
-    it "demo mode".
-  - **Live workspace (`make session` with your Meta key, capped at $5):** covers scenes 3 to 5
-    with Muse for real.
-- **Not built yet:** the screens for scene 6 (Skills, Options, Routes). Film them after they
+- **Live set-up:**
+  - Run `make session` on the Mac, with your own Meta key pasted into the app.
+  - Make two workspaces, "Maya (made up)" and "Sam (made up)", in **Live-assisted** mode, set up
+    as session W2's package describes (`docs/reviews/session-w2.md`), so the live conversation
+    runs on Muse Wonder.
+  - Each workspace is capped at $5 and each run at $0.75. A full shoot with retakes should cost a
+    few pounds. Every call is recorded in the spending log.
+- **Where Muse works, so every claim stays true:**
+  - The conversation: every reply and every proposed fact.
+  - Discovery: the searches and title ideas behind the suggestions.
+  - "Why this could suit you": the explanation, built from quotes that code checks.
+  - Role research: the live web search.
+  - Code, never Muse, decides readiness, money, routes and rankings. Say "Meta's Muse", never
+    "AI decides".
+- **Live means unscripted:**
+  - Muse's replies differ on every take. Rehearse the typed messages, film several takes, and
+    pick the best real one. Never edit a reply's words or splice two replies together.
+  - If a reply goes somewhere unexpected but sensible, keep it: that's the flexibility the video
+    is about. Adjust the voiceover to match what really happened.
+  - The demo workspace's offline interviewer is pre-written: don't use it for this video.
+- **Not built yet:** the screens in scene 7 (Skills, Options, Routes). Film them after they
   land.
 - **Honesty, on screen and in the edit:**
-  - Label Maya "made up".
+  - Label Maya and Sam "made up".
   - Nothing may imply a job offer.
   - No numbers in the voiceover that the app doesn't show.
   - Keep "not yet found" and "unknown" results if they happen; they're part of the pitch.
-- **Look and sound:** Source Sans 3 for every caption; use the app's colours only; calm, warm
-  music; a friendly, unhurried voice with a UK accent; captions on throughout.
+  - If the calm support panel appears in a take, cut that take, never the panel.
+- **Look and sound:** Source Sans 3 for every caption; the app's colours only; calm, warm music;
+  a friendly, unhurried voice with a UK accent; captions on throughout.
