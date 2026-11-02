@@ -1,15 +1,16 @@
 // The You chapter's states (S2.3-S2.5, S2.7, SW.4) on a scripted API at the network edge: the
-// start, a reply streaming and to review (one with a limit to confirm), a failed reply,
-// paused; its other views, what we know and the suggestions; a save with Undo and an undo; the
+// start, a reply streaming and to review (one with a limit to confirm, one changing lists), a
+// failed reply, paused; Send waiting for the start's choice and for the review card (session
+// W2); its other views, what we know and the suggestions; a save with Undo and an undo; the
 // slate full and thin, with its written note written, pending and unavailable, and with a
-// salary floor applied; key consent and a stored key; and the early sketch with a target.
-// Every value is synthetic.
+// salary floor applied; key consent, and a stored key as the account menu shows it; and the
+// early sketch with a target. Every value is synthetic.
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 import { userEvent, within } from "storybook/test";
 import { Directions } from "@/components/Directions";
-import { KeySetup } from "@/components/KeySetup";
+import { KeySetup, MetaKeySetting } from "@/components/KeySetup";
 import { TitleDetails } from "@/components/TitleDetails";
 import { SaveNotice } from "@/components/WhatWeKnow";
 import { YouChapter, type YouView } from "@/components/YouChapter";
@@ -488,6 +489,20 @@ const unanswered: ProfileOut = {
 export const Start: Story = {
   render: you(chapterRoutes(prefs(null), []), "conversation", unanswered),
 };
+/** Typed before choosing how to start: Send waits for the choice, saying so, and the words
+ *  stay in the field (session W2). */
+const typedReply =
+  (words: string): Story["play"] =>
+  async ({ canvasElement }) => {
+    const field = await within(canvasElement).findByRole("textbox", {
+      name: "Reply to Careerwright",
+    });
+    await userEvent.type(field, words);
+  };
+export const StartSendWaits: Story = {
+  render: you(chapterRoutes(prefs(null), []), "conversation", unanswered),
+  play: typedReply("Synthetic: I fix bikes at weekends."),
+};
 
 // The type-ahead open (Task 6d slice B fix round 1, design review M-3): what the person sees as
 // they type, each from the scripted API's answer for those words.
@@ -583,6 +598,61 @@ export const ReplyStreaming: Story = {
 };
 export const ReplyToReview: Story = {
   render: you(chapterRoutes(prefs("unsure"), [turn("complete", proposal)])),
+};
+/** A reply changing lists (session W2): against what is saved, what each adds and removes (a
+ *  task taken back reads as removed); the task answers' hints tell one activity's two answers
+ *  apart; with four changes, Save stays at the foot of the screen. Typed meanwhile, Send waits
+ *  for the card, saying so. */
+const withTasks: ProfileOut = {
+  ...profile,
+  document: {
+    ...profile.document,
+    enjoyed_tasks: given(["repairing physical objects", "helping at Brownies"]),
+    evidenced_tasks: given(["running a Brownies pack meeting"]),
+  },
+};
+const listChange = (
+  id: string,
+  field: "enjoyed_tasks" | "confident_tasks" | "evidenced_tasks" | "cities",
+  value: string[],
+  reason: string,
+) => ({
+  change_id: id,
+  field,
+  state: "provided" as const,
+  value,
+  basis: "stated" as const,
+  message_ids: ["m1"],
+  reason,
+  hard_constraint: field === "cities",
+});
+const listProposal: TurnOut["proposal"] = {
+  ...(proposal as NonNullable<TurnOut["proposal"]>),
+  reply: "Demo interviewer (synthetic): I noted 4 things for you to review.",
+  changes: [
+    listChange(
+      "c1",
+      "enjoyed_tasks",
+      ["repairing physical objects", "fixing machines"],
+      "You said Brownies is something you do, not something you enjoy.",
+    ),
+    listChange(
+      "c2",
+      "evidenced_tasks",
+      ["running a Brownies pack meeting", "helping at Brownies"],
+      "You said you help at Brownies every week.",
+    ),
+    listChange("c3", "confident_tasks", ["leading a small group"], "You said you could."),
+    listChange("c4", "cities", ["Leeds", "Manchester", "York"], "You named York."),
+  ],
+};
+export const ReplyChangesLists: Story = {
+  render: you(
+    chapterRoutes(prefs("unsure"), [turn("complete", listProposal)]),
+    "conversation",
+    withTasks,
+  ),
+  play: typedReply("Synthetic: and I'd rather not travel far."),
 };
 export const ReplyFailed: Story = { render: you(chapterRoutes(prefs("unsure"), [turn("failed")])) };
 export const Paused: Story = {
@@ -861,7 +931,17 @@ const key = (credentials: CredentialOut[]) => () => (
   </Api>
 );
 export const KeyConsent: Story = { render: key([]) };
-export const KeyStored: Story = { render: key([stored]) };
+/** A stored key as the account menu shows it, beside model spending (session W2: no longer
+ *  under every conversation): its date, with Rotate and Revoke one step away. */
+export const KeyStored: Story = {
+  render: () => (
+    <Api routes={[{ method: "GET", path: /\/credentials$/, answer: { items: [stored] } }]}>
+      <div className="popover on-space grid gap-8">
+        <MetaKeySetting workspace={workspace("live_assisted")} />
+      </div>
+    </Api>
+  ),
+};
 
 /** Seniority and industry beside each title, each optional and never a default, and the
  *  skills ESCO lists for the role's kind of work, one marked "not part of my job" (Task 6d

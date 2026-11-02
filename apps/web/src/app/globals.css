@@ -1541,6 +1541,16 @@
     color: var(--text-on-reading-muted);
   }
 
+  /* Send sits beside the field; why it waits (the start's choice, a review card's decision)
+     takes a line of its own under both, so the field keeps its width on a phone. */
+  .composer-send {
+    display: contents;
+  }
+
+  .composer-send > .btn + span {
+    grid-column: 1 / -1;
+  }
+
   .known {
     display: flex;
     flex-direction: column;
@@ -1595,6 +1605,45 @@
   .proposal-actions .btn {
     min-height: 32px;
     padding: 0 var(--space-12);
+  }
+
+  /* The review card's Save and Keep none stay at the foot of the screen while the card is in
+     view, so Save is in the first screen however many changes there are (session W2). On a
+     card's own surface, as the reply field's Send is: no new colour pairing. Why Save waits
+     takes a line of its own under both buttons, so the bar stays two rows at most on a phone.
+     Whatever focus scrolls into view stops above it (WCAG 2.4.11; 96 px holds its two rows
+     with room to spare), and on a phone it rises above an open sheet. */
+  .tray-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-8);
+    padding: var(--space-8) var(--space-12);
+    background: var(--surface-card);
+    border: 1px solid var(--line-reading-hairline);
+    border-radius: var(--radius-control);
+  }
+
+  .tray-actions > .btn + span {
+    order: 1;
+    flex-basis: 100%;
+  }
+
+  html:has(.you-view:not([hidden]) .tray-actions) {
+    scroll-padding-bottom: 96px;
+  }
+
+  @media (max-width: 760px) {
+    .app[data-drawer="open"] .tray-actions {
+      bottom: var(--sheet-peek);
+    }
+
+    html:has(.app[data-drawer="open"] .you-view:not([hidden]) .tray-actions) {
+      scroll-padding-bottom: calc(var(--sheet-peek) + 96px);
+    }
   }
 
   .fact-list {

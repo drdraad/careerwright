@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import type { CredentialOut, WorkspaceOut } from "@/generated/api";
 import { keys } from "@/lib/queries";
 import { fakeApi } from "@/test/fakeApi";
-import { KeySetup } from "./KeySetup";
+import { KeySetup, MetaKeySetting } from "./KeySetup";
 
 const workspace: WorkspaceOut = {
   workspace_id: "w-key",
@@ -144,5 +144,51 @@ describe("[MODEL-07] a key is stored only after explicit consent to encrypted st
 
     expect(await screen.findByRole("alert")).toBeVisible();
     expect(field).toHaveValue("test-key-not-real-0123456789");
+  });
+});
+
+describe("[MODEL-07] the stored key is a setting in the account menu (session W2)", () => {
+  function renderSetting(where: WorkspaceOut) {
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <MetaKeySetting workspace={where} />
+      </QueryClientProvider>,
+    );
+    return userEvent.setup();
+  }
+
+  it("shows a stored key's date, with Rotate and Revoke one step away", async () => {
+    fakeApi([{ method: "GET", path: /\/credentials$/, answer: { items: [stored] } }]);
+    const user = renderSetting(workspace);
+
+    await user.click(await screen.findByText(/^Meta key: stored \d+ \w+ \d{4}$/));
+    expect(screen.getByRole("button", { name: "Rotate the key" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Revoke the key" })).toBeVisible();
+  });
+
+  it("says when no key is stored, and where to connect one", async () => {
+    fakeApi([
+      { method: "GET", path: /\/credentials$/, answer: { items: [{ ...stored, active: false }] } },
+    ]);
+    renderSetting(workspace);
+
+    expect(
+      await screen.findByText("Meta key: none stored. Connect one in the conversation."),
+    ).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Store the key" })).toBeNull();
+  });
+
+  it("shows nothing in a demo workspace, which never calls a model, and asks for no key", () => {
+    const sent = fakeApi([]);
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MetaKeySetting workspace={{ ...workspace, data_mode: "demo" }} />
+      </QueryClientProvider>,
+    );
+
+    expect(container).toBeEmptyDOMElement();
+    expect(sent).toEqual([]);
   });
 });

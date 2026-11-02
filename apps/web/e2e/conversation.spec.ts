@@ -650,6 +650,56 @@ test.describe("phone, first screen", () => {
   });
 });
 
+test("[UI-12][STATE-06] with four changes to review, the card's Save and Keep none are in the first screen at 1280 × 800 and 390 × 844 (session W2)", async ({
+  browser,
+}) => {
+  // Session W2: with three or more changes, Save sat below the first screen (y≈838 at 800).
+  test.setTimeout(180_000);
+  const token = await emulatorToken("ada");
+  const workspace = await demoWorkspace("Four to review (synthetic)");
+  const base = `/v1/workspaces/${workspace}`;
+  await asBrowser("PUT", `${base}/interview/preferences`, token, {
+    expected_version: 0,
+    entry_mode: "unsure",
+    conversation_mode: null,
+    paused: false,
+  });
+  const { version } = await asBrowser<{ version: number }>("GET", `${base}/profile`, token);
+  const turn = await asBrowser<{ turn_id: string }>("POST", `${base}/interview/turns`, token, {
+    expected_profile_version: version,
+    message:
+      "I am a warehouse supervisor. I enjoy fixing bikes. I could do 5 hours a week in Leeds.",
+  });
+  await expect
+    .poll(
+      async () =>
+        (
+          await asBrowser<{ run: { status: string } }>(
+            "GET",
+            `${base}/interview/turns/${turn.turn_id}`,
+            token,
+          )
+        ).run.status,
+      { timeout: 60_000 },
+    )
+    .toBe("complete");
+
+  for (const viewport of [
+    { width: 1280, height: 800 },
+    { width: 390, height: 844 },
+  ]) {
+    const context = await browser.newContext({ viewport, reducedMotion: "reduce" });
+    const page = await context.newPage();
+    await signIn(page, "ada", chapterUrl("you", workspace));
+    const tray = page.getByRole("region", { name: /To review: 4 changes/ });
+    await expect(tray).toBeVisible({ timeout: 60_000 });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expectOnTop(page, tray.getByRole("button", { name: /^Save .*to What we know$/ }));
+    await expectOnTop(page, tray.getByRole("button", { name: "Keep none" }));
+    await context.close();
+  }
+});
+
 test("[UI-12] in a window too short for a band (a phone turned sideways) the console starts in the first screen (re-review N3)", async ({
   browser,
 }) => {

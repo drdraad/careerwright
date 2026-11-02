@@ -27,6 +27,7 @@ import { SupportShown, useSupportPanels, useWorldSettings } from "@/lib/world/se
 import { ChapterMenu, ChapterRail } from "./ChapterNav";
 import { ConversationTone } from "./ConversationTone";
 import { EvidenceDrawer, useEvidence } from "./EvidenceDrawer";
+import { MetaKeySetting } from "./KeySetup";
 import { ModelSpending } from "./ModelSpending";
 import { NotInvited, PageFrame, PageLoading, RequestFailure } from "./PageState";
 import { SyntheticLabel } from "./Status";
@@ -213,8 +214,9 @@ export function WorkspaceShell({
             status={supportShown && <StillWhileSupport />}
             settings={
               // Calm mode is this viewer's, and below a desktop's width the world's controls
-              // join it; the tone and the model spending, under the preferences heading, are
-              // this workspace's.
+              // join it; the tone, the model spending and the stored Meta key (session W2: no
+              // longer under every conversation), under the preferences heading, are this
+              // workspace's.
               <>
                 <div className="menu-world">
                   <WorldControls settings={world} />
@@ -225,6 +227,7 @@ export function WorkspaceShell({
                   workspaceId={workspaceId}
                   demo={workspace.data.data_mode === "demo"}
                 />
+                <MetaKeySetting workspace={workspace.data} />
               </>
             }
             onSignOut={() => void auth.signOut()}

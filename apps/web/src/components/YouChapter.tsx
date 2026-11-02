@@ -10,10 +10,13 @@
 // buttons"); the limits say what they mean ("what do these mean??").
 //
 // The conversation's one filled primary action: connecting a key when none is stored, else
-// Resume while the interview is paused, else Try again after a failed reply, else saving the
-// review tray when it has proposals, else Send. What we know has one while its answer form is
-// open (Save changes), and the suggestions while asking for them or choosing one
-// (`Directions`).
+// Resume while the interview is paused, else saving the review tray when it has proposals, else
+// Try again after a failed reply, else Send once the start is done (until then the start's
+// choices are the bright action). What we know has one while its answer form is open (Save
+// changes), and the suggestions while asking for them or choosing one (`Directions`). Send
+// waits, saying why, for the start's choice and for the tray's decision (session W2), and the
+// stored key's details are a setting in the account menu (`MetaKeySetting`), not under the
+// conversation.
 //
 // The three views stay mounted, the inactive ones hidden, so moving between them never loses
 // what the person typed or chose: a reply, the tray's choices, the answer form's edits, the
@@ -39,7 +42,7 @@ import {
   useState,
 } from "react";
 import type { ProfileOut, SupportNoteOut, WorkspaceOut } from "@/generated/api";
-import { reviewable, turnFailed, turnRunning } from "@/lib/conversation";
+import { entryNeeded, reviewable, turnFailed, turnRunning } from "@/lib/conversation";
 import {
   useCredentials,
   useLatestDiscovery,
@@ -49,6 +52,7 @@ import {
   useSubmitDiscovery,
   useTurns,
 } from "@/lib/queries";
+import { SEND_WAITS } from "@/lib/vocabulary";
 import { Button } from "./Button";
 import { Conversation } from "./Conversation";
 import { Directions, suggestionStart } from "./Directions";
@@ -225,26 +229,38 @@ export function YouChapter({
   const keyStored = demo || (credentials.data ?? []).some((credential) => credential.active);
   const unavailable = keyStored ? undefined : NO_KEY;
   const pending = reviewable(turns.data, profile.version);
+  const reviewing = pending !== null && !pending.stale;
+  const starting = entryNeeded(preferences.data, turns.data);
   const latest = turns.data.at(-1);
   const latestFailed = latest !== undefined && turnFailed(latest);
-  // Every way of sending a message says why it can't (never disabled silently).
+  // Every way of sending a message says why it can't (never disabled silently). It waits for
+  // the start's choice and for a review card's decision, so no reply's proposals are lost
+  // (session W2); the reply field keeps what is typed meanwhile.
   const sendBlocked = preferences.data.paused
     ? "Paused: resume to send."
     : (unavailable ??
-      (latest !== undefined && turnRunning(latest)
-        ? "Careerwright is still replying."
-        : sender.pending
-          ? "Sending…"
-          : undefined));
+      (starting
+        ? SEND_WAITS.start
+        : latest !== undefined && turnRunning(latest)
+          ? "Careerwright is still replying."
+          : reviewing
+            ? SEND_WAITS.review
+            : sender.pending
+              ? "Sending…"
+              : undefined));
+  // A card waiting comes before Try again, which waits for it too (a message sent before
+  // session W2's fix may have failed after a card it left waiting).
   const primary = !keyStored
     ? "key"
     : preferences.data.paused
       ? "resume"
-      : latestFailed
-        ? "retry"
-        : pending !== null && !pending.stale
-          ? "review"
-          : "send";
+      : reviewing
+        ? "review"
+        : latestFailed
+          ? "retry"
+          : starting
+            ? "start"
+            : "send";
   const current = preferences.data;
   const sure = current.entry_mode === "sure";
   const edit = () => {
@@ -363,16 +379,6 @@ export function YouChapter({
                 {reviewPanel}
                 {tray}
               </>
-            }
-            after={
-              !demo &&
-              keyStored && (
-                <KeySetup
-                  workspace={workspace}
-                  credentials={credentials.data ?? []}
-                  primary={false}
-                />
-              )
             }
           />
         </>,
