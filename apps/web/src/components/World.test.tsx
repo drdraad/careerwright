@@ -235,6 +235,33 @@ describe("[WLD-01][WLD-02][WLD-03][WLD-07][UI-07][UI-05] the world behind every 
     expect(world()).toHaveAttribute("data-motion", "running");
   });
 
+  it("[WLD-05] moves again when the person lets go, however soon the next frame comes", async () => {
+    vi.useFakeTimers({
+      toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"],
+    });
+    motion({ reduce: false, webgl2: true });
+    const { rerender } = render(<World place="roles" input={input} calm={false} paused />);
+    await act(async () => {
+      vi.advanceTimersByTime(4000);
+    });
+    expect(world()).toHaveAttribute("data-motion", "still");
+    // Two more frames (on the 16 ms grid), so the frames are stopped at rest.
+    await act(async () => {
+      vi.advanceTimersByTime(32);
+    });
+
+    // Let go about a millisecond before the next frame is due: that first frame's step is
+    // tiny, and must still count as moving (the click was once lost this way).
+    await act(async () => {
+      vi.advanceTimersByTime(15.5);
+    });
+    rerender(<World place="roles" input={input} calm={false} paused={false} />);
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(world()).toHaveAttribute("data-motion", "running");
+  });
+
   it("measures the panels again when a view is shown or hidden, with nothing added or removed (re-review N1)", async () => {
     // The You chapter's views stay mounted and switch by `hidden`: with no child or text
     // change, the world must still notice that the panel over it moved.

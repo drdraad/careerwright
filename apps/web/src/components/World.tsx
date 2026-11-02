@@ -590,7 +590,9 @@ export function World({
       const hold = l.paused || l.reading || t - l.typedAt < TYPING_HOLD_SECONDS;
       const target = hold ? 0 : 1;
       l.live += (target - l.live) * Math.min(1, dt * (target > l.live ? 1.5 : 5));
-      if (l.live < 0.002) l.live = 0;
+      // Settling to rest snaps to zero; waking never does, or a first frame that comes soon
+      // after the wake (a tiny step) would drop the world back to rest and lose the wake.
+      if (target === 0 && l.live < 0.002) l.live = 0;
       l.ambient += dt * l.live;
       const view = l.tween.current(t);
       const f = l.frame;
@@ -628,7 +630,8 @@ export function World({
           measure.onResult(measurement);
         }
       }
-      if (meter || l.live > 0 || animating(t)) raf = requestAnimationFrame(frame);
+      // Waking (nothing holds it) keeps the frames coming even if this frame's step was zero.
+      if (meter || l.live > 0 || target > 0 || animating(t)) raf = requestAnimationFrame(frame);
       else l.running = false;
     };
     wake.current = () => {
