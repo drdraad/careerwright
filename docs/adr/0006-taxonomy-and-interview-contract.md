@@ -405,3 +405,9 @@ asks for or infers age.
   unchanged. Evaluation cases INT-18 (a dislike and a take-back) and INT-19 (Sam's hinted pay
   cut, no start chosen) carry the rules; no live call was made here: the controller runs the
   capped live check (R5).
+- **A person's distress words are never an answer to save** (the slice's review, important 1).
+  `check_turn` drops any proposed change whose value or reason trips the support screen
+  (`has_risk_stem`), on every turn, never repaired, and keeps the rest of the proposal; the
+  demo interviewer applies the same rule before it counts what it noted. "I hate my job and I
+  want to kill myself" shows the support panel and proposes nothing. The screen's words,
+  lists and policy version are unchanged.
