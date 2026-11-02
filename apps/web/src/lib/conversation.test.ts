@@ -265,9 +265,10 @@ const SRC = "8d1f6f8e-46a1-5c2b-9d0e-3f7a1b2c4d5e";
 const unasked = { state: "unasked", value: null, source_ref_id: null } as const;
 const known = { state: "unknown", value: null, source_ref_id: SRC } as const;
 const blank: ProfileDocument = {
-  schema_version: "4",
+  schema_version: "5",
   work_status: unasked,
   qualifications: unasked,
+  disliked_tasks: unasked,
   preferred_name: unasked,
   current_role: unasked,
   cities: unasked,

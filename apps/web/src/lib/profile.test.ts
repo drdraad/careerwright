@@ -9,9 +9,10 @@ const SOURCE = "6f1d3c2a-0000-4000-8000-000000000001";
 
 function document(overrides: Partial<ProfileDocument> = {}): ProfileDocument {
   return {
-    schema_version: "4",
+    schema_version: "5",
     work_status: { state: "unasked", value: null, source_ref_id: null },
     qualifications: { state: "unasked", value: null, source_ref_id: null },
+    disliked_tasks: { state: "unasked", value: null, source_ref_id: null },
     preferred_name: { state: "unasked", value: null, source_ref_id: null },
     current_role: { state: "unknown", value: null, source_ref_id: SOURCE },
     cities: { state: "provided", value: ["Manchester"], source_ref_id: SOURCE },
@@ -64,6 +65,7 @@ describe("[API-04] the profile form sends exactly what was answered, in integer 
         minimum_salary: { state: "unasked" },
         work_status: { state: "unasked" },
         qualifications: { state: "unasked" },
+        disliked_tasks: { state: "unasked" },
       },
     });
   });
@@ -174,6 +176,7 @@ describe("[API-04] the profile form sends exactly what was answered, in integer 
       "evidenced_tasks",
       "work_style",
       "qualifications", // Task 6f
+      "disliked_tasks", // Task W2F
     ]);
     for (const [name, published, used] of lists) expect([name, used]).toEqual([name, published]);
   });

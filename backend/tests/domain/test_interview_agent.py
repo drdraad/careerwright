@@ -654,6 +654,40 @@ def test_the_demo_never_reads_a_retake_or_a_fail_as_achieved() -> None:
         assert achieved == [], words
 
 
+@pytest.mark.req("REC1-04")
+def test_the_demo_notes_what_the_person_doesnt_enjoy_apart_from_what_they_enjoy() -> None:
+    # Task W2F: a dislike has its own answer, so it is never an enjoyed task.
+    both = demo(demo_turn("I enjoy helping people. I don't enjoy filling in forms."))
+    assert [(u.field, u.items) for u in both.proposed_updates] == [
+        (ProfileField.ENJOYED_TASKS, ["helping people"]),
+        (ProfileField.DISLIKED_TASKS, ["filling in forms"]),
+    ]
+    for words, task in (
+        ("I hate spreadsheets.", "spreadsheets"),
+        ("I don't like early starts", "early starts"),
+        ("I do not enjoy cold calling.", "cold calling"),
+    ):
+        out = demo(demo_turn(words))
+        assert [(u.field, u.items) for u in out.proposed_updates] == [
+            (ProfileField.DISLIKED_TASKS, [task])
+        ], words
+    # A dislike the profile holds is kept: the list proposed is the whole list after it.
+    held = demo_turn("I hate spreadsheets.")
+    held = held.model_copy(
+        update={
+            "profile": {
+                **held.profile,
+                ProfileField.DISLIKED_TASKS: ContextField(
+                    state=FieldState.PROVIDED, value=["early starts"]
+                ),
+            }
+        }
+    )
+    assert [(u.field, u.items) for u in demo(held).proposed_updates] == [
+        (ProfileField.DISLIKED_TASKS, ["early starts", "spreadsheets"])
+    ]
+
+
 def test_each_demo_question_names_what_it_asks_about() -> None:
     assert asked_field(SURE_QUESTION) is ProfileField.TARGET_TITLES
     for asked_about, question in QUESTIONS.items():

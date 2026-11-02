@@ -673,6 +673,7 @@ def _source_search(
         "minimum_salary",
         "work_status",
         "qualifications",
+        "disliked_tasks",
     )
     profile: dict[str, Any] = {name: {"state": "unasked"} for name in fields}
     profile["cities"] = {"state": "provided", "value": [SEARCH_CITY]}

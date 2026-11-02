@@ -17,6 +17,7 @@ from careerwright.profile.document import (
     VERSION_2_FIELDS,
     VERSION_3_FIELDS,
     VERSION_4_FIELDS,
+    VERSION_5_FIELDS,
     FieldState,
     ProfileDocument,
     ProfileInput,
@@ -182,7 +183,7 @@ def test_task_lists_are_bounded_with_a_typed_error() -> None:
 
 
 def test_a_version_1_document_reads_with_the_new_fields_not_asked() -> None:
-    later = (*VERSION_2_FIELDS, *VERSION_3_FIELDS)
+    later = (*VERSION_2_FIELDS, *VERSION_3_FIELDS, *VERSION_4_FIELDS, *VERSION_5_FIELDS)
     stored = {
         "schema_version": "1",
         **{name: {"state": "unasked"} for name in FIELD_NAMES if name not in later},
@@ -191,7 +192,7 @@ def test_a_version_1_document_reads_with_the_new_fields_not_asked() -> None:
 
     document = ProfileDocument.model_validate(stored)
 
-    assert document.schema_version == "4"
+    assert document.schema_version == "5"
     assert document.cities.value == ["Leeds"]
     for name in later:
         assert getattr(document, name).state is FieldState.UNASKED
@@ -210,7 +211,7 @@ def test_a_version_2_document_reads_with_work_style_not_asked() -> None:
 
     document = ProfileDocument.model_validate(stored)
 
-    assert document.schema_version == "4"
+    assert document.schema_version == "5"
     assert document.enjoyed_tasks.value == ["fixing bikes"]
     assert document.work_style.state is FieldState.UNASKED
     assert document.minimum_salary.state is FieldState.UNASKED
@@ -481,13 +482,17 @@ def test_qualifications_are_bounded_and_one_named_twice_is_refused() -> None:
 def test_a_version_3_document_reads_with_both_new_answers_not_asked() -> None:
     stored = {
         "schema_version": "3",
-        **{name: {"state": "unasked"} for name in FIELD_NAMES if name not in VERSION_4_FIELDS},
+        **{
+            name: {"state": "unasked"}
+            for name in FIELD_NAMES
+            if name not in (*VERSION_4_FIELDS, *VERSION_5_FIELDS)
+        },
         "current_role": {"state": "provided", "value": "Baker", "source_ref_id": str(SOURCE)},
     }
 
     document = ProfileDocument.model_validate(stored)
 
-    assert document.schema_version == "4"
+    assert document.schema_version == "5"
     assert document.current_role.value == "Baker"
     assert document.work_status.state is FieldState.UNASKED
     assert document.qualifications.state is FieldState.UNASKED
@@ -505,3 +510,73 @@ def test_migration_0040_names_every_field_added_after_version_1() -> None:
 
 def test_neither_new_answer_is_a_hard_constraint() -> None:
     assert {"work_status", "qualifications"}.isdisjoint(HARD_CONSTRAINTS)
+
+
+@pytest.mark.req("REC1-04", "REC1-03")
+def test_tasks_the_person_doesnt_enjoy_are_an_answer_of_their_own_and_never_a_limit() -> None:
+    # Task W2F (spec section 4's "disliked tasks"): a fourth task answer, kept apart from
+    # what the person enjoys, optional, bounded like the others and never a hard constraint.
+    new = profile_input(
+        enjoyed_tasks=provided(["helping the younger girls with crafts"]),
+        disliked_tasks=provided(["filling in forms", "early starts"]),
+    )
+
+    document = apply_profile_input(empty_profile(), new, SOURCE)
+
+    assert document.disliked_tasks.value == ["filling in forms", "early starts"]
+    assert document.disliked_tasks.source_ref_id == SOURCE
+    assert document.enjoyed_tasks.value == ["helping the younger girls with crafts"]
+    assert "disliked_tasks" not in HARD_CONSTRAINTS
+    skipped = apply_profile_input(
+        empty_profile(), profile_input(disliked_tasks={"state": "skipped"}), SOURCE
+    )
+    assert (skipped.disliked_tasks.state, skipped.disliked_tasks.value) == (
+        FieldState.SKIPPED,
+        None,
+    )
+    with pytest.raises(CareerwrightError) as raised:
+        apply_profile_input(
+            empty_profile(),
+            profile_input(disliked_tasks=provided([f"task {n}" for n in range(MAX_TASKS + 1)])),
+            SOURCE,
+        )
+    assert raised.value.details == {"field": "disliked_tasks", "limit": MAX_TASKS}
+    with pytest.raises(CareerwrightError) as twice:
+        apply_profile_input(
+            empty_profile(),
+            profile_input(disliked_tasks=provided(["Filling in forms", "filling in forms"])),
+            SOURCE,
+        )
+    assert twice.value.details == {"field": "disliked_tasks", "reason": "duplicate"}
+
+
+def test_a_version_4_document_reads_with_the_tasks_the_person_doesnt_enjoy_not_asked() -> None:
+    stored = {
+        "schema_version": "4",
+        **{name: {"state": "unasked"} for name in FIELD_NAMES if name not in VERSION_5_FIELDS},
+        "qualifications": {
+            "state": "provided",
+            "value": [{"name": "A-level biology", "status": "expected"}],
+            "source_ref_id": str(SOURCE),
+        },
+    }
+
+    document = ProfileDocument.model_validate(stored)
+
+    assert VERSION_5_FIELDS == ("disliked_tasks",)
+    assert document.schema_version == "5"
+    assert document.qualifications.value == [
+        QualificationAnswer(name="A-level biology", status=QualificationStatus.EXPECTED)
+    ]
+    assert document.disliked_tasks.state is FieldState.UNASKED
+
+
+def test_migration_0046_names_every_field_added_after_version_1() -> None:
+    from careerwright.migrations.versions import r0046_disliked_tasks as m0046
+
+    later = (*VERSION_2_FIELDS, *VERSION_3_FIELDS, *VERSION_4_FIELDS, *VERSION_5_FIELDS)
+    assert later == m0046.ADDED_AFTER_VERSION_1
+    sql = m0046.SCHEMA
+    for name in later:
+        assert f"'{name}', '{{\"state\": \"unasked\"}}'::jsonb" in sql
+    assert "'schema_version', '5'" in sql

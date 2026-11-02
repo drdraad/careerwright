@@ -65,3 +65,22 @@ def test_a_new_qualification_s_name_is_screened_and_a_held_one_or_a_status_is_no
     )
 
     assert words == ["A-level biology"]
+
+
+@pytest.mark.req("PROF-09")
+def test_a_new_task_the_person_doesnt_enjoy_is_screened_like_any_typed_words(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Task W2F: what the person doesn't enjoy is typed words, so the support screen reads it.
+    monkeypatch.setattr(
+        store, "profile_version", lambda _tx, _ws, _v: SimpleNamespace(document=empty_profile())
+    )
+
+    words = entered_words(
+        None,  # type: ignore[arg-type]  # the stand-in store reads no transaction
+        WORKSPACE,
+        1,
+        {"disliked_tasks": answer("disliked_tasks", ["filling in forms"])},
+    )
+
+    assert words == ["filling in forms"]

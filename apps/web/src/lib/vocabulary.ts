@@ -281,6 +281,15 @@ export const PROFILE_FIELDS: Record<ProfileFieldName, FieldWords> = {
     hint: "Things you have done and could point to, such as work, a course or a reference.",
     lessPrecise: "Which requirements count as demonstrated rather than unresolved.",
   },
+  // Task W2F (spec section 4's "disliked tasks"): it informs the conversation only; no
+  // suggestion, search or limit reads it.
+  disliked_tasks: {
+    label: "Tasks you don't enjoy",
+    kind: "list",
+    itemLabel: "Task you don't enjoy",
+    hint: "Optional: work you find draining, even if you're good at it. It never rules work out.",
+    lessPrecise: "Nothing is ruled out: the conversation just knows less about what to avoid.",
+  },
   work_style: {
     label: "How you like to work",
     kind: "list",
@@ -316,6 +325,7 @@ export const PROFILE_FIELD_ORDER: readonly ProfileFieldName[] = [
   "enjoyed_tasks",
   "confident_tasks",
   "evidenced_tasks",
+  "disliked_tasks",
   "work_style",
   "preferred_name",
 ];
@@ -371,6 +381,7 @@ export const EXAMPLE_REPLIES: Record<ProfileFieldName | "open", readonly string[
   preferred_name: [],
   work_status: [],
   qualifications: [],
+  disliked_tasks: [],
 };
 
 /** "Do you have a role in mind, or would you like to explore?": two ways on, in the
@@ -836,6 +847,8 @@ export const ANSWER_SOURCE: Record<ProfileField, string> = {
   minimum_salary: "The lowest pay you'd accept",
   work_status: "What you're doing now",
   qualifications: "Your qualifications",
+  // Never shown: no search reads what the person doesn't enjoy (Task W2F).
+  disliked_tasks: "What you don't enjoy",
 };
 
 type FoundNoWork = Extract<SlateNote, { reason: "answer_found_no_work" }>;

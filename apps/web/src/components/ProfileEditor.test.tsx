@@ -10,15 +10,17 @@ import { configureApiClient } from "@/lib/api";
 import { SupportShown } from "@/lib/world/settings";
 import { EvidenceDrawer, EvidenceProvider } from "./EvidenceDrawer";
 import { ProfileEditor } from "./ProfileEditor";
+import { WhatWeKnow } from "./WhatWeKnow";
 
 const WS = "74fa4514-899d-5316-80fd-4161dc0dbda0";
 const SRC = "8d1f6f8e-46a1-5c2b-9d0e-3f7a1b2c4d5e";
 
 function documentWith(cities: string[]): ProfileDocument {
   return {
-    schema_version: "4",
+    schema_version: "5",
     work_status: { state: "unasked", value: null, source_ref_id: null },
     qualifications: { state: "unasked", value: null, source_ref_id: null },
+    disliked_tasks: { state: "unasked", value: null, source_ref_id: null },
     preferred_name: { state: "unasked", value: null, source_ref_id: null },
     current_role: { state: "unasked", value: null, source_ref_id: null },
     cities: { state: "provided", value: cities, source_ref_id: SRC },
@@ -502,5 +504,53 @@ describe("[BND1-12][UI-09] the source drawer shows the live provenance state", (
     expect(await screen.findByText(fixtureSource.label)).toBeInTheDocument();
     expect(screen.queryByText(/no source record was found/)).not.toBeInTheDocument();
     expect(calls).toBe(2); // the first list predated the answer's source; it looked again
+  });
+});
+
+describe("[REC1-04][PROF-07] tasks the person doesn't enjoy are an answer of their own", () => {
+  it("shows them in What we know under their own label, apart from the tasks they enjoy", () => {
+    const profile = profileOut(2, ["Manchester"]);
+    profile.document = {
+      ...profile.document,
+      enjoyed_tasks: { state: "provided", value: ["helping people"], source_ref_id: SRC },
+      disliked_tasks: {
+        state: "provided",
+        value: ["filling in forms", "early starts"],
+        source_ref_id: SRC,
+      },
+    };
+    render(<WhatWeKnow profile={profile} onEdit={() => {}} editing={false} form={null} />);
+
+    const answers = screen.getByRole("region", { name: "Your answers" });
+    const disliked = within(answers).getByText("Tasks you don't enjoy");
+    expect(disliked.closest(".fact")).toHaveTextContent("filling in forms, early starts");
+    expect(within(answers).getByText("Tasks you enjoy").closest(".fact")).toHaveTextContent(
+      "helping people",
+    );
+  });
+
+  it("saves them from the answers form through the same command as every answer", async () => {
+    const current = { profile: profileOut(1, ["Manchester"]) };
+    const sent = api(current, [json(201, profileOut(2, ["Manchester"]))]);
+    const user = renderEditor(current.profile);
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "How you answer tasks you don't enjoy" }),
+      "provided",
+    );
+    await user.type(
+      screen.getByRole("textbox", { name: "Task you don't enjoy 1" }),
+      "filling in forms",
+    );
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
+    expect(sent.find((request) => request.method === "PUT")?.body).toMatchObject({
+      expected_version: 1,
+      profile: {
+        disliked_tasks: { state: "provided", value: ["filling in forms"] },
+        enjoyed_tasks: { state: "unasked" },
+      },
+    });
   });
 });

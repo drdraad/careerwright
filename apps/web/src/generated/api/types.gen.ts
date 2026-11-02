@@ -6709,7 +6709,7 @@ export type ProfileDocument = {
     /**
      * Schema Version
      */
-    schema_version?: '4';
+    schema_version?: '5';
     preferred_name: TextField;
     current_role: TextField;
     cities: TextListField;
@@ -6724,6 +6724,7 @@ export type ProfileDocument = {
     minimum_salary: SalaryField;
     work_status: WorkStatusField;
     qualifications: QualificationListField;
+    disliked_tasks: TextListField;
 };
 
 /**
@@ -6745,7 +6746,8 @@ export const ProfileField = {
     WORK_STYLE: 'work_style',
     MINIMUM_SALARY: 'minimum_salary',
     WORK_STATUS: 'work_status',
-    QUALIFICATIONS: 'qualifications'
+    QUALIFICATIONS: 'qualifications',
+    DISLIKED_TASKS: 'disliked_tasks'
 } as const;
 
 /**
@@ -6802,6 +6804,10 @@ export type ProfileInput = {
      * Qualifications the person has or is taking (optional), at most 8, each achieved or expected. An expected one is never counted as achieved.
      */
     qualifications: QualificationListInput;
+    /**
+     * Tasks the person doesn't enjoy or finds draining (optional), at most 8. It informs the conversation and is never a search, a filter or a ranking input.
+     */
+    disliked_tasks: TaskListInput;
 };
 
 /**
