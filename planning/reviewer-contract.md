@@ -6,8 +6,8 @@ task-scoped gate; a whole-branch review happens separately at the end.
 Inputs (paths in your dispatch): the task brief (requirements + Global Constraints +
 standing rulings), the implementer's report, and a review package (commit list, stat,
 diff excluding lockfiles/generated code/binaries). The repository is at
-/home/user/careerwright, a Linux cloud container (`planning/env-cloud.md`); worktrees are at
-/home/user/careerwright-wt/<id>, and the integration branch is
+/Users/darianraad/Code/careerwright, the product owner's Mac; worktrees are at
+/Users/darianraad/Code/careerwright-wt/<id>, and the integration branch is
 `claude/confident-ramanujan-ux3saw`. One reviewer per piece, or per half, covers both the
 experience and the code (R12–R17 in the sprint tasks file: R16, R17). There is one fix round
 at most; a second review runs only for a Critical finding.
@@ -19,9 +19,7 @@ Method
   per risk; name the risk and what you checked).
 - Do not re-run the implementer's suites. Run a focused test only when reading the code
   raises a specific doubt no existing run answers. Never run live Meta calls, make no web
-  requests and never start Docker (the controller does all three). A focused test that
-  runs node or pnpm starts with `export PATH=/opt/node24/bin:$PATH;`; a Python test runs as
-  `env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY` (never print either value).
+  requests and never start Docker (the controller does all three).
 - Read-only: never modify the working tree, index, HEAD or branches. Never print secrets
   (the repo `.env` holds a live key — do not read it).
 - Do not dispatch subagents.

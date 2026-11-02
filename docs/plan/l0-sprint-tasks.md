@@ -82,38 +82,28 @@ These bind every task and every review.
     section 10 (six questions + the card's coherence question), distinguishing
     passed / failed / blocked / not run.
 
-## Environment facts (a Linux cloud container, from 2026-11-01)
+## Environment facts (the product owner's Mac, from 2026-11-02)
 
-The product is Careerwright (called Nessa until 2026-10-30). The build moved from the product
-owner's Mac to a Claude Code cloud container on 2026-11-01. The machine note,
-`planning/env-cloud.md`, has the details; where an older file names a Mac path or branch,
-read it as below.
-- Main tree: `/home/user/careerwright`. Worktrees: `/home/user/careerwright-wt/<id>`, branch
-  `wt-<id>`.
+The product is Careerwright (called Nessa until 2026-10-30). The build ran in a Claude Code
+cloud container on 1–2 November 2026 (its note, `planning/env-cloud.md`, is a record) and
+came back to the product owner's Mac on 2026-11-02.
+- macOS arm64, Docker Desktop (engine 29.1.2), uv 0.9.18, Node 24 through nvm, pnpm
+  10.33.2. Host Python is 3.14; the backend uses only `backend/.venv` (uv-managed Python
+  3.12, built with `uv sync --locked`).
+- Main tree: `/Users/darianraad/Code/careerwright`. Worktrees:
+  `/Users/darianraad/Code/careerwright-wt/<id>`, branch `wt-<id>`.
 - Integration branch: `claude/confident-ramanujan-ux3saw` (the controller's;
   `l0-local-release` was merged into `main` on GitHub). Only the controller moves it.
-- Node 24 is at `/opt/node24/bin`, with pnpm 10.33.2 through corepack. Start every shell
-  command that runs node or pnpm (including `make check`) with
-  `export PATH=/opt/node24/bin:$PATH;`. The `/opt/node22` on the default PATH is the wrong
-  version.
-- Python 3.12 for the backend: `backend/.venv` (built with `uv sync --locked`). Never use
-  another Python for the backend.
-- Fast checks: `env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY make check`. The container
-  exports both Adzuna variables, and one test reads the process environment. Never print
-  either value.
-- Docker: PostgreSQL 16 and the Firebase Auth emulator run only in containers. The
-  controller starts `dockerd` and builds the images with `planning/cloud-build-images.sh`
-  (the build shim: the session proxy and its CA, at build time only). Implementers never
-  start Docker, pull or build images. The controller runs `make acceptance` once per batch,
-  under the lock `/home/user/careerwright/.superpowers/acceptance.lock`; report it as "not
+- Fast checks: `make check`.
+- Docker: PostgreSQL 16 and the Firebase Auth emulator run only in containers.
+  Implementers never start Docker, pull or build images. The controller runs
+  `make acceptance` once per batch, under the lock
+  `/Users/darianraad/Code/careerwright/.superpowers/acceptance.lock`; report it as "not
   run: the controller runs acceptance". A focused stack or integration test runs only when
   your dispatch asks for it, under the same lock.
-- Chromium for the acceptance journeys: `CAREERWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium`
-  (opt-in in `apps/web/playwright.config.ts`) runs them on the machine's own Chromium. Never
-  reinstall Playwright's browsers here.
 - Web requests and live calls: the controller makes every web fetch and every live call.
   Implementers and reviewers make none.
-- `META_API_KEY` and the Adzuna credentials are in `/home/user/careerwright/.env`
+- `META_API_KEY` and the Adzuna credentials are in `/Users/darianraad/Code/careerwright/.env`
   (gitignored). Never read it, print a key, echo it, pass it as a command argument, write it
   elsewhere, or commit it; code and tooling load it themselves.
 - Git: commit on the branch your dispatch names, with messages ending
@@ -261,8 +251,8 @@ read it as below.
   superseded wording is under "Superseded rulings" in `planning/controller-state.md`.
   - **Today's rules, in short:**
     - Up to four implementers at once, on disjoint files: one in the main tree
-      (`/home/user/careerwright`), the rest in git worktrees
-      (`/home/user/careerwright-wt/<id>`, branch `wt-<id>`).
+      (`/Users/darianraad/Code/careerwright`), the rest in git worktrees
+      (`/Users/darianraad/Code/careerwright-wt/<id>`, branch `wt-<id>`).
     - One reviewer per piece, or per half, covering both the experience and the code.
     - One fix round at most. Only safety, truth and lost-input problems are fixed inside a
       piece; everything else goes on a list.

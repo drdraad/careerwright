@@ -289,19 +289,19 @@ replaced it.
   - Up to two implementers at once: one in the main tree, one in a git worktree
     (`/Users/darianraad/Code/careerwright-wt/<id>`, branch `wt-<id>`), on disjoint
     modules.
-  *Widened to three by R16 and to four by R17. The worktree path is now
-  `/home/user/careerwright-wt/<id>` (`planning/env-cloud.md`).*
+  *Widened to three by R16 and to four by R17. The worktree path was
+  `/home/user/careerwright-wt/<id>` in the cloud (1–2 November) and is this one again on
+  the Mac from 2 November.*
 - From R15, its last clause as first written (the branch name only changed since):
   - The controller integrates a worktree by fast-forwarding `l0-local-release` after the
     implementer rebases onto it; an implementer never moves `l0-local-release`.
   *`l0-local-release` was merged into `main` on GitHub; the integration branch is now
-  `claude/confident-ramanujan-ux3saw` (`planning/env-cloud.md`).*
+  `claude/confident-ramanujan-ux3saw`.*
 - From R16 (Speed):
   - **Full checks once per piece.** Implementers run `make check` after each change and
     `make acceptance` once, at the end of the piece (after its fix round, if any).
   *Replaced by R17's "`make acceptance` runs once per batch of integrated halves": the
-  controller runs it once per batch, and implementers never start Docker
-  (`planning/env-cloud.md`). R16's "A flaky failure is re-run once; a second failure is a
+  controller runs it once per batch, and implementers never start Docker. R16's "A flaky failure is re-run once; a second failure is a
   finding." stays.*
   - **Up to three implementers at once,** on disjoint modules: one in the main tree and up to
     two in worktrees. This widens R15's two; R15's other rules stand. Each card's
