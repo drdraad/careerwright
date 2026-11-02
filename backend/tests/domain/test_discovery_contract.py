@@ -139,6 +139,22 @@ def test_removing_a_target_or_putting_one_back_leaves_a_slate_current() -> None:
     assert not stays_current([pinned, answered(one_left, removed_by, cities=["York"])], choices)
 
 
+@pytest.mark.req("STATE-10", "REC1-03")
+def test_a_change_to_the_tasks_the_person_doesnt_enjoy_alone_leaves_a_slate_current() -> None:
+    # Task W2F: no suggestion reads them, so changing them asks the slate nothing new.
+    pinned = document(enjoyed_tasks=["repairing physical objects"])
+    edited = uuid.uuid4()
+    disliked = answered(pinned, edited, disliked_tasks=["filling in forms"])
+    more = answered(disliked, edited, disliked_tasks=["filling in forms", "early starts"])
+    skipped = unanswered(more, edited, "disliked_tasks", "skipped")
+
+    assert stays_current([pinned, disliked, more, skipped], frozenset())
+    # Beside another answer's change, the answers still changed.
+    assert not stays_current(
+        [pinned, answered(disliked, edited, enjoyed_tasks=["repairing bikes"])], frozenset()
+    )
+
+
 @pytest.mark.req("REC1-01", "DIV1-10")
 def test_the_evidence_is_the_confirmed_answers_that_describe_work_and_nothing_else() -> None:
     evidence = evidence_of(P02)

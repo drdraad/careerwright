@@ -15,9 +15,10 @@ const WS = "w-known";
 const unasked = { state: "unasked" as const, value: null, source_ref_id: null };
 const given = <T,>(value: T) => ({ state: "provided" as const, value, source_ref_id: "s1" });
 const document: ProfileDocument = {
-  schema_version: "4",
+  schema_version: "5",
   work_status: unasked,
   qualifications: unasked,
+  disliked_tasks: unasked,
   preferred_name: unasked,
   current_role: given("Warehouse shift supervisor"),
   cities: given(["Leeds"]),
@@ -210,5 +211,46 @@ describe("[STATE-10][PROF-07] What we know's targets: Remove beside each, with U
     expect(screen.getByRole("region", { name: "Not asked yet" })).not.toHaveTextContent(
       "Target roles",
     );
+  });
+});
+
+describe("[REC1-04] tasks the person doesn't enjoy are an answer of their own (Task W2F)", () => {
+  it("shows them under their own label, apart from the tasks they enjoy", async () => {
+    profileApi({
+      ...at(4, document.target_titles),
+      document: {
+        ...document,
+        enjoyed_tasks: given(["helping people"]),
+        disliked_tasks: given(["filling in forms", "early starts"]),
+      },
+    });
+    renderKnown();
+
+    const answers = await screen.findByRole("region", { name: "Your answers" });
+    const disliked = within(answers).getByText("Tasks you don't enjoy");
+    expect(disliked.closest(".fact")).toHaveTextContent("filling in forms, early starts");
+    expect(within(answers).getByText("Tasks you enjoy").closest(".fact")).toHaveTextContent(
+      "helping people",
+    );
+  });
+
+  it("keeps them when a target is removed: the save sends them as stored", async () => {
+    const sent = profileApi({
+      ...at(4, document.target_titles),
+      document: { ...document, disliked_tasks: given(["filling in forms"]) },
+    });
+    const user = renderKnown();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Remove Zoo keeper from your targets" }),
+    );
+
+    await screen.findByRole("heading", { name: "Removed “Zoo keeper” from your targets" });
+    expect(saves(sent)[0]?.body).toMatchObject({
+      profile: {
+        target_titles: { state: "provided", value: ["Veterinary nurse", "Animal care attendant"] },
+        disliked_tasks: { state: "provided", value: ["filling in forms"] },
+      },
+    });
   });
 });
