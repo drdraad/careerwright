@@ -332,7 +332,9 @@ export function ProfileEditor({
           }}
         />
       )}
-      <div className="flex flex-wrap items-center gap-12">
+      {/* Kept in view at the foot of the window while the form is open (session W2, finding 9:
+          Save was some 3,400 px down). */}
+      <div className="form-save flex flex-wrap items-center gap-12">
         <Button
           ref={saveButton}
           type="submit"

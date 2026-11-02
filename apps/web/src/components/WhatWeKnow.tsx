@@ -2,15 +2,22 @@
 // "What we know" in brief (spec section 3): the answers so far and what is not known yet,
 // each in words (Unknown, Skipped and Prefer not to say are answers, never blanks), the limits
 // explained in plain words (session 2: "total spending limit and monthly payment limit - what
-// do these mean??"), and the way in to edit them. `SaveNotice` says what the last decision
-// saved, with Undo in its own colour (session 2, C3), wherever the person is.
+// do these mean??"), and the way in to edit them. The targets come first, in a short list of
+// their own, each with its Remove (Task W2F). `SaveNotice` says what the last decision saved,
+// with Undo in its own colour (session 2, C3), wherever the person is.
 import { type ReactNode, type Ref, useId } from "react";
 import type { ProfileOut } from "@/generated/api";
 import { describeField } from "@/lib/profile";
 import { useRevertProfile } from "@/lib/queries";
-import { EXPLAINED_FIELDS, PROFILE_FIELD_ORDER, PROFILE_FIELDS } from "@/lib/vocabulary";
+import {
+  EXPLAINED_FIELDS,
+  PROFILE_FIELD_ORDER,
+  PROFILE_FIELDS,
+  YOUR_TARGETS,
+} from "@/lib/vocabulary";
 import { Button } from "./Button";
 import { RequestFailure } from "./PageState";
+import { RemovalNotice, RemoveButton, targetTitles, useTargetRemoval } from "./TargetRemoval";
 
 /**
  * What the person's last decision on Careerwright's proposals did: saved a new version (which
@@ -85,10 +92,43 @@ export function SaveNotice({
   );
 }
 
+const IN_THE_LIST = "known";
+
+/** The person's targets, near the top, each with its Remove (Task W2F; session W2, finding 2).
+ *  Listed here only: the target roles are never repeated among the answers. */
+function YourTargets({ profile }: { profile: ProfileOut }) {
+  const removal = useTargetRemoval(profile);
+  const titles = targetTitles(profile);
+  return (
+    <section className="known-group" aria-labelledby="known-targets">
+      <h3 id="known-targets">{YOUR_TARGETS.heading}</h3>
+      {titles.length === 0 ? (
+        <p className="small muted">
+          {describeField(profile.document.target_titles, "target_titles")}
+        </p>
+      ) : (
+        <ul className="fact-list">
+          {titles.map((title) => (
+            <li key={title} className="target-row">
+              <span className="target-title">{title}</span>
+              <RemoveButton
+                title={title}
+                busy={removal.busy}
+                onRemove={() => removal.remove([title], IN_THE_LIST)}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+      <RemovalNotice removal={removal} where={IN_THE_LIST} level="h4" />
+    </section>
+  );
+}
+
 /**
  * The view's action comes first, under its heading, and the answer form it opens right under
  * it, so a phone shows the decision in its first screen however many answers there are (F7,
- * design review I3); the answers follow.
+ * design review I3); the targets follow, each with its Remove, then the other answers.
  */
 export function WhatWeKnow({
   profile,
@@ -102,8 +142,10 @@ export function WhatWeKnow({
   /** The answer form, while it is open. */
   form: ReactNode;
 }) {
-  const known = PROFILE_FIELD_ORDER.filter((name) => profile.document[name].state !== "unasked");
-  const open = PROFILE_FIELD_ORDER.filter((name) => profile.document[name].state === "unasked");
+  // The targets have their own list above.
+  const answers = PROFILE_FIELD_ORDER.filter((name) => name !== "target_titles");
+  const known = answers.filter((name) => profile.document[name].state !== "unasked");
+  const open = answers.filter((name) => profile.document[name].state === "unasked");
 
   return (
     <>
@@ -118,6 +160,7 @@ export function WhatWeKnow({
         </Button>
       </div>
       {form}
+      <YourTargets profile={profile} />
       <section className="known-group" aria-labelledby="known-answers">
         <h3 id="known-answers">Your answers</h3>
         {known.length === 0 ? (

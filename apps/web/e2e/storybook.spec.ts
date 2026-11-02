@@ -1,13 +1,14 @@
-// Every Storybook state renders without errors and passes axe (UI-04, UI-06). Runs against the
-// static build (`pnpm run build-storybook`, done first by `make acceptance`), served on an
-// ephemeral loopback port; it needs no stack.
+// Every Storybook state renders without errors and passes axe (UI-04, UI-06); What we know's
+// long answers stay clear of their labels, and the open answer form keeps Save in reach, at
+// three widths (Task W2F). Runs against the static build (`pnpm run build-storybook`, done
+// first by `make acceptance`), served on an ephemeral loopback port; it needs no stack.
 import { existsSync, readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
-import { axe } from "./helpers";
+import { axe, inReach, overprintedLabels } from "./helpers";
 
 const STATIC = fileURLToPath(new URL("../storybook-static/", import.meta.url));
 const TYPES: Record<string, string> = {
@@ -68,4 +69,43 @@ test("[UI-04][UI-06] every story renders cleanly and passes axe", async ({ page 
 
   expect(stories.length).toBeGreaterThanOrEqual(25);
   expect(failures).toEqual({});
+});
+
+const WIDTHS = [
+  { width: 1440, height: 900 },
+  { width: 768, height: 1024 },
+  { width: 390, height: 844 },
+] as const;
+
+test("[UI-11] What we know's long answers: no label is printed over its value at any width (session W2, finding 1)", async ({
+  browser,
+}) => {
+  for (const viewport of WIDTHS) {
+    const page = await browser.newPage({ viewport });
+    await page.goto(`${origin}/iframe.html?id=what-we-know--long-values&viewMode=story`);
+    await expect(page.locator(".fact").first()).toBeVisible();
+    await page.evaluate(() => document.fonts.ready);
+    expect(await page.locator(".fact").count()).toBeGreaterThanOrEqual(6);
+    expect(await overprintedLabels(page), `${viewport.width} px`).toEqual([]);
+    await page.close();
+  }
+});
+
+test("[UI-12] the answer form's Save stays in reach while the form is open (session W2, finding 9)", async ({
+  browser,
+}) => {
+  for (const viewport of WIDTHS) {
+    const page = await browser.newPage({ viewport });
+    await page.goto(`${origin}/iframe.html?id=what-we-know--answer-form-open&viewMode=story`);
+    const save = page.getByRole("button", { name: "Save changes" });
+    await expect(save).toBeVisible();
+    // Each field at the top of the window, from the first to the last: Save is in view.
+    for (const field of ["target_titles", "qualifications", "monthly_payment_cap", "work_style"]) {
+      await page
+        .locator(`[data-field='${field}']`)
+        .evaluate((element) => element.scrollIntoView({ block: "start" }));
+      expect(await inReach(save), `${viewport.width} px, ${field} at the top`).toBe(true);
+    }
+    await page.close();
+  }
 });

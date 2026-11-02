@@ -1,7 +1,8 @@
 // The visual review package (plan section 5, UI-11): every chapter and the shell's default,
 // selected, empty, stale, unavailable and failed states, and the You chapter's states as
 // rebuilt in Sprint W and finished in Task W2E (the start with its reply field, what we know
-// with the limits explained, a reply to review, a decided reply with Undo, the role-or-explore
+// with the limits explained and with long answers (Task W2F), a reply to review, a decided
+// reply with Undo, the role-or-explore
 // question with its two ways on, the slate in its own view with its written note written,
 // pending and unavailable, a chosen target confirmed in place, the support panel, a failed
 // reply, key consent, Unknown/Skipped/Prefer not to say, the scrolled stale conflict and its
@@ -26,7 +27,16 @@ import {
   saveElsewhere,
   talkedWorkspace,
 } from "./api";
-import { type AxeViolation, axe, chapterUrl, liveUpdates, saved, signIn, youView } from "./helpers";
+import {
+  type AxeViolation,
+  axe,
+  chapterUrl,
+  liveUpdates,
+  overprintedLabels,
+  saved,
+  signIn,
+  youView,
+} from "./helpers";
 import { FIXTURE_WORKSPACE, stack } from "./stack";
 
 const VIEWPORTS = [
@@ -283,7 +293,51 @@ type Scratch = {
   /** As `named`, the closest occupation chosen, with seniority and industry given and one
    *  skill ESCO lists marked "not part of my job" (Task 6d slice C). */
   detailed: string;
+  /** Long answers beside short labels: three long targets, an expected qualification and long
+   *  task answers (Task W2F; session W2, finding 1). */
+  long: string;
 };
+
+/** Long answers, as a person might give them (invented for layout testing): every label
+ *  must stay clear of its value at every width. */
+async function longAnswersWorkspace(token: string): Promise<string> {
+  const { workspace_id: workspace } = await asBrowser<{ workspace_id: string }>(
+    "POST",
+    "/v1/workspaces",
+    token,
+    { name: "Long answers (synthetic)", data_mode: "demo", synthetic: true },
+  );
+  const path = `/v1/workspaces/${workspace}/profile`;
+  const blank = await asBrowser<{ document: Record<string, unknown> }>("GET", path, token);
+  const profile: Record<string, unknown> = Object.fromEntries(
+    Object.keys(blank.document)
+      .filter((field) => field !== "schema_version")
+      .map((field) => [field, { state: "unasked" }]),
+  );
+  const given = (value: unknown) => ({ state: "provided", value });
+  Object.assign(profile, {
+    target_titles: given([
+      "Senior data governance and information quality manager",
+      "Clinical data standards and interoperability specialist",
+      "Veterinary nurse in a large animal referral hospital",
+    ]),
+    current_role: given("Warehouse shift supervisor on nights and weekend cover"),
+    cities: given(["Manchester", "Newcastle upon Tyne", "Kingston upon Hull"]),
+    work_status: given("in_education_or_training"),
+    qualifications: given([
+      { name: "A levels in Biology, Chemistry and English Literature", status: "expected" },
+      { name: "GCSEs in nine subjects", status: "achieved" },
+    ]),
+    enjoyed_tasks: given([
+      "looking after animals",
+      "being outdoors in all weathers",
+      "helping people who are worried about something",
+    ]),
+    confident_tasks: given(["explaining complicated rules to new starters on a busy shift"]),
+  });
+  await asBrowser("PUT", path, token, { expected_version: 0, profile });
+  return workspace;
+}
 
 /** A role with its closest ESCO occupation, its seniority and industry, and one skill ESCO
  *  lists for its kind of work marked not part of the job. */
@@ -425,6 +479,26 @@ const shots = (scratch: Scratch): Shot[] => [
       await inYou("What we know")(page);
       await expect(page.getByText(/^The most you'd spend on your next step/)).toBeVisible();
       await expect(page.getByText("Loading the early sketch")).toHaveCount(0); // B-M5
+    },
+  },
+  {
+    // Long answers beside their labels, the targets in their own list with Remove: no label is
+    // printed over its value at any width (Task W2F; session W2, finding 1).
+    name: "you--what-we-know-long",
+    as: "ada",
+    url: chapterUrl("you", scratch.long),
+    ready: async (page) => {
+      await inYou("What we know")(page);
+      const targets = page.getByRole("region", { name: "Your targets" });
+      await expect(
+        targets.getByRole("button", { name: /^Remove .* from your targets$/ }),
+      ).toHaveCount(3);
+      await expect(
+        page.getByText(/^A levels in Biology.*\(expected, not achieved yet\)/),
+      ).toBeVisible();
+      await page
+        .getByRole("region", { name: "Your answers" })
+        .evaluate((element) => element.scrollIntoView({ block: "start" }));
     },
   },
   {
@@ -892,30 +966,6 @@ function expectClean(results: Result[], reflow = true) {
   }
 }
 
-/** Each `dt` whose painted text meets the painted text of the `dd` after it. */
-function overprintedLabels(page: Page): Promise<string[]> {
-  return page.evaluate(() => {
-    const textBoxes = (element: Element) => {
-      const range = document.createRange();
-      range.selectNodeContents(element);
-      return Array.from(range.getClientRects()).filter((box) => box.width > 0);
-    };
-    const meet = (a: DOMRect, b: DOMRect) =>
-      Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.5 &&
-      Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.5;
-    const found: string[] = [];
-    for (const label of document.querySelectorAll("dt")) {
-      const value = label.nextElementSibling;
-      if (value?.tagName !== "DD") continue;
-      const values = textBoxes(value);
-      if (textBoxes(label).some((box) => values.some((other) => meet(box, other)))) {
-        found.push(label.textContent ?? "");
-      }
-    }
-    return found;
-  });
-}
-
 test.beforeAll(() => {
   // The named fixture workspace exactly as seeded: P01's answers, version 1.
   stack("reset-demo");
@@ -949,6 +999,7 @@ for (const viewport of VIEWPORTS) {
         chosen: (await chosenTargetWorkspace(token)).workspace,
         named: await create("Your title (synthetic)", "demo"),
         detailed: await detailedWorkspace(token),
+        long: await longAnswersWorkspace(token),
       };
       await asBrowser("POST", `/v1/workspaces/${scratch.named}/origin/role/title`, token, {
         expected_version: 0,

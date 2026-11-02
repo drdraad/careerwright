@@ -444,6 +444,31 @@ export const SUGGESTION_WORDS = {
   skillsNamed: (first: string, more: boolean) =>
     more ? `Among them: ${first}.` : `Those skills: ${first}.`,
   otherSkills: (count: number) => `The other ${count} ${count === 1 ? "skill" : "skills"}`,
+  /** An open suggestion's ESCO description, under its own heading so it is never read as part
+   *  of the title, with the kind of work after it (session W2, finding 8). */
+  whatTheWorkIs: "What the work is",
+  kindOfWork: (label: string) => `Kind of work: ${label}`,
+  /** Beside Make this a target when the targets are full: where one can be removed. */
+  full: (limit: number) =>
+    `You have ${limit} targets, the most you can have. To add this one, remove one in What we know.`,
+} as const;
+
+/** The person's targets in What we know, and removing one there or on a saved suggestion (Task
+ *  W2F; session W2, finding 2): what Careerwright did, with Undo in place. Removing the last
+ *  target leaves the target roles Unknown (Task W2F's ruling). */
+export const YOUR_TARGETS = {
+  heading: "Your targets",
+  remove: "Remove",
+  /** Read after "Remove" by assistive tech: which target. */
+  removeWhich: (title: string) => `${title} from your targets`,
+  removing: "Removing…",
+  undoing: "Undoing…",
+  removed: (titles: readonly string[]) => `Removed ${quotedList(titles)} from your targets`,
+  undo: "Undo",
+  /** Read after "Undo" by assistive tech: what it undoes. */
+  undoWhich: (titles: readonly string[]) => `removing ${quotedList(titles)}`,
+  undone: (titles: readonly string[]) =>
+    `Undone: ${quotedList(titles)} ${titles.length === 1 ? "is one of your targets" : "are your targets"} again`,
 } as const;
 
 /** A streamed reply's state in words. Only "incomplete" is final; nothing streamed is saved. */
