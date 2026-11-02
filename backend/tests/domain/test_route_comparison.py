@@ -10,7 +10,7 @@ import pytest
 from careerwright.errors import CareerwrightError, ErrorCode
 from careerwright.money import SignedMoney
 from careerwright.planning.catalogue import ActionKind, AwardState, OfferGate, RecordState
-from careerwright.planning.checker import Scenario
+from careerwright.planning.checker import FindingCode, Scenario
 from careerwright.planning.comparison import (
     COMPARATOR_RULE,
     PROJECTION_POINTS,
@@ -23,7 +23,7 @@ from careerwright.planning.comparison import (
     route_detail,
     schedule_page,
 )
-from careerwright.planning.compiler import MonthlyInput, compile_input
+from careerwright.planning.compiler import ExistingDebt, MonthlyInput, compile_input
 from careerwright.planning.families import EqualPoint
 from careerwright.planning.inputs import BaselineKind
 from careerwright.planning.search import (
@@ -35,6 +35,7 @@ from careerwright.planning.search import (
     search_routes,
 )
 from tests.support.planning import (
+    CONSTRUCTED,
     START,
     catalogue_of,
     directai_fixture,
@@ -198,6 +199,47 @@ def test_a_route_longer_than_the_model_is_its_own_state_never_no_route() -> None
     assert found.code is None  # never "no route"
     assert found.longer_than_model == ["degree"]
     assert found.beyond_horizon == []
+
+
+@pytest.mark.req("PLN-12", "API-02")
+def test_a_limit_that_rules_out_the_shorter_course_keeps_no_route_beside_a_long_degree() -> None:
+    """Review 14A, Important 1: a two-month course over the direct-spend cap beside a 36-month
+    degree. The long degree is not the whole reason nothing fits: the person's own limit rules
+    out the shorter course, so no route leads, with its code, and the degree is named beside."""
+    short = course("short", months=2, payments=((0, 500000),))
+    degree = course("degree", months=36)
+    monthly = constructed(24, short, degree, teaches=("short", "degree"), direct_cap=100000)
+    result = search_routes(monthly)
+    found = comparison(result, monthly)
+
+    assert result.outcome is Outcome.NO_ROUTE_IN_BOUNDED_MODEL
+    assert found.lead is Lead.NO_ROUTE_IN_BOUNDED_MODEL
+    assert found.code == "NO_ROUTE_IN_BOUNDED_MODEL"
+    assert found.longer_than_model == ["degree"]
+    [aside] = [s for s in found.set_aside if s.variant_id == "short"]
+    assert FindingCode.DIRECT_SPEND_CAP in aside.violations  # the checker's breach, named
+
+
+@pytest.mark.req("PLN-12", "API-02")
+def test_a_starting_breach_keeps_no_route_beside_a_long_degree() -> None:
+    """Review 14A, Important 1: repayments already above the payment cap rule out every route
+    whatever its length, so no route leads, the breach named, the degree beside."""
+    card = ExistingDebt(
+        debt_id="card", monthly_repayment_minor=1500, balance_minor=None, cited=CONSTRUCTED
+    )
+    degree = course("degree", months=36)
+    short = course("short", months=2)
+    monthly = constructed(
+        24, short, degree, teaches=("short", "degree"), monthly_cap=1000, existing_debts=[card]
+    )
+    result = search_routes(monthly)
+    found = comparison(result, monthly)
+
+    assert result.outcome is Outcome.NO_ROUTE_IN_BOUNDED_MODEL
+    assert found.lead is Lead.NO_ROUTE_IN_BOUNDED_MODEL
+    assert found.code == "NO_ROUTE_IN_BOUNDED_MODEL"
+    assert found.longer_than_model == ["degree"]
+    assert {f.code for f in found.starting_violations} == {FindingCode.REPAYMENTS_ABOVE_PAYMENT_CAP}
 
 
 @pytest.mark.req("PLN-12", "API-02")

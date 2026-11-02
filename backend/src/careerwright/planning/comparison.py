@@ -100,9 +100,9 @@ class Lead(StrEnum):
     BEST_TRADE_OFFS_FOUND = "best_trade_offs_found"  # routes, complete or not
     NONE_FOUND_BEFORE_LIMIT = "none_found_before_limit"  # stopped early: never "no route"
     UNRESOLVED = "unresolved"  # complete, nothing proved, something unknown: what to confirm
-    # Nothing in the bounded model reaches the target, and an option it needs takes longer
-    # than the 24-month model plans (plan v1.6): its own state, never "no route", "not
-    # feasible" or impossible.
+    # Nothing in the bounded model reaches the target only because an option it needs takes
+    # longer than the 24-month model plans, with no breach of any limit (plan v1.6;
+    # `_only_length`): its own state, never "no route", "not feasible" or impossible.
     LONGER_THAN_MODEL = "longer_than_model"
     NO_ROUTE_IN_BOUNDED_MODEL = "no_route_in_bounded_model"  # complete, nothing unknown
 
@@ -648,7 +648,25 @@ def _lead(result: SearchResult, longer: list[str]) -> Lead:
         return Lead.NONE_FOUND_BEFORE_LIMIT
     if result.outcome is Outcome.UNRESOLVED:
         return Lead.UNRESOLVED
-    return Lead.LONGER_THAN_MODEL if longer else Lead.NO_ROUTE_IN_BOUNDED_MODEL
+    return (
+        Lead.LONGER_THAN_MODEL if _only_length(result, longer) else Lead.NO_ROUTE_IN_BOUNDED_MODEL
+    )
+
+
+def _only_length(result: SearchResult, longer: list[str]) -> bool:
+    """Whether options longer than the model are the whole reason nothing fits (review 14A,
+    Important 1): some option is longer, and nothing the checker lists rules out any route,
+    shorter ones included. No breach in the starting position, no option set aside for a
+    breach of its own, no candidate checked and found not feasible, and no subtree cut for a
+    breach. Otherwise the bounded model's no-route leads, its violations named, and the long
+    options are listed beside it."""
+    return (
+        bool(longer)
+        and not result.starting_violations
+        and not any(s.violations for s in result.set_aside)
+        and result.not_feasible == 0
+        and not any(result.pruned.values())
+    )
 
 
 def _long_options(monthly: MonthlyInput, limits: M0SearchLimits) -> tuple[list[str], list[str]]:

@@ -487,10 +487,16 @@ parts).
     the baseline's kind and monthly pay); the model's bounds (`limits`) and the pack's label;
     options longer than the 24-month model (`longer_than_model`: usable only after month 24)
     and those beyond this horizon only (`beyond_horizon`). **Ruling:** a complete search that
-    finds no route while an option is longer than the model leads with `longer_than_model`,
-    and its `code` is then null: "longer than Careerwright can plan yet", never "no route",
-    "not feasible" or impossible (plan v1.6; PLN-12). With anything unknown it stays
-    `unresolved`, the long options listed beside. **The projection** (VIS2-09): every point
+    finds no route leads with `longer_than_model`, its `code` then null, only when options
+    longer than the model are the whole reason nothing fits: some option is longer, and
+    nothing the checker lists rules out any route (no starting breach, no option set aside for
+    a breach of its own, no candidate found not feasible, no subtree cut for a breach). Then
+    it is "longer than Careerwright can plan yet", never "no route", "not feasible" or
+    impossible (plan v1.6; PLN-12). Otherwise `no_route_in_bounded_model` leads with its code
+    and the checker's violations, the long options listed beside it (fix round 1, review 14A,
+    Important 1: a course over the spend cap beside a 36-month degree once led with the
+    degree and hid the breach). With anything unknown it stays `unresolved`, the long
+    options listed beside. **The projection** (VIS2-09): every point
     in F1 to F3 (at most one a month in each), the points of pinned schedules, the soonest and
     the cheapest beyond F3, then others beyond F3 evenly spaced in order of time and cost, up
     to 200, with `points_shown` and `points_total`; a point names at most 20 of its schedules
