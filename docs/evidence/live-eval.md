@@ -60,3 +60,11 @@ Budget scope `wonder-qualification`. Model `muse-wonder-1.0` (production model, 
 |---|---|---|---|---|
 | EXP-01 P02: each suggestion's written why quotes P02's answers and ESCO's record, and nothing else | explanation | discovery complete, explanation complete | pass | - |
 
+## Live evaluation, 2026-11-02 22:30 UTC
+
+Budget scope `live-eval`. Model `muse-spark-1.3-contributor` (test model, synthetic cases only); 1 cases; at most 2 requests, worst case $0.003500; ledger rows [55]. Failures by type: none. Each case's output is kept in the private evidence directory (`CAREERWRIGHT_HOME/evidence/live-eval.jsonl`, not committed).
+
+| Case | Kind | Run | Result | Failures |
+|---|---|---|---|---|
+| INT-19 Sam's first message, sent before choosing how to start: a pay cut hinted without a figure is asked for in pounds next, never proposed, and the start choice is never asked | interview | complete | pass | - |
+
