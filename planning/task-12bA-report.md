@@ -246,3 +246,75 @@ C04: a supplied cost recasts a stated instalment plan as a lump in month 0 and
 over-qualifies the page-priced variant.
 
 Counts: Critical 0, Important 1, Minor 6.
+
+## Fix round 1
+
+Status: DONE. Fresh implementer. Worktree `/home/user/careerwright-wt/12b`, branch `wt-12b`,
+rebased onto `claude/confident-ramanujan-ux3saw` (6d59c2f). Head `5dd0534`.
+
+Commit: `5dd0534` Figures: a supplied cost fills only what a plan leaves unstated, in its own
+shape; only routes on that plan rest on it (review 12bA, Important 1). The four earlier
+commits were replayed by the rebase (now `2f40790`..`d0a9709`).
+
+### I1, fixed
+- **The rule** (`planning/figures.py`): a supplied cost is still the whole the person pays,
+  but it fills only what a plan leaves unstated, in the plan's own shape. New
+  `unplaceable(plan, whole)`: a plan whose cost is known (`not_missing`); a plan with a
+  stated schedule, a `Recurring` (`stated_schedule`); a whole below the page's own payments
+  (`below_stated_cost`). Otherwise `_filled` keeps the page's payments and adds the rest of
+  the whole as one payment in the first month (a `fee` where the page states none, else an
+  `extra` beside the page's fee; D12's rule). No plan is renamed or recast. `refused` rejects
+  a cost no plan can take, with the first unknown plan's reason; `with_figures` leaves any
+  plan it can't place unknown (a stored figure).
+- **Who rests on it**: new `PaymentPlan.supplied_cost` marks the plan filled.
+  `Offering.supplied` now holds only dates and hours; `Offering.supplied_for(plan)` adds
+  `cost` only for the plan a variant pays by. The compiler (`compiler.py:383`) and the
+  checkpoint (`OptionFacts.supplied`) both use it, via the new `figures.variant_plan` (the
+  same plan choice `variant_missing` already made).
+- **Effect on pack 0.4.0**: C04 with £3,336.72 is refused `stated_schedule`; stored, its
+  instalments stay "from £69.52 a month", cost unknown (unresolved, no payment-cap
+  violation), and its pay-in-full variant (the page's £2,995) carries no `cost` figure. C01's
+  "as-stated" plan fills as before (fee £0 in month 0). C10 (£295 stated, exam fee not): a
+  £400 whole keeps the £295 and adds a £105 extra; £200 is refused `below_stated_cost`. The
+  only newly created plan (an offering with no plan at all, never in the pack) is called
+  `own-figure`, not `as-stated`.
+- ADR 0013's Task 12b line 1 updated. Generated client regenerated (`PaymentPlan.supplied_cost`
+  and the cost field's description).
+
+### Tests (failing first)
+- New, `tests/domain/test_option_checkpoint.py`:
+  `test_a_supplied_cost_never_recasts_a_stated_instalment_plan` (the reviewer's C04 case on
+  pack 0.4.0: refusal, plans unchanged, the compiled instalments still recurring and cost
+  unknown, no payment-cap finding, pay-in-full and the checkpoint carry no `cost` figure);
+  `test_a_supplied_cost_fills_only_the_unstated_part_of_a_plan` (C10);
+  `test_only_a_route_using_a_supplied_cost_rests_on_it` (the checker case: a constructed
+  C04/C10-shaped catalogue, `tests/support/planning.py` `supplied_costs()`; the pay-in-full
+  route is feasible without `supplied_figures`, the instalments unresolved with no violation,
+  the part-stated route qualified).
+- Oracle: `supplied_costs()` added as an `@example` to the search-equals-oracle test and the
+  independent-checker test in `tests/domain/test_route_oracle.py`.
+- API: `tests/integration/test_option_checkpoint.py` refusal test gains C10's
+  `below_stated_cost` case.
+- RED: all three new domain tests failed on the old code for the reported reasons
+  (`refused` returned None for C04 and for C10's £200; the stated pay-in-full variant carried
+  `[cost]`). GREEN after the change.
+- **Changed expectation (disclosed):**
+  `test_a_supplied_figure_fills_only_a_missing_fact_and_is_labelled_the_person_s` asserted
+  `filled.supplied == [start_date, weekly_hours, cost]` on the offering. The cost now sits on
+  the plan, so it asserts the same list through `filled.supplied_for(plan)` and adds
+  `plan.supplied_cost is True` (plan ID `as-stated`, unchanged). Intended change; the C01
+  route's qualification is unchanged (the integration assertion
+  `c01["supplied"] == ["start_date", "weekly_hours", "cost"]` still holds).
+
+### Checks run
+- `env -u ADZUNA_APPLICATION_ID -u ADZUNA_API_KEY make check` (Node 24), before and after the
+  rebase: pass (backend 2205 passed, 9 skipped; web 472 passed; client matches).
+- Focused integration under the lock with the build shim, one guarded command:
+  `tests/integration/test_option_checkpoint.py tests/integration/test_route_solves.py`:
+  26 passed.
+- `make acceptance`: not run, the controller runs it. Live calls: none, $0.
+
+### Left for the final review
+Minors M1 to M6 untouched. M2 (C01's eligible-learner fee with a supplied cost) is
+unchanged by this fix: C01's plan is still filled, and its eligibility confirmation still
+missing.
