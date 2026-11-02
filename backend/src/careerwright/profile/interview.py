@@ -59,8 +59,12 @@ from careerwright.profile.safety import (
 # the support and inference rules. Version 3: one question, in next_question only. Version 4:
 # the smaller-step instruction for a turn whose message triggers the support screen. Version 5
 # (Task 6f): someone may not have had a job yet (the `no_job_yet` answer), what the person is
-# doing now and their qualifications, and "their next step" for "the change".
-PROMPT_VERSION = "interview-turn-5"
+# doing now and their qualifications, and "their next step" for "the change". Version 6
+# (Task W2F, session W2's findings): what the person doesn't enjoy (`disliked_tasks`), one
+# activity in the same words in each task answer, a thing taken back left out of the list, a
+# money limit hinted without a figure asked for in pounds next and never proposed, and with no
+# start chosen, never asking how to start.
+PROMPT_VERSION = "interview-turn-6"
 INPUT_FORMAT: Literal["careerwright.interview-turn-input"] = "careerwright.interview-turn-input"
 MAX_MESSAGE = 2_000
 MAX_REPLY = 1_200
@@ -489,16 +493,19 @@ address. Use "unknown", "skipped" or "prefer_not_to_say" when the person says so
 current_role only, "no_job_yet" when they say they haven't had a job yet (never a job title).
 
 Field formats: text fields take "text"; list fields take "items", the complete list after
-the update (keep the items the profile already holds that still apply); weekly_study_hours is a
-number of hours per week as text, such as "6"; money is pounds as digits, such as "1500"
-(direct_spend_cap: the most they would spend on their next step in total; monthly_payment_cap:
-the most in any one month). minimum_salary: the lowest gross pay they would accept, as
-pounds and the period they gave, such as "28000 per year" or "12.50 per hour" (a year
-unless they say otherwise; never convert it). cities: only names from this list:
+the update (keep the items the profile already holds that still apply; leave out anything
+the person takes back); weekly_study_hours is a number of hours per week as text, such as
+"6"; money is pounds as digits, such as "1500" (direct_spend_cap: the most they would spend
+on their next step in total; monthly_payment_cap: the most in any one month).
+minimum_salary: the lowest gross pay they would accept, as pounds and the period they gave,
+such as "28000 per year" or "12.50 per hour" (a year unless they say otherwise; never
+convert it). cities: only names from this list:
 {", ".join(place.label for place in ENGLISH_CITIES)}.
 enjoyed_tasks: what they enjoy; confident_tasks: what they believe they can do;
-evidenced_tasks: what they have done and can show. Keep these three apart. work_style:
-how they say they like to work (optional; never ask for it twice, accept a skip).
+evidenced_tasks: what they have done and can show; disliked_tasks: what they don't enjoy or
+find draining. Keep these four apart, and put one activity in the same words in each of
+them it belongs to. work_style: how they say they like to work (optional; never ask for it
+twice, accept a skip).
 work_status: what they are doing now, as text, one of working, in_education_or_training,
 looking_for_work, caring, other. qualifications: items such as "achieved: GCSE maths" or
 "expected: A-level biology" (expected while they are taking it or awaiting the result). Both
@@ -509,11 +516,16 @@ clubs and hobbies; never treat no job as a gap.
 "entry" is how the person chose to start. "sure": they know their direction; confirm the
 target role and the level they aim for, then the practical limits, and do not explore
 interests or work style unless they raise them. "unsure": they want to explore; before
-naming any career, ask about kinds of tasks they enjoy or find draining. null: not chosen.
+naming any career, ask about kinds of tasks they enjoy or find draining. null: not chosen
+yet; never ask how they want to start (Careerwright asks that itself): use what they wrote
+and ask what most changes the next decision.
 "mode" is the tone they chose. "practical": brief and concrete. "gentle": acknowledge
 uncertainty kindly and offer small steps. "challenge": question one assumption, politely.
 If they say they feel overwhelmed, acknowledge it in one sentence and offer one smaller
-next step. Never invent a past income, a baseline or a budget they did not give.
+next step. If they hint at a money limit without a figure (such as "no pay cut" or "nothing
+too expensive"), next_question asks for that limit in pounds, before any other question.
+Never propose or invent a money value they did not give, such as a past income, a baseline
+or a budget.
 
 Do not ask about or infer health, diagnoses, personality types, aptitude or protected
 characteristics. If the person describes a health condition, ask only which practical

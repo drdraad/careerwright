@@ -398,8 +398,7 @@ def test_a_status_the_person_never_said_is_never_shown_as_their_words() -> None:
 
 
 @pytest.mark.req("STATE-11", "PROF-14")
-def test_the_instructions_say_someone_may_not_have_had_a_job_yet_and_the_version_moved() -> None:
-    assert PROMPT_VERSION == "interview-turn-5"
+def test_the_instructions_say_someone_may_not_have_had_a_job_yet() -> None:
     assert (
         "Someone may not have had a job yet: ask about school or college, volunteering, "
         "caring, clubs and hobbies; never treat no job as a gap" in " ".join(INSTRUCTIONS.split())
@@ -407,6 +406,70 @@ def test_the_instructions_say_someone_may_not_have_had_a_job_yet_and_the_version
     assert "no_job_yet" in INSTRUCTIONS
     assert "this change" not in INSTRUCTIONS
     assert "the change" not in INSTRUCTIONS
+
+
+def instructions_text() -> str:
+    """The instructions with line breaks as spaces, as the model reads the sentences."""
+    return " ".join(INSTRUCTIONS.split())
+
+
+# Task W2F (session W2's findings 4 to 7 and Sam's first message): one new prompt version.
+@pytest.mark.req("REC1-04", "PROF-08")
+def test_the_version_moved_and_what_the_person_doesnt_enjoy_goes_in_its_own_answer() -> None:
+    assert PROMPT_VERSION == "interview-turn-6"
+    assert "disliked_tasks: what they don't enjoy or find draining." in instructions_text()
+    assert "Keep these four apart" in instructions_text()
+
+
+@pytest.mark.req("REC1-04", "PROF-08")
+def test_one_activity_takes_the_same_words_in_each_task_answer_it_belongs_to() -> None:
+    # Session W2: one Brownies activity was offered as "done" and as "enjoyed" in two wordings.
+    assert "put one activity in the same words in each of them it belongs to" in (
+        instructions_text()
+    )
+
+
+@pytest.mark.req("PROF-08")
+def test_a_thing_the_person_takes_back_is_left_out_of_the_list_proposed() -> None:
+    # A list proposal is the whole list after it and replaces the saved one.
+    assert (
+        "keep the items the profile already holds that still apply; leave out anything the "
+        "person takes back" in instructions_text()
+    )
+
+
+@pytest.mark.req("PROF-08", "PROF-04")
+def test_a_hinted_money_limit_is_asked_for_in_pounds_next_and_never_proposed() -> None:
+    # Session W2: Sam's "a pay cut" got no pounds question.
+    assert (
+        'If they hint at a money limit without a figure (such as "no pay cut" or "nothing too '
+        'expensive"), next_question asks for that limit in pounds, before any other question.'
+        in instructions_text()
+    )
+    assert "Never propose or invent a money value they did not give" in instructions_text()
+
+
+@pytest.mark.req("PROF-08")
+def test_with_no_start_chosen_the_interviewer_never_asks_how_to_start() -> None:
+    # Session W2: Sam wrote before choosing, and Muse asked the start choice instead.
+    assert (
+        "null: not chosen yet; never ask how they want to start (Careerwright asks that itself): "
+        "use what they wrote and ask what most changes the next decision." in instructions_text()
+    )
+
+
+@pytest.mark.req("PROF-09", "REC1-02")
+def test_the_safety_and_no_inference_rules_are_unchanged() -> None:
+    for rule in (
+        "Do not ask about or infer health, diagnoses, personality types, aptitude or protected "
+        "characteristics.",
+        "If the person describes a health condition, ask only which practical adjustment would "
+        "help, and never record the condition in a field.",
+        "Never give a match percentage.",
+        "If they say they feel overwhelmed, acknowledge it in one sentence and offer one smaller "
+        "next step.",
+    ):
+        assert rule in instructions_text()
 
 
 def test_a_reply_without_proposals_is_valid() -> None:
@@ -548,7 +611,7 @@ def test_the_prompt_says_how_the_person_chose_to_start_and_to_be_spoken_to() -> 
     payload = json.loads(render_prompt(ctx).removeprefix(CONTEXT_MARKER))
 
     assert (payload["entry"], payload["mode"]) == ("sure", "gentle")
-    assert ctx.prompt_version == "interview-turn-5"
+    assert ctx.prompt_version == "interview-turn-6"
 
 
 @pytest.mark.req("PROF-09")
