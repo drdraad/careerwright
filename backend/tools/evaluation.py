@@ -151,6 +151,8 @@ class FailureType(StrEnum):
     UNKNOWN_AS_VALUE = "unknown_as_value"  # unknown, skipped or declined turned into a value
     QUESTION = "question"  # more than one question, or the wrong kind of question
     REASKED = "reasked"  # asked again for something already known
+    LEFT_IN = "left_in"  # a list kept what the person took back or doesn't enjoy (Task W2F)
+    SPLIT_ACTIVITY = "split_activity"  # one activity in two wordings across task answers
     INFERENCE = "inference"  # health, type, protected characteristic or percentage inferred
     COUNTERFACTUAL = "counterfactual_drift"  # an irrelevant cue changed the result
     GROUNDING = "grounding"  # a suggestion not grounded in ESCO and the answers
@@ -260,8 +262,9 @@ def _changes(observed: Json) -> dict[str, Json]:
     return {c["field"]: c for c in proposal.get("changes", [])}
 
 
-# Interview checks: `observed` is a turn as the API returns it (`TurnOut`).
-def _interview(observed: Json, e: Expectation) -> Failure | None:
+# Interview checks: `observed` is a turn as the API returns it (`TurnOut`); `held` is the case's
+# profile, as the turn found it.
+def _interview(observed: Json, e: Expectation, held: Json) -> Failure | None:
     proposal = observed.get("proposal")
     if proposal is None:
         return Failure(FailureType.SCHEMA_INVALID, f"run {observed['run']['status']}")
@@ -318,6 +321,27 @@ def _interview(observed: Json, e: Expectation) -> Failure | None:
         if change is None or not change["hard_constraint"]:
             return Failure(FailureType.MISSED_FACT, f"{e.field} not proposed as a hard limit")
         return None
+    if e.check == "list_leaves_out":
+        # Task W2F: a list proposal is the whole list after it, so what the person took back
+        # (or doesn't enjoy) is not in it. A list not proposed is left as it was.
+        change = changes.get(e.field or "")
+        items = change["value"] if change is not None else None
+        kept = [i for i in items or [] if _has(_value_text(i), e.words, whole=e.whole_words)]
+        return Failure(FailureType.LEFT_IN, f"{e.field} keeps {kept}") if kept else None
+    if e.check == "same_words_across":
+        # Task W2F: one activity takes the same words in each task answer it belongs to; an
+        # answer the turn leaves alone is read as the profile holds it.
+        wordings: set[str] = set()
+        for name in e.fields:
+            items = changes[name]["value"] if name in changes else held.get(name)
+            if isinstance(items, list):
+                wordings |= {
+                    " ".join(str(i).casefold().split())
+                    for i in items
+                    if _has(str(i), e.words, whole=e.whole_words)
+                }
+        split = len(wordings) > 1
+        return Failure(FailureType.SPLIT_ACTIVITY, f"{sorted(wordings)}") if split else None
     raise ValueError(f"unknown interview check {e.check!r}")
 
 
@@ -626,7 +650,7 @@ def evaluate(case: Case, observed: Json, others: Mapping[str, Json]) -> list[Fai
                 else _paired(case, observed, other, e)
             )
         elif case.kind is CaseKind.INTERVIEW:
-            failure = _interview(observed, e)
+            failure = _interview(observed, e, case.profile)
         elif case.kind is CaseKind.DISCOVERY:
             failure = _discovery(observed, e, answers_of(case))
         elif case.kind is CaseKind.EXPLANATION:

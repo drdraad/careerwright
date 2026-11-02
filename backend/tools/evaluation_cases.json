@@ -726,9 +726,10 @@
         {"check": "missing_excludes", "fields": ["current_role"]},
         {"check": "one_question"},
         {"check": "question_mentions_any", "words": ["enjoy", "like doing", "interest"]},
-        {"check": "question_avoids", "words": ["job title", "do you do now", "most recently", "age"], "whole_words": true}
+        {"check": "question_avoids", "words": ["job title", "do you do now", "most recently", "age"], "whole_words": true},
+        {"check": "same_words_across", "fields": ["enjoyed_tasks", "confident_tasks", "evidenced_tasks", "disliked_tasks"], "words": ["Brownies"]}
       ],
-      "note": "Task 6e (plan v1.6; TEST1-16): the card's own words. Her subjects may be proposed as expected qualifications (never achieved); the demo interviewer reads them only with the word A-levels, so the case does not require them. Live: CASES=INT-16 on interview prompt version 5."
+      "note": "Task 6e (plan v1.6; TEST1-16): the card's own words. Her subjects may be proposed as expected qualifications (never achieved); the demo interviewer reads them only with the word A-levels, so the case does not require them. Live: CASES=INT-16 on interview prompt version 5. Task W2F (interview-turn-6; session W2 saw her Brownies group as done and as enjoyed in two wordings): wherever the Brownies group goes, it takes the same words."
     },
     {
       "id": "INT-17",
@@ -753,6 +754,41 @@
         {"check": "question_avoids", "words": ["job title", "do you do now", "most recently", "age"], "whole_words": true}
       ],
       "note": "Task 6e. Her current role is already answered (no job yet), so it is never missing and never asked again."
+    },
+    {
+      "id": "INT-18",
+      "kind": "interview",
+      "title": "A dislike goes in its own answer, and something the person takes back is left out of the list proposed",
+      "requirements": ["REC1-04", "REC1-03", "PROF-08"],
+      "synthetic": true,
+      "demo": true,
+      "entry_mode": "unsure",
+      "profile": {
+        "enjoyed_tasks": ["baking cakes", "helping the younger girls with crafts"]
+      },
+      "message": "Synthetic persona: I've gone off baking cakes. And I don't enjoy filling in forms.",
+      "expect": [
+        {"check": "proposes", "field": "disliked_tasks", "words": ["form"]},
+        {"check": "list_leaves_out", "field": "enjoyed_tasks", "words": ["baking", "form"]},
+        {"check": "no_value_for", "fields": ["direct_spend_cap", "monthly_payment_cap", "minimum_salary", "target_titles"]}
+      ],
+      "note": "Task W2F (interview-turn-6; session W2's findings 4 and 6). A list proposal replaces the saved list, so an enjoyed list proposed here must leave out the baking she took back, and her dislike is never an enjoyed task. The demo interviewer reads the dislike and proposes no enjoyed list. Live: CASES=INT-18 on interview prompt version 6."
+    },
+    {
+      "id": "INT-19",
+      "kind": "interview",
+      "title": "Sam's first message, sent before choosing how to start: a pay cut hinted without a figure is asked for in pounds next, never proposed, and the start choice is never asked",
+      "requirements": ["PROF-08", "PROF-04", "REC1-04"],
+      "synthetic": true,
+      "message": "Synthetic persona: Good with people, hate spreadsheets, would retrain if it didn't mean a pay cut for three years.",
+      "expect": [
+        {"check": "proposes", "field": "disliked_tasks", "words": ["spreadsheet"]},
+        {"check": "no_value_for", "fields": ["minimum_salary", "direct_spend_cap", "monthly_payment_cap"]},
+        {"check": "one_question"},
+        {"check": "question_mentions_any", "words": ["£", "pound"]},
+        {"check": "question_avoids", "words": ["explore", "role in mind"]}
+      ],
+      "note": "Task W2F (interview-turn-6; session W2's finding 7 and Sam's step 6, where Muse asked 'Do you already have a target role in mind, or would you like to explore options first?'). No entry mode: he wrote before choosing. Live only: the demo interviewer reads no hinted limit. Live: CASES=INT-19 on interview prompt version 6."
     },
     {
       "id": "DSC-21",

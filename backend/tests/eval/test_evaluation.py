@@ -15,6 +15,7 @@ from tools.evaluation import (
     CaseKind,
     FailureType,
     _discovery,
+    _interview,
     evaluate,
     failures_by_type,
     load_cases,
@@ -163,6 +164,62 @@ def turn(
 
 def change(field: str, value: Any, *, state: str = "provided") -> dict[str, Any]:
     return {"field": field, "state": state, "value": value, "hard_constraint": False}
+
+
+# Task W2F: the cases for interview-turn-6's rules catch the failures session W2 showed.
+@pytest.mark.req("TEST1-10", "PROF-08", "REC1-04")
+def test_a_dislike_has_its_own_answer_and_a_list_leaves_out_what_was_taken_back() -> None:
+    case = BY_ID["INT-18"]  # enjoyed held "baking cakes"; the person has gone off it
+    disliked = change("disliked_tasks", ["filling in forms"])
+    left_out = turn([disliked, change("enjoyed_tasks", ["helping the younger girls"])])
+    kept = turn([disliked, change("enjoyed_tasks", ["baking cakes", "helping the younger girls"])])
+    moved = turn([change("enjoyed_tasks", ["helping the younger girls", "filling in forms"])])
+
+    assert evaluate(case, turn([disliked]), {}) == []  # no enjoyed list proposed: none kept
+    assert evaluate(case, left_out, {}) == []
+    assert [f.type for f in evaluate(case, kept, {})] == [FailureType.LEFT_IN]
+    assert {f.type for f in evaluate(case, moved, {})} == {
+        FailureType.MISSED_FACT,  # the dislike is not in its own answer
+        FailureType.LEFT_IN,  # and sits in the enjoyed list instead
+    }
+
+
+@pytest.mark.req("TEST1-10", "REC1-04")
+def test_one_activity_in_two_wordings_across_the_task_answers_fails() -> None:
+    [check] = [e for e in BY_ID["INT-16"].expect if e.check == "same_words_across"]
+    done = change("evidenced_tasks", ["help run a Brownies group"])
+    same = turn([done, change("enjoyed_tasks", ["help run a Brownies group"])])
+    split = turn([done, change("enjoyed_tasks", ["running Brownies"])])
+    # An answer the turn leaves alone is read as the profile holds it.
+    held = {"evidenced_tasks": ["help run a Brownies group"]}
+    split_from_held = turn([change("enjoyed_tasks", ["running Brownies"])])
+
+    assert _interview(same, check, {}) is None
+    assert _interview(turn([done]), check, {}) is None
+    for observed, profile in ((split, {}), (split_from_held, held)):
+        failure = _interview(observed, check, profile)
+        assert failure is not None
+        assert failure.type is FailureType.SPLIT_ACTIVITY
+
+
+@pytest.mark.req("TEST1-10", "PROF-08", "PROF-04")
+def test_a_hinted_pay_cut_must_be_asked_for_in_pounds_never_with_the_start_choice() -> None:
+    case = BY_ID["INT-19"]  # Sam's words, sent before he chose how to start
+    disliked = change("disliked_tasks", ["spreadsheets"])
+    pounds = "What's the lowest yearly pay, in pounds, you could live with while you retrain?"
+    asked = turn([disliked], question=pounds)
+    # Session W2: Muse asked the start choice instead of the pounds question.
+    session_w2 = turn(
+        [disliked],
+        question="Do you already have a target role in mind, or would you like to explore "
+        "options first?",
+    )
+    floor = {"amount": {"minor_units": 2_500_000, "currency": "GBP"}, "period": "year"}
+    invented = turn([disliked, change("minimum_salary", floor)], question=pounds)
+
+    assert evaluate(case, asked, {}) == []
+    assert {f.type for f in evaluate(case, session_w2, {})} == {FailureType.QUESTION}
+    assert [f.type for f in evaluate(case, invented, {})] == [FailureType.INVENTED_VALUE]
 
 
 @pytest.mark.req("TEST1-10")
