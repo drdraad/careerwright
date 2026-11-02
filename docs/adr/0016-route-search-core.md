@@ -536,8 +536,9 @@ parts).
   measurement; realistic L0 results hold about a thousand schedules or fewer).
 - Scenario whiskers on every point are not computed in the comparison: a chosen route's
   stress cases are (a check per scenario per route would multiply the cost by the archive).
-- **The four planning-model gaps** are proposed as L0 deferrals, awaiting the product owner's
-  yes (not approved): information-gathering and waiting actions as their own actions (PLN-01);
+- **The four planning-model gaps:** three are L0 deferrals (proposed by Task 14A; the
+  product owner's yes, 2 November 2026; plan section 1): information-gathering and waiting
+  actions as their own actions (PLN-01);
   the search and review step before an offer gate (OPTN-04); experience beyond an offering's
   own outcomes (OUT1-08). Each needs catalogue data and capability rules no pack record has,
   and changes the search's input and the oracle. The verification milestone after an
