@@ -7,7 +7,9 @@
 // different (a dashed edge). Edits are checked before anything is
 // sent; then one decision saves the accepted proposals and the person's own answers together,
 // as one version, or nothing at all (the tray and its edits stay, with the reason). Nothing
-// changes until the person saves.
+// changes until the person saves. Session W2: a list change says what it adds and removes
+// against what is saved, the task answers show their hints, and Save and Keep none stay in
+// view while the card is.
 import { useState } from "react";
 import type {
   ProfileDocument,
@@ -17,7 +19,7 @@ import type {
   TurnOut,
 } from "@/generated/api";
 import { ApiError } from "@/lib/api";
-import { type Choice, type Choices, decisionFor, type Edits } from "@/lib/conversation";
+import { type Choice, type Choices, decisionFor, type Edits, listChange } from "@/lib/conversation";
 import {
   describeValue,
   type FieldDraft,
@@ -28,9 +30,11 @@ import {
 } from "@/lib/profile";
 import { useDecideTurn } from "@/lib/queries";
 import {
+  CARD_HINTED,
   EXPLAINED_FIELDS,
   FIELD_STATE,
   fieldStates,
+  LIST_CHANGE,
   PROFILE_FIELDS,
   type ProfileFieldName,
 } from "@/lib/vocabulary";
@@ -202,13 +206,20 @@ export function ReviewTray({
         const errorId = `edit-${change.change_id}-error`;
         const setDraft = (next: FieldDraft) =>
           setDrafts((current) => ({ ...current, [change.change_id]: next }));
+        const listed = listChange(change, profile.document[field]);
         return (
           <div key={change.change_id} className="proposal" data-basis={change.basis}>
             <span className="proposal-kind">{kindOf(change)}</span>
             <span className="proposal-value">
               {label}: {proposedValue(change)}
             </span>
-            {EXPLAINED_FIELDS.has(field) && (
+            {listed !== null && listed.added.length > 0 && (
+              <span className="small">{LIST_CHANGE.adds(listed.added)}</span>
+            )}
+            {listed !== null && listed.removed.length > 0 && (
+              <span className="small">{LIST_CHANGE.removes(listed.removed)}</span>
+            )}
+            {(EXPLAINED_FIELDS.has(field) || CARD_HINTED.has(field)) && (
               <span className="small muted">{PROFILE_FIELDS[field].hint}</span>
             )}
             {editing && (
@@ -279,7 +290,9 @@ export function ReviewTray({
           announce={!(failure instanceof ApiError && failure.code === "STALE_INPUT_VERSION")}
         />
       )}
-      <div className="flex flex-wrap items-center gap-8">
+      {/* Kept in view at the foot of the screen while the card is (session W2: with three or
+          more changes, Save sat below the first screen). */}
+      <div className="tray-actions">
         <Button
           variant={primary ? "primary" : "secondary"}
           onClick={() => void save()}

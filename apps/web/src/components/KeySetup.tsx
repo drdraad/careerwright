@@ -4,11 +4,14 @@
 // the key is sent. Declining keeps editing and saved results usable. A stored key is never
 // shown again; it can be rotated or revoked (once confirmed) here, and a key found already
 // revoked is replaced by storing a new one. A typed key is cleared only once it is stored.
+// The connect card leads the conversation while no key is stored; a stored key's details are
+// a setting in the account menu (`MetaKeySetting`).
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import type { CredentialOut, WorkspaceOut } from "@/generated/api";
 import { ApiError } from "@/lib/api";
-import { keys, useKeyChange } from "@/lib/queries";
+import { keys, useCredentials, useKeyChange } from "@/lib/queries";
+import { NO_KEY_STORED } from "@/lib/vocabulary";
 import { Button } from "./Button";
 import { RequestFailure } from "./PageState";
 
@@ -237,4 +240,23 @@ export function KeySetup({
       </div>
     </details>
   );
+}
+
+/**
+ * The stored key as a setting in the account menu, beside model spending (session W2: its card
+ * sat under every conversation). A stored key shows its date, with Rotate and Revoke one step
+ * away; with none stored, one line says where to connect one (the conversation's card). A demo
+ * workspace never calls a model, so it shows nothing and asks for no key.
+ */
+export function MetaKeySetting({ workspace }: { workspace: WorkspaceOut }) {
+  const demo = workspace.data_mode === "demo";
+  const credentials = useCredentials(workspace.workspace_id, !demo);
+  if (demo) return null;
+  if (credentials.data === undefined) {
+    return credentials.error ? <RequestFailure error={credentials.error} /> : null;
+  }
+  if (!credentials.data.some((credential) => credential.active)) {
+    return <p className="small muted">{NO_KEY_STORED}</p>;
+  }
+  return <KeySetup workspace={workspace} credentials={credentials.data} primary={false} />;
 }

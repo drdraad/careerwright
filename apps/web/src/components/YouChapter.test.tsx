@@ -12,6 +12,7 @@ import type {
   PreferencesOut,
   ProfileDocument,
   ProfileOut,
+  ProposedChangeOut,
   SketchOut,
   SlateOut,
   SuggestionOut,
@@ -413,10 +414,20 @@ describe("[PROF-08][REC1-10] the chapter leads with how to start", () => {
 
   it("[PROF-08] has the reply field from the first screen, and no tone setting in the chapter", async () => {
     // Session 2: "Chat should be immediate"; "ditch the tone selection - this should be in
-    // preferences" (it is in the account menu, `ConversationTone`).
+    // preferences" (it is in the account menu, `ConversationTone`). Session W2: a message sent
+    // before the choice went out with none, and the choice was gone for good, so Send waits for
+    // it, saying so, and keeps what was typed.
     const state = { preferences: prefs(null), turns: [] as TurnOut[] };
     const sent = fakeApi(
       routes(state, [
+        {
+          method: "PUT",
+          path: /\/interview\/preferences$/,
+          answer: () => {
+            state.preferences = prefs("unsure");
+            return state.preferences;
+          },
+        },
         {
           method: "POST",
           path: /\/interview\/turns$/,
@@ -426,15 +437,32 @@ describe("[PROF-08][REC1-10] the chapter leads with how to start", () => {
       ]),
     );
     const user = renderYou();
-    await skipFirstQuestion(user);
+    const waits = "Choose how to start, then send. Your words stay here.";
 
+    // At the first question, then at the choice: typed, Send waits and says why.
+    const field = await screen.findByLabelText("Reply to Careerwright");
+    await user.type(field, "I fix bikes.");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(screen.getByRole("button", { name: "Send" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByText(waits)).toBeVisible();
+    await skipFirstQuestion(user);
     expect(
       await screen.findByRole("heading", { name: "How would you like to start?" }),
     ).toBeVisible();
     expect(screen.queryByLabelText("How Careerwright talks with you")).toBeNull();
-    await user.type(screen.getByLabelText("Reply to Careerwright"), "I fix bikes.");
     await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(screen.getByText(waits)).toBeVisible();
+    expect(sent.some((s) => s.method === "POST")).toBe(false);
+    expect(field).toHaveValue("I fix bikes."); // never wiped
 
+    // Once the choice is made, the same words go.
+    await user.click(screen.getByRole("button", { name: "Help me explore" }));
+    await screen.findByRole("heading", {
+      name: "What would you like your working life to be like?",
+    });
+    expect(screen.queryByText(waits)).toBeNull();
+    expect(field).toHaveValue("I fix bikes.");
+    await user.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(sent.some((s) => s.method === "POST")).toBe(true));
     expect(sent.find((s) => s.method === "POST")?.body).toEqual({
       expected_profile_version: 1,
@@ -684,6 +712,58 @@ describe("[UI-04][UI-06] one decision at a time, and Resume while paused", () =>
     expect(saved.compareDocumentPosition(question) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("[STATE-06] keeps Send waiting until the card is saved or Keep none, with what was typed kept", async () => {
+    // Session W2: a message sent while a card waited replaced it, and nothing from it was saved.
+    const state: Live = {
+      preferences: prefs("unsure"),
+      turns: [turn("complete", proposal)],
+      profile,
+    };
+    const sent = fakeApi(
+      liveRoutes(state, [
+        {
+          method: "POST",
+          path: /\/turns\/t1\/decision$/,
+          status: 201,
+          answer: () => {
+            state.turns = [{ ...turn("complete", proposal), decision: {} as TurnOut["decision"] }];
+            return { turn_id: "t1", decision: {}, profile: state.profile };
+          },
+        },
+        {
+          method: "POST",
+          path: /\/interview\/turns$/,
+          status: 202,
+          answer: { ...turn("queued"), turn_id: "t2", support_note: null },
+        },
+      ]),
+    );
+    const { user } = renderLive();
+    const tray = await screen.findByRole("region", { name: /To review: 2 changes/ });
+    const waits = "Save the changes above or choose Keep none, then send. Your words stay here.";
+    const messages = () =>
+      sent.filter((s) => s.method === "POST" && s.path.endsWith("/interview/turns"));
+
+    const field = screen.getByLabelText("Reply to Careerwright");
+    await user.type(field, "Not Leeds, I meant York.");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(screen.getByRole("button", { name: "Send" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByText(waits)).toBeVisible();
+    expect(messages()).toEqual([]);
+    expect(field).toHaveValue("Not Leeds, I meant York.");
+
+    await user.click(within(tray).getByRole("button", { name: "Keep none" }));
+    expect(await screen.findByRole("heading", { name: "Nothing saved" })).toBeVisible();
+    expect(screen.queryByText(waits)).toBeNull();
+    expect(field).toHaveValue("Not Leeds, I meant York.");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() =>
+      expect(messages().map((s) => s.body)).toEqual([
+        { expected_profile_version: 1, message: "Not Leeds, I meant York." },
+      ]),
+    );
+  });
+
   it("makes Resume the one primary action while paused, and keeps focus with the change", async () => {
     // App review M7: while paused, the bright action was a Send that couldn't send.
     const state = { preferences: prefs("unsure"), turns: [] as TurnOut[] };
@@ -808,6 +888,69 @@ describe("[STATE-06][PROF-04] the review tray saves only what the person chose a
       confirm_hard_constraints: ["cities"],
       edits: [],
     });
+  });
+});
+
+describe("[STATE-06] the card says what a list change does, and what each task answer means", () => {
+  it("shows what a list change adds and removes against what is saved, with the task answers' hints", async () => {
+    // Session W2: a taken-back fact could stay unseen (the card showed the whole list), and one
+    // activity offered as two answers read the same (the card hid the hints between them).
+    const told = (field: ProposedChangeOut["field"], value: string[], id: string) => ({
+      change_id: id,
+      field,
+      state: "provided" as const,
+      value,
+      basis: "stated" as const,
+      message_ids: ["m1"],
+      reason: "You said so.",
+      hard_constraint: false,
+    });
+    const tasks: TurnOut["proposal"] = {
+      ...(proposal as NonNullable<TurnOut["proposal"]>),
+      changes: [
+        told("enjoyed_tasks", ["helping at Brownies", "fixing machines"], "c5"),
+        told("confident_tasks", ["leading a group"], "c6"),
+        told("evidenced_tasks", ["helping at Brownies"], "c7"),
+      ],
+    };
+    const savedTasks: ProfileOut = {
+      ...profile,
+      document: {
+        ...answers,
+        enjoyed_tasks: {
+          state: "provided",
+          value: ["working outdoors", "helping at Brownies"],
+          source_ref_id: "s1",
+        },
+      },
+    };
+    fakeApi(routes({ preferences: prefs("unsure"), turns: [turn("complete", tasks)] }));
+    renderYou(savedTasks);
+    const tray = await screen.findByRole("region", { name: /To review: 3 changes/ });
+    const card = (value: string) => {
+      const found = within(tray).getByText(value).closest(".proposal");
+      if (!(found instanceof HTMLElement)) throw new Error(`no proposal for ${value}`);
+      return within(found);
+    };
+
+    const enjoyed = card("Tasks you enjoy: helping at Brownies, fixing machines");
+    expect(enjoyed.getByText("Adds “fixing machines”")).toBeVisible();
+    expect(enjoyed.getByText("Removes “working outdoors”")).toBeVisible(); // taken back
+    expect(
+      enjoyed.getByText("Work you find satisfying, whether or not you are good at it yet."),
+    ).toBeVisible();
+    const confident = card("Tasks you believe you can do: leading a group");
+    expect(
+      confident.getByText("Things you are confident about, even without proof yet."),
+    ).toBeVisible();
+    // Nothing saved here yet: every item is new, and the value says it.
+    const done = card("Tasks you can show you have done: helping at Brownies");
+    expect(done.queryByText(/^(Adds|Removes) /)).toBeNull();
+    expect(
+      done.getByText(
+        "Things you have done and could point to, such as work, a course or a reference.",
+      ),
+    ).toBeVisible();
   });
 });
 
@@ -1766,10 +1909,10 @@ describe("[UI-04][S0-V08] one filled primary action in each state of the chapter
     expect(screen.getByRole("button", { name: "I know my direction" })).toHaveClass("btn-choice");
     expect(screen.getByRole("button", { name: "Send" })).toHaveClass("btn-secondary");
     expect(count()).toBe(0);
-    // Chat is still immediate (session 2): typed first, Send is the one bright action.
+    // Typed first, Send still waits for the choice (session W2), so it never turns bright.
     await start.type(screen.getByRole("textbox", { name: "Reply to Careerwright" }), "Hello");
-    expect(screen.getByRole("button", { name: "Send" })).toHaveClass("btn-primary");
-    expect(count()).toBe(1);
+    expect(screen.getByRole("button", { name: "Send" })).toHaveClass("btn-secondary");
+    expect(count()).toBe(0);
 
     cleanup();
     fakeApi(routes({ preferences: prefs("unsure"), turns: [] }));
@@ -2014,6 +2157,22 @@ describe("[STATE-09] the demo conversation never loops: example replies and two 
     renderYou();
     await screen.findByRole("region", { name: /To review/ });
     expect(screen.queryByText("Careerwright covers England for now.")).toBeNull();
+  });
+});
+
+describe("[MODEL-07] a stored key's details are in the account menu, not under the conversation", () => {
+  it("shows no key card in the conversation once a key is stored", async () => {
+    // Session W2: the Meta key card sat under every conversation (it is `MetaKeySetting`).
+    const live = { ...workspace, data_mode: "live_assisted" as const };
+    fakeApi(routes({ preferences: prefs("unsure"), turns: [] }, [keyStored]));
+    renderYou(profile, live);
+
+    const conversation = await screen.findByRole("tabpanel", { name: "Conversation" });
+    await screen.findByRole("heading", {
+      name: "What would you like your working life to be like?",
+    });
+    expect(within(conversation).queryByText(/Meta key/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Rotate the key" })).toBeNull();
   });
 });
 

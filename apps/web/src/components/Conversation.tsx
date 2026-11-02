@@ -15,7 +15,9 @@
 //
 // Task W2E: before the entry choice, one plain line says what Careerwright is for; until the
 // first answer, one says Careerwright covers England for now (BND1-02); and the entry choice
-// is the bright action, never Send on an empty field (F17).
+// is the bright action, never Send on an empty field (F17). Session W2: Send waits, saying
+// why, until the person has chosen how to start and until a waiting review card is saved or
+// kept none of (`sendBlocked`), and the field keeps what is typed meanwhile.
 // Each demo question offers one-tap example replies the demo interviewer reads (STATE-09), and
 // the role-or-explore question offers two ways on that open existing views.
 import { type ReactNode, type Ref, useEffect, useId, useRef, useState } from "react";
@@ -29,6 +31,7 @@ import type {
 } from "@/generated/api";
 import {
   asksRoleOrExplore,
+  entryNeeded,
   questionAsks,
   replyView,
   turnFailed,
@@ -77,8 +80,6 @@ type Props = {
   onNameRole(): void;
   /** What the latest reply proposes, or what the last decision on it did: right after it. */
   review?: ReactNode;
-  /** Quiet things at the end of the view (the stored key's details). */
-  after?: ReactNode;
 };
 
 function Reply({
@@ -378,7 +379,6 @@ export function Conversation({
   onShowSuggestions,
   onNameRole,
   review,
-  after,
 }: Props) {
   const id = workspace.workspace_id;
   const setPreferences = useSetPreferences(id);
@@ -405,7 +405,7 @@ export function Conversation({
     (turns.length === 0 && preferences.entry_mode
       ? OPENING_QUESTION[preferences.entry_mode]
       : null);
-  const entryNeeded = preferences.entry_mode === null && turns.length === 0;
+  const starting = entryNeeded(preferences, turns);
   const asks = questionAsks(answered, preferences.entry_mode);
   const roleOrExplore = asksRoleOrExplore(asks, demo, preferences.entry_mode, profile.document);
 
@@ -484,7 +484,7 @@ export function Conversation({
         Conversation with Careerwright
       </h2>
 
-      {entryNeeded ? (
+      {starting ? (
         <Start
           workspace={workspace}
           profile={profile}
@@ -625,7 +625,7 @@ export function Conversation({
           }}
         />
       )}
-      {!entryNeeded && titleNote !== null && (
+      {!starting && titleNote !== null && (
         <SupportNote
           note={titleNote}
           onDismiss={() => {
@@ -656,8 +656,9 @@ export function Conversation({
           value={message}
           onChange={(event) => setMessage(event.target.value)}
         />
-        <div className="grid justify-items-end gap-4">
-          {/* Bright only with something to send: never Send on an empty field (F17). */}
+        {/* Bright only with something to send: never Send on an empty field (F17). Why it
+            waits takes a line of its own under the field, so the field keeps its width. */}
+        <div className="composer-send">
           <Button
             type="submit"
             variant={primary === "send" && message.trim() !== "" ? "primary" : "secondary"}
@@ -668,9 +669,9 @@ export function Conversation({
         </div>
       </form>
 
-      {(!entryNeeded || demo) && (
+      {(!starting || demo) && (
         <div className="thread-meta">
-          {!entryNeeded && !preferences.paused && (
+          {!starting && !preferences.paused && (
             // Named for what it pauses; the world's own control is "Hold the world still" (F17).
             <Button
               variant="quiet"
@@ -687,7 +688,6 @@ export function Conversation({
           )}
         </div>
       )}
-      {after}
     </section>
   );
 }

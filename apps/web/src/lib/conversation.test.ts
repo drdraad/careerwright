@@ -11,6 +11,7 @@ import {
   asksRoleOrExplore,
   type Choices,
   decisionFor,
+  listChange,
   questionAsks,
   replyView,
   reviewable,
@@ -189,6 +190,63 @@ describe("[STATE-06][PROF-04] the review tray saves only what the person chose",
 
     expect(reviewable([older, decided], 2)).toBeNull(); // B-M10
     expect(reviewable([older, resent], 2)).toBeNull(); // B-I2: the resend is under way
+  });
+});
+
+describe("[STATE-06] a list change reads as what it adds and removes against what is saved", () => {
+  // Session W2: a list proposal is the whole list and replaces the saved one, so a thing taken
+  // back could stay, or a saved one go, unseen.
+  const saved = (value: string[]) => ({ state: "provided" as const, value, source_ref_id: "s1" });
+  const proposed = (
+    field: ProposedChangeOut["field"],
+    value: ProposedChangeOut["value"],
+    state: ProposedChangeOut["state"] = "provided",
+  ): ProposedChangeOut => ({ ...change("c1", field), state, value });
+
+  it("names each item added and each item removed, in the person's words and order", () => {
+    expect(
+      listChange(
+        proposed("enjoyed_tasks", ["helping at Brownies", "fixing machines"]),
+        saved(["working outdoors", "helping at Brownies"]),
+      ),
+    ).toEqual({ added: ["fixing machines"], removed: ["working outdoors"] });
+    // Words that differ only in case are a different answer, as saving would store them.
+    expect(listChange(proposed("cities", ["leeds"]), saved(["Leeds"]))).toEqual({
+      added: ["leeds"],
+      removed: ["Leeds"],
+    });
+  });
+
+  it("removes every saved item when the list is answered another way", () => {
+    expect(
+      listChange(proposed("enjoyed_tasks", null, "skipped"), saved(["working outdoors"])),
+    ).toEqual({ added: [], removed: ["working outdoors"] });
+  });
+
+  it("reads a qualification with its status, so a status change is a removal and an addition", () => {
+    const held = {
+      state: "provided" as const,
+      value: [{ name: "Maths GCSE", status: "expected" as const }],
+      source_ref_id: "s1",
+    };
+    expect(
+      listChange(proposed("qualifications", [{ name: "Maths GCSE", status: "achieved" }]), held),
+    ).toEqual({
+      added: ["Maths GCSE (achieved)"],
+      removed: ["Maths GCSE (expected, not achieved yet)"],
+    });
+  });
+
+  it("says nothing more for a list with nothing saved yet, or an answer that isn't a list", () => {
+    const unasked = { state: "unasked" as const, value: null, source_ref_id: null };
+    expect(listChange(proposed("enjoyed_tasks", ["fixing machines"]), unasked)).toBeNull();
+    expect(
+      listChange(proposed("current_role", "Night manager"), {
+        state: "provided",
+        value: "Shift supervisor",
+        source_ref_id: "s1",
+      }),
+    ).toBeNull();
   });
 });
 

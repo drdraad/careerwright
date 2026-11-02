@@ -483,6 +483,35 @@ export const PARTIAL_REPLY: Record<PartialCompleteness, { label: string }> = {
 /** A failed turn's reply so far: shown, never saved (MODEL-03). */
 export const FAILED_REPLY_LABEL = "Stopped: not checked, nothing saved";
 
+/** Why Send waits (session W2): for the choice of how to start, and for a reply's review card
+ *  to be saved or kept none of, so no reply's proposals are lost. What is typed is kept. */
+export const SEND_WAITS = {
+  start: "Choose how to start, then send. Your words stay here.",
+  review: "Save the changes above or choose Keep none, then send. Your words stay here.",
+} as const;
+
+/** The stored Meta key's line in the account menu when no key is stored (session W2: its card
+ *  left the conversation, whose connect card is where a key is stored). */
+export const NO_KEY_STORED = "Meta key: none stored. Connect one in the conversation.";
+
+// The review card (session W2).
+
+/** What a list change does against what is saved: each item it adds, and each it removes, so
+ *  an item taken back reads as removed. */
+export const LIST_CHANGE = {
+  adds: (items: readonly string[]) => `Adds ${quotedList(items)}`,
+  removes: (items: readonly string[]) => `Removes ${quotedList(items)}`,
+} as const;
+
+/** Answers whose hint the review card shows beside a proposal, as well as the two limits'
+ *  (`EXPLAINED_FIELDS`): the task answers, so one activity offered as two of them reads as two
+ *  different answers. */
+export const CARD_HINTED: ReadonlySet<ProfileFieldName> = new Set([
+  "enjoyed_tasks",
+  "confident_tasks",
+  "evidenced_tasks",
+]);
+
 /** Why a model run ended without a result, in the person's words (failure classes). */
 export const FAILURE_CLASS: Record<FailureClass, { title: string; action: string }> = {
   access_revoked: {

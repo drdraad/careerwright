@@ -675,11 +675,12 @@ const shots = (scratch: Scratch): Shot[] => [
   },
   {
     // A message with a risk stem is sent as usual, with the support panel beside it. The
-    // send is answered here so the scratch conversation is left as it was.
+    // send is answered here so the scratch conversation is left as it was. Sent where no reply
+    // waits for review: Send waits for a waiting card's decision (session W2).
     name: "you--support-note",
     as: "ada",
     context: "support-note",
-    url: chapterUrl("you", scratch.talked),
+    url: chapterUrl("you", scratch.asking),
     prepare: async (page) => {
       await page.route("**/interview/turns", (route) =>
         route.request().method() === "POST"

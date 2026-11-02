@@ -9,12 +9,14 @@ import type {
   FieldEdit,
   PartialCompleteness,
   PartialReplyOut,
+  PreferencesOut,
   ProfileDocument,
   ProposedChangeOut,
   TurnOut,
   WorkState,
 } from "@/generated/api";
-import { OPENING_ASKS, type ProfileFieldName } from "./vocabulary";
+import { describeQualification } from "./profile";
+import { OPENING_ASKS, PROFILE_FIELDS, type ProfileFieldName } from "./vocabulary";
 
 export type ReplyView =
   | { kind: "checked"; text: string }
@@ -107,6 +109,12 @@ export function decisionFor(
   };
 }
 
+/** The start is still showing: no choice of how to start, and no message yet. Send waits for
+ *  the choice meanwhile (session W2), so a message never goes before it. */
+export function entryNeeded(preferences: Pick<PreferencesOut, "entry_mode">, turns: TurnOut[]) {
+  return preferences.entry_mode === null && turns.length === 0;
+}
+
 /** The early-value answers the live stage waits for before it offers "Show me suggestions":
  *  work area, weekly availability and budget (spec section 3). Never the current role (Task
  *  6f): someone who hasn't had a job may never give one. */
@@ -144,6 +152,32 @@ export function asksRoleOrExplore(
     document.target_titles.state === "unasked" &&
     EARLY_VALUE.every((name) => document[name].state !== "unasked")
   );
+}
+
+/** A list answer's items as text: a qualification reads with its status. */
+function itemsOf(value: ProposedChangeOut["value"]): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => (typeof item === "string" ? item : describeQualification(item)));
+}
+
+/**
+ * What a change to a list answer does to the saved list (session W2): the items it adds and
+ * the items it removes, exactly as saving would store them. A list proposal is the whole list
+ * and replaces the saved one, so an item the person took back reads as removed only here. Null
+ * for an answer that isn't a list, or a list with nothing saved yet (every item is new).
+ */
+export function listChange(
+  change: ProposedChangeOut,
+  saved: ProfileDocument[ProfileFieldName],
+): { added: string[]; removed: string[] } | null {
+  const kind = PROFILE_FIELDS[change.field as ProfileFieldName].kind;
+  if ((kind !== "list" && kind !== "qualifications") || saved.state !== "provided") return null;
+  const before = itemsOf(saved.value as ProposedChangeOut["value"]);
+  const after = change.state === "provided" ? itemsOf(change.value) : [];
+  return {
+    added: after.filter((item) => !before.includes(item)),
+    removed: before.filter((item) => !after.includes(item)),
+  };
 }
 
 /** The newest turn with proposals, if they are not yet decided on; stale when the profile
