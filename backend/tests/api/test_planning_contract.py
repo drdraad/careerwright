@@ -8,8 +8,8 @@ from typing import Any
 import pytest
 
 from careerwright.api.app import openapi_document
-from careerwright.api.routes_planning import result_code
 from careerwright.errors import ErrorCode
+from careerwright.planning.comparison import result_code
 from careerwright.planning.compiler import compile_input
 from careerwright.planning.search import (
     M0SearchLimits,
@@ -59,9 +59,21 @@ def reachable(name: str, every: dict[str, Any]) -> set[str]:
 
 
 @pytest.mark.req("ARC1-10", "OPTN-01", "PLN-11")
-# The options, the person's planning inputs as they are read and written (Task 12a), and a
-# route solve with its result (Task 13b).
-@pytest.mark.parametrize("schema", [RESPONSE, "PlanningInputsOut", "WriteInputs", "SolveOut"])
+# The options, the person's planning inputs as they are read and written (Task 12a), a route
+# solve with its result (Task 13b), and the Routes chapter's facts (Task 14, API-04: an
+# economic cost is `SignedMoney`, a payment `Money`).
+@pytest.mark.parametrize(
+    "schema",
+    [
+        RESPONSE,
+        "PlanningInputsOut",
+        "WriteInputs",
+        "SolveOut",
+        "ComparisonOut",
+        "SchedulePageOut",
+        "RouteDetail",
+    ],
+)
 def test_every_amount_the_options_serve_is_money(schema: str) -> None:
     every = schemas()
     served = reachable(schema, every)
@@ -158,3 +170,17 @@ def test_a_served_solve_result_carries_no_sentence_careerwright_composed() -> No
         ErrorCode.SOLVE_LIMIT_REACHED.value,
         ErrorCode.NO_ROUTE_IN_BOUNDED_MODEL.value,
     }
+
+
+@pytest.mark.req("API-04", "API-02", "VIS2-04")
+@pytest.mark.parametrize("schema", ["ComparisonOut", "SchedulePageOut", "RouteDetail"])
+def test_the_routes_chapter_s_facts_are_codes_and_signed_money_never_a_composed_sentence(
+    schema: str,
+) -> None:
+    # R11: the Routes chapter's facts carry codes, numbers and money; the web words them. A
+    # finding's working note never reaches them, and an economic cost is `SignedMoney`.
+    every = schemas()
+    served = reachable(schema, every)
+
+    assert sorted(n for n in served if "reason" in every[n].get("properties", {})) == []
+    assert "SignedMoney" in served

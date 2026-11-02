@@ -616,6 +616,87 @@ def test_p01_with_the_missing_facts_supplied_gets_routes_each_qualified_and_with
     assert no_reason_anywhere(after)
 
 
+@pytest.mark.req("VIS2-09", "VIS2-08", "OPTN-13", "FRESH-06", "STATE-06", "API-06", "DUR-03")
+def test_the_routes_chapter_reads_a_solve_s_comparison_pages_and_a_chosen_route(
+    person: Person, workers: Any
+) -> None:
+    """Task 14's facts at the API, on P01 with C01's missing facts supplied: the comparison
+    leads with the best trade-offs, every schedule is reachable in the pages, and a chosen
+    route's steps name the pack's date and each record's review state, rechecked on the
+    solve's own input. A later edit is named beside the routes, never applied to them."""
+    person.ready_for_the_target()
+    person.state(
+        stated(
+            offering_figures=[
+                {
+                    "offering_id": C01_FULL_TIME,
+                    "start": {"on": f"{next_month()}-01", "basis": "own_figure"},
+                    "weekly_hours": 9,
+                    "cost": gbp(0),
+                }
+            ],
+            variants=[
+                {
+                    "variant_id": C01_FULL_TIME,
+                    "condition_statuses": dict.fromkeys(C01_CONDITIONS, "confirmed"),
+                }
+            ],
+        )
+    )
+    asked = person.ask().json()
+    run_id = asked["run"]["run_id"]
+    base = f"{person.base}/planning/solves/{run_id}"
+    early = person.api.get(f"{base}/comparison", person.token)  # queued: no result yet
+    worker = workers("worker")
+    person.wait_terminal(run_id)
+    worker.stop()
+
+    compared = person.api.get(f"{base}/comparison", person.token)
+    pages = person.api.get(f"{base}/schedules?limit=1", person.token).json()
+    rest = person.api.get(
+        f"{base}/schedules?limit=200&cursor={pages['next_cursor']}", person.token
+    ).json()
+    index = next(i["index"] for i in [*pages["items"], *rest["items"]] if i["route"])
+    detail = person.api.get(f"{base}/schedules/{index}", person.token)
+    person.state(stated(opening_cash=gbp(900000)))  # a later edit
+    later = person.api.get(f"{base}/comparison", person.token).json()
+    missing = person.api.get(f"{base}/schedules/999", person.token)
+
+    assert early.status_code == 422
+    assert early.json()["error"]["details"]["reason"] == "solve_not_complete"
+    assert compared.status_code == 200, compared.text
+    body = compared.json()
+    assert (body["lead"], body["code"], body["coverage"]) == (
+        "best_trade_offs_found",
+        None,
+        "complete",
+    )
+    assert body["basis"]["objective_basis"] == "economic"
+    assert body["basis"]["baseline"]["kind"] == "current_role"
+    assert body["basis"]["horizon_months"] == 24
+    assert body["label"]["dated"]  # the pack's date (R9)
+    assert body["points_shown"] == body["points_total"]
+    assert body["changed_since"] == {"planning_inputs": False, "profile": False}
+    assert later["changed_since"]["planning_inputs"] is True
+    # Every retained schedule, once, across the pages.
+    seen = [i["index"] for i in [*pages["items"], *rest["items"]]]
+    assert seen == list(range(body["schedules_total"]))
+    assert rest["next_cursor"] is None
+    assert detail.status_code == 200, detail.text
+    chosen = detail.json()
+    [step] = chosen["steps"]
+    assert step["variant_id"] == C01_FULL_TIME
+    assert "supplied_figures" in step["qualified_by"]
+    assert {r["record"] for r in step["records"]} >= {"concept", "offering"}
+    assert all(r["review_state"] for r in step["records"])
+    assert step["title"]
+    assert next(m["month"] for m in chosen["months"]) == next_month()
+    assert len(chosen["scenarios"]) == 3
+    assert missing.status_code == 404
+    assert no_reason_anywhere(body)
+    assert no_reason_anywhere(chosen)
+
+
 @pytest.mark.req("OPT1-04", "LIMITS-02")
 def test_two_solves_asked_together_run_one_at_a_time_each_on_its_own_clock(
     person: Person, workers: Any

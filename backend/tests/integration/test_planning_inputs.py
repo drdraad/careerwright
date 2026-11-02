@@ -177,11 +177,10 @@ def test_every_input_round_trips_through_its_command_and_a_stale_version_is_refu
         "own_options": [],
     }
     assert stored["inputs"] == {**expected, **unanswered, "schema_version": "1"}
-    # The caps are the profile's answers, beside the inputs; what a solve needs is named.
+    # The caps are the profile's answers, beside the inputs; what a solve needs is named. A
+    # budget-qualified solve needs both confirmed limits (the stage check, API-05, Task 14).
     assert (stored["direct_spend_cap"], stored["monthly_payment_cap"]) == (gbp(150000), None)
-    assert stored["needs"] == [
-        {"input": "monthly_payment_cap", "effect": "leaves_every_route_unresolved"}
-    ]
+    assert stored["needs"] == [{"input": "monthly_payment_cap", "effect": "blocks_a_solve"}]
     assert (replayed.status_code, replayed.json()) == (201, written.json())
     assert stale.status_code == 409
     assert stale.json()["error"]["code"] == "STALE_INPUT_VERSION"
@@ -219,6 +218,9 @@ def test_nothing_stated_names_what_a_solve_needs_and_unknown_money_is_null(
         "commitments",
         "existing_debts",
         "scenario_delay_months",
+        # The profile states no limit: a budget-qualified solve needs both (API-05, Task 14).
+        "direct_spend_cap",
+        "monthly_payment_cap",
     ]
 
 

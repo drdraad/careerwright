@@ -447,3 +447,93 @@ payments, and the route carries it as a loan to repay. `PRUNING_VERSION` is now
   only the options they kept (`excluded_variants`).
 - The solve workflow's step sequence is unchanged: `application_version` stays
   `careerwright-l0-1`.
+
+## Amendment, 2026-11-02 (Task 14, backend half): the Routes chapter's facts
+
+Sprint 7's facts, served from a complete solve by `careerwright.planning.comparison` (pure) and
+`careerwright.api.routes_comparison`. Nothing re-ranks the archive, merges a schedule or
+computes affordability anew, and the web computes no rank, layer or affordability. Facts and
+codes, never sentences (R11). No new run kind, workflow or migration: the solve workflow's
+step sequence is unchanged, so `application_version` stays `careerwright-l0-1`.
+Requirements: the VIS2 rows (backend), ROU1-04, PARETO-04, DIRECTAI-02, TRACE01-05, FAMILY-02,
+API-02 (`NO_ROUTE_IN_BOUNDED_MODEL`), API-04, API-06, PLN-12, FUNDING-06 and STATE-06 (backend
+parts).
+
+23. **One comparator rule** (`COMPARATOR_RULE`, `soonest_dominator_in_the_layer_above`). A
+    point in F2 or F3 is compared with the points of the layer just above that dominate it
+    (F3 for a point beyond F3); by peeling there is always one. The named comparator is the
+    soonest of them, and among equally soon ones the cheapest: an order on time, then cost,
+    never a distance across months and pounds (spec section 13: no "inherently nearest" one).
+    Every other dominator in that layer is listed beside it. The margin is `months_sooner` and
+    `cost_less`, in the comparison's own cost basis, with a code: `sooner_and_cheaper`,
+    `sooner_same_cost`, or `cheaper_same_time` (an equal-time tie on the boundary, such as
+    TRACE-01's D beside B: bettered, never a best trade-off; PARETO-04).
+24. **The output keeps its input.** The worker seals the ranked result with the monthly input
+    it was computed from (`SolveOutput`), so a chosen route's ledgers, steps and stress cases are
+    `check_route` and `evaluate_route` on exactly that input; the API reads the run's output,
+    never its sealed input (whose SELECT the API role still lacks). The base check must repeat
+    what the search archived (time, both costs, verdict, input version), or the solve is
+    refused as out of date (`STALE_INPUT_VERSION`, `solve_outdated`): solve again, never other
+    numbers. An output stored before this amendment is the bare result and is refused the same
+    way. The compiled variant now also carries its concept's title and provider and its
+    evidence's date (`as_of`), so a step card names them as the solve read them.
+25. **The comparison** (`GET .../solves/{run_id}/comparison`): what leads (`lead`:
+    `best_trade_offs_found` whenever routes were found, complete or not;
+    `none_found_before_limit`; `unresolved`; `longer_than_model`; `no_route_in_bounded_model`),
+    spec section 18's `code`, the coverage, stop reason, instance size and narrowings, and,
+    when stopped, the sizes Task 13a measured to complete with no limit binding
+    (`completes_at`: 18 or 10 concepts at 24 months with one or two starts, 20 or 10 at 12);
+    the cost definition (`basis`: objective basis, first month, horizon, currency, scenario,
+    the baseline's kind and monthly pay); the model's bounds (`limits`) and the pack's label;
+    options longer than the 24-month model (`longer_than_model`: usable only after month 24)
+    and those beyond this horizon only (`beyond_horizon`). **Ruling:** a complete search that
+    finds no route while an option is longer than the model leads with `longer_than_model`,
+    and its `code` is then null: "longer than Careerwright can plan yet", never "no route",
+    "not feasible" or impossible (plan v1.6; PLN-12). With anything unknown it stays
+    `unresolved`, the long options listed beside. **The projection** (VIS2-09): every point
+    in F1 to F3 (at most one a month in each), the points of pinned schedules, the soonest and
+    the cheapest beyond F3, then others beyond F3 evenly spaced in order of time and cost, up
+    to 200, with `points_shown` and `points_total`; a point names at most 20 of its schedules
+    and its count. Families best layer first, at most 100, with their totals; every schedule
+    stays reachable in the pages. `changed_since` says whether the planning inputs or the
+    profile have a newer version than the solve read (STATE-06): the routes stay as they
+    were, beside it, until the person asks again.
+26. **The archive, paged and viewed** (`GET .../solves/{run_id}/schedules`): archive order,
+    an opaque cursor, at most 200 a page, and a view (months, cost in minor units, layer,
+    family) that never changes a recorded `layer`. Reranking is explicit (`rerank=true`,
+    "best within these choices"): `view_layer` is the layering of the view's schedules alone,
+    beside the recorded one and never in its place (`rank_scope`), so a hidden dominator never
+    makes a route best overall. Pinned schedules come back with `in_view`.
+27. **A chosen route** (`GET .../solves/{run_id}/schedules/{index}`): the cost parts kept
+    apart and coded (direct spending, the pay difference over the horizon, the economic cost,
+    peak payment, lowest prefunded cash, the reserve, and fees a fee loan pays as loans to
+    repay with their amounts, their repayment unknown); the monthly table; liabilities beyond
+    the horizon, unscheduled or before the start; the debts; each step's facts (dates and model
+    months, active months, weekly hours, payments with their months, supports, its fee loan,
+    work pattern, net pay after an accepted offer, the offer's role class, prerequisites and
+    grants, each record's review state with the pack's label beside them (R9), the evidence's
+    date, the person's supplied facts, and `qualified_by`: `proposed_record`,
+    `accepted_assumption`, `own_option`, `supplied_figures`, `synthetic`); the cited spans of
+    its source values (API-06; a person citation's locator is never served); the gates (each
+    condition at its step's start month); the waits (months before readiness no step touches);
+    the milestones (readiness and, when readiness rests on an assessed completion, its
+    verification at that month, PLN-04); and the stress cases apart (`delay`, `no_award`,
+    `no_offer`), each with null time or cost where it fails or is unknown and `same_as_base`
+    when the whole check is unchanged. A route resting on a fee loan not yet approved carries
+    `self_paid`: the route where the person pays, beside it.
+
+### Consequences (Task 14, backend half)
+
+- `GET .../planning/solves/{run_id}` still serves the whole result (Task 13b's contract); the
+  Routes chapter reads the bounded endpoints above, so a result at the archive cap is paged.
+- Each request parses the stored output once (2.4 s for an 86 MB result at the cap, Task 13b's
+  measurement; realistic L0 results hold about a thousand schedules or fewer).
+- Scenario whiskers on every point are not computed in the comparison: a chosen route's
+  stress cases are (a check per scenario per route would multiply the cost by the archive).
+- **The four planning-model gaps** are proposed as L0 deferrals, awaiting the product owner's
+  yes (not approved): information-gathering and waiting actions as their own actions (PLN-01);
+  the search and review step before an offer gate (OPTN-04); experience beyond an offering's
+  own outcomes (OUT1-08). Each needs catalogue data and capability rules no pack record has,
+  and changes the search's input and the oracle. The verification milestone after an
+  assessed completion (PLN-04) is modelled as a milestone fact (decision 27), with no planning
+  change.

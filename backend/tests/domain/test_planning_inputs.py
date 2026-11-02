@@ -119,8 +119,10 @@ def test_nothing_stated_needs_every_input_and_a_solve_is_refused_naming_them() -
         (NeededInput.COMMITMENTS, BLOCKS),
         (NeededInput.EXISTING_DEBTS, BLOCKS),
         (NeededInput.SCENARIO_DELAY_MONTHS, BLOCKS),
-        (NeededInput.DIRECT_SPEND_CAP, UNRESOLVED),
-        (NeededInput.MONTHLY_PAYMENT_CAP, UNRESOLVED),
+        # The solve's stage checks (API-05, Task 14): a budget-qualified solve needs both
+        # confirmed limits.
+        (NeededInput.DIRECT_SPEND_CAP, BLOCKS),
+        (NeededInput.MONTHLY_PAYMENT_CAP, BLOCKS),
         (NeededInput.RESERVE, UNRESOLVED),
         (NeededInput.WEEKLY_AVAILABILITY, UNRESOLVED),
         (NeededInput.WORK_RIGHTS, UNRESOLVED),
@@ -179,24 +181,53 @@ def test_the_stated_inputs_read_as_the_monthly_input_one_value_a_month() -> None
     # The baseline is needed for the economic comparison only (FIN1-07: never a silent switch).
     direct = complete(objective_basis="direct_spending", baseline=None)
     assert needs(direct, P01_CAPS) == []
+    # The solve's stage check (API-05, Task 14): an economic solve needs its baseline (the
+    # horizon is part of every solve request), so a solve is refused naming it.
     economic = needs(complete(baseline=None), P01_CAPS)
-    assert [(n.input, n.effect) for n in economic] == [(NeededInput.BASELINE, UNRESOLVED)]
+    assert [(n.input, n.effect) for n in economic] == [(NeededInput.BASELINE, BLOCKS)]
+    # A deficit cap under direct spending reads the baseline too, but is no economic solve.
+    deficit = complete(objective_basis="direct_spending", baseline=None, monthly_deficit_cap=gbp(1))
+    assert [(n.input, n.effect) for n in needs(deficit, P01_CAPS)] == [
+        (NeededInput.BASELINE, UNRESOLVED)
+    ]
+
+
+@pytest.mark.req("API-05")
+@pytest.mark.parametrize(
+    ("caps", "changes", "missing"),
+    [
+        (SpendingCaps(None, P01_CAPS.monthly_payment_cap), {}, ["direct_spend_cap"]),
+        (SpendingCaps(P01_CAPS.direct_spend_cap, None), {}, ["monthly_payment_cap"]),
+        (UNASKED_CAPS, {}, ["direct_spend_cap", "monthly_payment_cap"]),
+        (P01_CAPS, {"baseline": None}, ["baseline"]),
+    ],
+)
+def test_a_solve_without_its_stage_s_inputs_is_refused_naming_them(
+    caps: SpendingCaps, changes: dict[str, object], missing: list[str]
+) -> None:
+    with pytest.raises(CareerwrightError) as refused:
+        ready(complete(**changes), caps=caps)
+
+    assert refused.value.code is ErrorCode.VALIDATION_FAILED
+    assert refused.value.details == {"reason": "inputs_missing", "missing": missing}
 
 
 @pytest.mark.req("PLN-11", "FIN1-06", "API-05")
 @pytest.mark.parametrize(
-    ("caps", "changes", "unstated"),
+    ("unset", "unstated"),
     [
-        (SpendingCaps(None, P01_CAPS.monthly_payment_cap), {}, "direct_spend_cap"),
-        (SpendingCaps(P01_CAPS.direct_spend_cap, None), {}, "monthly_payment_cap"),
-        (P01_CAPS, {"reserve": None}, "reserve"),
+        ("direct_spend_cap_minor", "direct_spend_cap"),
+        ("monthly_payment_cap_minor", "monthly_payment_cap"),
+        ("reserve_minor", "reserve"),
     ],
 )
-def test_an_unasked_limit_leaves_a_route_unresolved(
-    caps: SpendingCaps, changes: dict[str, object], unstated: str
-) -> None:
+def test_an_unasked_limit_leaves_a_route_unresolved(unset: str, unstated: str) -> None:
+    """The checker's own rule, beside the solve's stage checks: a monthly input without a hard
+    limit leaves a route unresolved, never passed."""
     course = catalogue_of(option("course", payments=((0, 1000),)))
-    result = checked(ready(complete(**changes), course, caps), ["course"])
+    prepared = ready(complete(), course)
+    inputs = prepared.inputs.model_copy(update={unset: None})
+    result = check_route(compile_input(inputs, prepared.catalogue), ["course"])
 
     assert [(f.code, f.reason) for f in result.findings] == [(FindingCode.LIMIT_UNKNOWN, unstated)]
     assert result.feasibility is Feasibility.UNRESOLVED

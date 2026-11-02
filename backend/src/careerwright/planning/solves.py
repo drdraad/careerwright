@@ -35,7 +35,7 @@ from careerwright.identity.workspaces import visible_workspace
 from careerwright.planning import store
 from careerwright.planning.checkpoint import expected_entry
 from careerwright.planning.commands import current_inputs, person_entry, target_catalogues
-from careerwright.planning.compiler import ReadinessBasis, compile_input
+from careerwright.planning.compiler import MonthlyInput, ReadinessBasis, compile_input
 from careerwright.planning.inputs import decided_outcomes, prepare
 from careerwright.planning.months import MAX_HORIZON_MONTHS, Month
 from careerwright.planning.search import (
@@ -50,6 +50,7 @@ from careerwright.planning.solve_records import (
     SolveAttempt,
     SolveRecord,
     SolveSnapshot,
+    read_output,
     solve_identity,
 )
 from careerwright.profile.commands import current_profile
@@ -78,6 +79,9 @@ class SolveView:
     solve: SolveRecord
     attempts: list[SolveAttempt]
     result: SearchResult | None  # only once the run is complete
+    # The monthly input the result was computed from (Task 14); None: no result, or one
+    # stored before the input was kept beside it.
+    monthly: MonthlyInput | None = None
 
 
 def _refused(reason: str, **details: str) -> CareerwrightError:
@@ -196,7 +200,7 @@ def solve_view(tx: Tx, keyring: Keyring, workspace_id: uuid.UUID, run_id: uuid.U
         raise CareerwrightError(
             ErrorCode.NOT_FOUND, "No such route search.", stage=ErrorStage.PLANNING
         )
-    result = None
+    result, monthly = None, None
     if run.status is WorkState.COMPLETE:
         output = open_output(tx, keyring, run)
         if output is None:  # a complete run always has its output (a database CHECK)
@@ -205,5 +209,5 @@ def solve_view(tx: Tx, keyring: Keyring, workspace_id: uuid.UUID, run_id: uuid.U
                 "A complete route search has no result.",
                 stage=ErrorStage.PLANNING,
             )
-        result = SearchResult.model_validate_json(output)
-    return SolveView(run, found, store.solve_attempts(tx, run_id), result)
+        result, monthly = read_output(output)
+    return SolveView(run, found, store.solve_attempts(tx, run_id), result, monthly)

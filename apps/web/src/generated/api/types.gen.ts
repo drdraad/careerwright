@@ -900,6 +900,22 @@ export const Band = {
 export type Band = typeof Band[keyof typeof Band];
 
 /**
+ * BaselineFact
+ *
+ * The confirmed counterfactual the economic cost is measured against.
+ */
+export type BaselineFact = {
+    /**
+     * Null: a fixture's own baseline.
+     */
+    kind: BaselineKind | null;
+    /**
+     * Net Income By Month
+     */
+    net_income_by_month: Array<Money>;
+};
+
+/**
  * BaselineInput
  */
 export type BaselineInput = {
@@ -1141,6 +1157,27 @@ export type Challenge = {
      * Recorded At
      */
     recorded_at: string;
+};
+
+/**
+ * Changed
+ *
+ * What changed since the solve read its inputs (STATE-06): its routes are shown as they
+ * were, beside this, until the person asks for a new solve. Nothing is invalidated here.
+ */
+export type Changed = {
+    /**
+     * Planning Inputs
+     *
+     * The planning inputs have a newer version.
+     */
+    planning_inputs: boolean;
+    /**
+     * Profile
+     *
+     * The profile (its limits among it) has a newer version.
+     */
+    profile: boolean;
 };
 
 /**
@@ -1529,6 +1566,156 @@ export const CommitmentKind = {
 export type CommitmentKind = typeof CommitmentKind[keyof typeof CommitmentKind];
 
 /**
+ * Comparator
+ */
+export type Comparator = {
+    /**
+     * Point Id
+     */
+    point_id: number;
+    dominance: DominanceReason;
+    /**
+     * Months Sooner
+     */
+    months_sooner: number;
+    cost_less: Money;
+};
+
+/**
+ * ComparisonBasis
+ *
+ * One comparison's definitions, the same for every route in it (VIS2-01).
+ */
+export type ComparisonBasis = {
+    /**
+     * Objective Basis
+     */
+    objective_basis: 'economic' | 'direct_spending';
+    /**
+     * Planning Start
+     *
+     * The comparison's first month, YYYY-MM.
+     */
+    planning_start: string;
+    /**
+     * Horizon Months
+     */
+    horizon_months: number;
+    /**
+     * Currency
+     */
+    currency: 'GBP';
+    scenario: Scenario;
+    /**
+     * Null: no baseline; direct spending.
+     */
+    baseline: BaselineFact | null;
+    /**
+     * Synthetic
+     */
+    synthetic: boolean;
+};
+
+/**
+ * ComparisonOut
+ */
+export type ComparisonOut = {
+    lead: Lead;
+    /**
+     * Code
+     *
+     * Spec section 18's code: null when the lead is longer_than_model.
+     */
+    code: 'SOLVE_LIMIT_REACHED' | 'NO_ROUTE_IN_BOUNDED_MODEL' | null;
+    coverage: SearchCoverage;
+    stop_reason: StopReason | null;
+    outcome: Outcome;
+    /**
+     * Layers Exact
+     */
+    layers_exact: boolean;
+    /**
+     * Comparator Rule
+     */
+    comparator_rule: 'soonest_dominator_in_the_layer_above';
+    basis: ComparisonBasis;
+    label: CatalogueLabel;
+    limits: M0SearchLimits;
+    instance: InstanceSize;
+    /**
+     * Narrowings
+     */
+    narrowings: Array<Narrowing>;
+    /**
+     * Completes At
+     *
+     * When stopped: sizes measured to complete, beside the narrowings.
+     */
+    completes_at: Array<MeasuredCompletion>;
+    /**
+     * Longer Than Model
+     *
+     * Options whose completion falls beyond the 24-month model, by variant.
+     */
+    longer_than_model: Array<string>;
+    /**
+     * Beyond Horizon
+     *
+     * Options within the model whose completion falls beyond this horizon.
+     */
+    beyond_horizon: Array<string>;
+    /**
+     * Blocking Inputs
+     */
+    blocking_inputs: Array<Finding>;
+    /**
+     * Starting Violations
+     */
+    starting_violations: Array<Finding>;
+    /**
+     * Set Aside
+     */
+    set_aside: Array<SetAside>;
+    /**
+     * Feasible Without Milestone
+     */
+    feasible_without_milestone: number;
+    /**
+     * Readiness Unknown
+     */
+    readiness_unknown: number;
+    /**
+     * Schedules Total
+     */
+    schedules_total: number;
+    /**
+     * Points Total
+     */
+    points_total: number;
+    /**
+     * Points Shown
+     */
+    points_shown: number;
+    /**
+     * Families Total
+     */
+    families_total: number;
+    /**
+     * Families Shown
+     */
+    families_shown: number;
+    /**
+     * Points
+     */
+    points: Array<PointOut>;
+    /**
+     * Families
+     */
+    families: Array<FamilyOut>;
+    changed_since: Changed;
+};
+
+/**
  * ConceptStarts
  */
 export type ConceptStarts = {
@@ -1656,6 +1843,35 @@ export const ConversationMode = {
 export type ConversationMode = typeof ConversationMode[keyof typeof ConversationMode];
 
 /**
+ * CostParts
+ *
+ * Each cost kept apart and named by code (H-13): what the person pays (direct spending),
+ * the pay they lose or gain against the baseline, and the economic cost, their sum. Which one
+ * the comparison plots is its `objective_basis`.
+ */
+export type CostParts = {
+    /**
+     * Objective Basis
+     */
+    objective_basis: 'economic' | 'direct_spending';
+    direct_cost: Money | null;
+    /**
+     * Over the horizon: lost pay > 0.
+     */
+    pay_difference: SignedMoney | null;
+    economic_cost: SignedMoney | null;
+    peak_monthly_payment: Money | null;
+    minimum_prefunded_cash: SignedMoney | null;
+    reserve: Money | null;
+    /**
+     * Loans To Repay
+     *
+     * Fees a fee loan pays to the provider: a loan to repay, never spending.
+     */
+    loans_to_repay: Array<LoanToRepay>;
+};
+
+/**
  * Count
  */
 export type Count = {
@@ -1774,6 +1990,20 @@ export const DataMode = {
 export type DataMode = typeof DataMode[keyof typeof DataMode];
 
 /**
+ * Debt
+ */
+export type Debt = {
+    /**
+     * Debt Id
+     */
+    debt_id: string;
+    /**
+     * Months
+     */
+    months: Array<DebtMonth>;
+};
+
+/**
  * DebtInput
  *
  * An existing debt: a fixed commitment whose repayments are outflows (spec section 10).
@@ -1787,6 +2017,20 @@ export type DebtInput = {
      * Interest a year in basis points: 1,990 is 19.9%.
      */
     annual_interest_bps?: number | null;
+};
+
+/**
+ * DebtMonth
+ */
+export type DebtMonth = {
+    /**
+     * Month
+     */
+    month: string;
+    opening: Money | null;
+    interest: Money | null;
+    repayment: Money;
+    closing: Money | null;
 };
 
 /**
@@ -1998,6 +2242,24 @@ export type DiscoveryProposalOut = {
      */
     hypotheses: Array<HypothesisOut>;
 };
+
+/**
+ * DominanceReason
+ *
+ * How the comparator betters a point, in the comparison's own cost basis.
+ */
+export const DominanceReason = {
+    SOONER_AND_CHEAPER: 'sooner_and_cheaper',
+    SOONER_SAME_COST: 'sooner_same_cost',
+    CHEAPER_SAME_TIME: 'cheaper_same_time'
+} as const;
+
+/**
+ * DominanceReason
+ *
+ * How the comparator betters a point, in the comparison's own cost basis.
+ */
+export type DominanceReason = typeof DominanceReason[keyof typeof DominanceReason];
 
 /**
  * Duration
@@ -2820,6 +3082,57 @@ export type FamilyAction = {
 };
 
 /**
+ * FamilyOut
+ */
+export type FamilyOut = {
+    /**
+     * Family Id
+     */
+    family_id: string;
+    /**
+     * Best Layer
+     *
+     * The lowest layer of its schedules.
+     */
+    best_layer: number | null;
+    /**
+     * Schedule Count
+     */
+    schedule_count: number;
+    /**
+     * Best Schedule
+     *
+     * The first archive index at its best layer.
+     */
+    best_schedule: number;
+    /**
+     * Actions
+     */
+    actions: Array<FamilyAction>;
+    /**
+     * Precedence
+     */
+    precedence: Array<[
+        number,
+        number
+    ]>;
+};
+
+/**
+ * Feasibility
+ */
+export const Feasibility = {
+    FEASIBLE: 'feasible',
+    NOT_FEASIBLE_IN_THIS_MODEL: 'not_feasible_in_this_model',
+    UNRESOLVED: 'unresolved'
+} as const;
+
+/**
+ * Feasibility
+ */
+export type Feasibility = typeof Feasibility[keyof typeof Feasibility];
+
+/**
  * FeeLoanKind
  *
  * The two loans paid straight to the provider that are a loan to repay in L0: a tuition
@@ -3180,6 +3493,34 @@ export const GapKind = {
  * GapKind
  */
 export type GapKind = typeof GapKind[keyof typeof GapKind];
+
+/**
+ * Gate
+ */
+export type Gate = {
+    /**
+     * Kind
+     */
+    kind: 'offer' | 'award' | 'application' | 'loan';
+    /**
+     * Variant Id
+     */
+    variant_id: string;
+    /**
+     * Instrument Id
+     */
+    instrument_id: string | null;
+    /**
+     * Verification
+     */
+    verification: string;
+    /**
+     * Month
+     *
+     * The step's start month: the gate comes before it.
+     */
+    month: string | null;
+};
 
 /**
  * GateInfo
@@ -3724,6 +4065,41 @@ export type LabelMatchOut = {
 };
 
 /**
+ * Lead
+ *
+ * What the Routes chapter leads with, one code per result.
+ */
+export const Lead = {
+    BEST_TRADE_OFFS_FOUND: 'best_trade_offs_found',
+    NONE_FOUND_BEFORE_LIMIT: 'none_found_before_limit',
+    UNRESOLVED: 'unresolved',
+    LONGER_THAN_MODEL: 'longer_than_model',
+    NO_ROUTE_IN_BOUNDED_MODEL: 'no_route_in_bounded_model'
+} as const;
+
+/**
+ * Lead
+ *
+ * What the Routes chapter leads with, one code per result.
+ */
+export type Lead = typeof Lead[keyof typeof Lead];
+
+/**
+ * Liability
+ */
+export type Liability = {
+    /**
+     * Variant Id
+     */
+    variant_id: string;
+    /**
+     * Due
+     */
+    due: string | null;
+    amount: Money;
+};
+
+/**
  * LoanToRepay
  *
  * What a fee loan paid straight to the provider (a tuition fee loan or an Advanced Learner
@@ -4090,6 +4466,30 @@ export type MatrixSources = {
 };
 
 /**
+ * MeasuredCompletion
+ *
+ * A size Task 13a measured to complete with no limit binding.
+ */
+export type MeasuredCompletion = {
+    /**
+     * Horizon Months
+     */
+    horizon_months: number;
+    /**
+     * Starts Per Concept
+     */
+    starts_per_concept: number;
+    /**
+     * Concepts
+     */
+    concepts: number;
+    /**
+     * Measured On
+     */
+    measured_on: string;
+};
+
+/**
  * Method
  */
 export const Method = {
@@ -4102,6 +4502,24 @@ export const Method = {
  * Method
  */
 export type Method = typeof Method[keyof typeof Method];
+
+/**
+ * Milestone
+ */
+export type Milestone = {
+    /**
+     * Kind
+     */
+    kind: 'readiness' | 'verify_assessed_completion';
+    /**
+     * Month
+     */
+    month: string;
+    /**
+     * Months To Readiness
+     */
+    months_to_readiness: number;
+};
 
 /**
  * MissingFact
@@ -4306,6 +4724,34 @@ export type MoneyField = {
 export type MoneyInput = {
     state: FieldState;
     value?: Money | null;
+};
+
+/**
+ * MonthRow
+ *
+ * One month of the route's money: null where it rests on an amount not known.
+ */
+export type MonthRow = {
+    /**
+     * Month
+     */
+    month: string;
+    payments: Money | null;
+    paid_to_provider: Money | null;
+    support: Money | null;
+    baseline_income: Money | null;
+    route_income: Money | null;
+    /**
+     * Baseline less route: lost pay > 0.
+     */
+    pay_difference: SignedMoney | null;
+    opening: SignedMoney | null;
+    early_receipts: Money | null;
+    living: Money;
+    debt_service: Money;
+    lower_bound: SignedMoney | null;
+    later_receipts: Money | null;
+    closing: SignedMoney | null;
 };
 
 /**
@@ -5781,6 +6227,19 @@ export type PersonQualification = {
 };
 
 /**
+ * PinnedSchedule
+ */
+export type PinnedSchedule = {
+    schedule: ScheduleOut;
+    /**
+     * In View
+     *
+     * False: pinned outside the view, kept with its badge.
+     */
+    in_view: boolean;
+};
+
+/**
  * PlaceList
  *
  * The finite list of English cities a work area can name. A city is geography only:
@@ -6064,6 +6523,47 @@ export type PlanningInputsOut = {
      */
     synthetic: boolean;
     data_mode: DataMode;
+};
+
+/**
+ * PointOut
+ */
+export type PointOut = {
+    /**
+     * Point Id
+     *
+     * Its place in the result's equal points.
+     */
+    point_id: number;
+    /**
+     * Months To Readiness
+     */
+    months_to_readiness: number;
+    objective_cost: SignedMoney;
+    /**
+     * Layer
+     */
+    layer: number | null;
+    /**
+     * Schedule Count
+     */
+    schedule_count: number;
+    /**
+     * Schedules
+     *
+     * The first archive indexes at this point.
+     */
+    schedules: Array<number>;
+    /**
+     * Null: in F1, bettered by nothing.
+     */
+    comparator: Comparator | null;
+    /**
+     * Dominators
+     *
+     * Every point of the layer above that betters it, by point_id.
+     */
+    dominators: Array<number>;
 };
 
 /**
@@ -7077,6 +7577,21 @@ export const RecordPart = {
 export type RecordPart = typeof RecordPart[keyof typeof RecordPart];
 
 /**
+ * RecordReview
+ */
+export type RecordReview = {
+    /**
+     * Record
+     */
+    record: 'concept' | 'offering' | 'support' | 'fee_loan';
+    /**
+     * Record Id
+     */
+    record_id: string;
+    review_state: RecordState;
+};
+
+/**
  * RecordState
  */
 export const RecordState = {
@@ -7763,6 +8278,62 @@ export const RoleState = {
 export type RoleState = typeof RoleState[keyof typeof RoleState];
 
 /**
+ * RouteDetail
+ */
+export type RouteDetail = {
+    schedule: ScheduleOut;
+    label: CatalogueLabel;
+    basis: ComparisonBasis;
+    costs: CostParts;
+    /**
+     * Months
+     */
+    months: Array<MonthRow>;
+    /**
+     * Beyond Horizon
+     */
+    beyond_horizon: Array<Liability>;
+    /**
+     * Unscheduled
+     */
+    unscheduled: Array<Liability>;
+    /**
+     * Before Start
+     */
+    before_start: Array<Liability>;
+    /**
+     * Debts
+     */
+    debts: Array<Debt>;
+    /**
+     * Steps
+     */
+    steps: Array<RouteStep>;
+    /**
+     * Gates
+     */
+    gates: Array<Gate>;
+    /**
+     * Waits
+     */
+    waits: Array<Wait>;
+    /**
+     * Milestones
+     */
+    milestones: Array<Milestone>;
+    /**
+     * Scenarios
+     *
+     * The stress cases, the base apart.
+     */
+    scenarios: Array<ScenarioCheck>;
+    /**
+     * With a fee loan not yet approved: the route where the person pays.
+     */
+    self_paid: ScenarioCheck | null;
+};
+
+/**
  * RouteQualification
  */
 export const RouteQualification = {
@@ -7782,6 +8353,127 @@ export const RouteQualification = {
  * RouteQualification
  */
 export type RouteQualification = typeof RouteQualification[keyof typeof RouteQualification];
+
+/**
+ * RouteStep
+ *
+ * One action of the route: a step card's facts and the Gantt's band.
+ */
+export type RouteStep = {
+    /**
+     * Variant Id
+     */
+    variant_id: string;
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    /**
+     * Offering Id
+     */
+    offering_id: string;
+    kind: ActionKind;
+    /**
+     * Title
+     */
+    title: string | null;
+    /**
+     * Provider
+     */
+    provider: string | null;
+    /**
+     * Start Date
+     */
+    start_date: string | null;
+    /**
+     * Finish Date
+     */
+    finish_date: string | null;
+    /**
+     * Start Month
+     */
+    start_month: string | null;
+    /**
+     * Finish Month
+     */
+    finish_month: string | null;
+    /**
+     * Usable Month
+     *
+     * From when what it grants is usable.
+     */
+    usable_month: string | null;
+    /**
+     * Active Months
+     *
+     * Every month it touches, beyond the horizon too.
+     */
+    active_months: Array<string>;
+    /**
+     * Weekly Hours
+     */
+    weekly_hours: number | null;
+    /**
+     * Payments
+     */
+    payments: Array<StepPayment>;
+    recurring: StepRecurring | null;
+    /**
+     * Supports
+     */
+    supports: Array<StepSupport>;
+    fee_loan: StepLoan | null;
+    work_pattern: StepWork | null;
+    /**
+     * Net pay a month after an accepted offer.
+     */
+    wage: Money | null;
+    offer: StepOffer | null;
+    /**
+     * Application Deadline
+     */
+    application_deadline: string | null;
+    /**
+     * Prerequisites
+     */
+    prerequisites: Array<string>;
+    /**
+     * Grants
+     */
+    grants: Array<string>;
+    /**
+     * Records
+     */
+    records: Array<RecordReview>;
+    /**
+     * As Of
+     *
+     * Its evidence's retrieval date: never current.
+     */
+    as_of: string | null;
+    /**
+     * Supplied
+     */
+    supplied: Array<SuppliedFact>;
+    /**
+     * Added By Person
+     */
+    added_by_person: boolean;
+    /**
+     * Synthetic
+     */
+    synthetic: boolean;
+    /**
+     * Qualified By
+     */
+    qualified_by: Array<StepQualification>;
+    /**
+     * Sources
+     *
+     * The cited spans of its source values.
+     */
+    sources: Array<Citation>;
+};
 
 /**
  * RowAssessment
@@ -8289,6 +8981,36 @@ export const Scenario = {
 export type Scenario = typeof Scenario[keyof typeof Scenario];
 
 /**
+ * ScenarioCheck
+ *
+ * The route under one stress case: no point is invented for one that fails or is unknown.
+ */
+export type ScenarioCheck = {
+    scenario: Scenario;
+    feasibility: Feasibility;
+    verdict: Verdict;
+    /**
+     * Months To Readiness
+     */
+    months_to_readiness: number | null;
+    /**
+     * Readiness Month
+     */
+    readiness_month: string | null;
+    objective_cost: SignedMoney | null;
+    direct_cost: Money | null;
+    economic_cost: SignedMoney | null;
+    /**
+     * Findings
+     */
+    findings: Array<Finding>;
+    /**
+     * Same As Base
+     */
+    same_as_base: boolean;
+};
+
+/**
  * Schedule
  *
  * One feasible schedule reaching the milestone: its identity, objectives and check.
@@ -8334,6 +9056,110 @@ export type Schedule = {
      * Layer
      */
     layer: number | null;
+};
+
+/**
+ * ScheduleOut
+ */
+export type ScheduleOut = {
+    /**
+     * Index
+     *
+     * Its place in the archive: stable within a solve.
+     */
+    index: number;
+    /**
+     * Route
+     */
+    route: Array<string>;
+    /**
+     * Family Id
+     */
+    family_id: string;
+    /**
+     * Point Id
+     */
+    point_id: number;
+    /**
+     * Months To Readiness
+     */
+    months_to_readiness: number;
+    /**
+     * Readiness Month
+     */
+    readiness_month: string;
+    objective_cost: SignedMoney;
+    direct_cost: Money;
+    economic_cost: SignedMoney | null;
+    verdict: Verdict;
+    /**
+     * Qualifications
+     */
+    qualifications: Array<RouteQualification | Qualification>;
+    /**
+     * Conditions
+     */
+    conditions: Array<Condition>;
+    /**
+     * Preferences
+     */
+    preferences: Array<Finding>;
+    /**
+     * Loans To Repay
+     */
+    loans_to_repay: Array<LoanToRepay>;
+    /**
+     * Layer
+     *
+     * As the search ranked it: never changed by a view.
+     */
+    layer: number | null;
+    /**
+     * View Layer
+     *
+     * Only when reranked: its layer within the view's schedules alone.
+     */
+    view_layer: number | null;
+};
+
+/**
+ * SchedulePageOut
+ */
+export type SchedulePageOut = {
+    /**
+     * Rank Scope
+     */
+    rank_scope: 'recorded' | 'within_view';
+    /**
+     * Layers Exact
+     */
+    layers_exact: boolean;
+    /**
+     * Retained
+     *
+     * Every schedule the archive holds.
+     */
+    retained: number;
+    /**
+     * Total
+     *
+     * The schedules the view holds.
+     */
+    total: number;
+    /**
+     * Items
+     */
+    items: Array<ScheduleOut>;
+    /**
+     * Next Cursor
+     *
+     * Opaque: the next page, or null at the end.
+     */
+    next_cursor: string | null;
+    /**
+     * Pinned
+     */
+    pinned: Array<PinnedSchedule>;
 };
 
 /**
@@ -9887,6 +10713,31 @@ export const Step = {
 export type Step = typeof Step[keyof typeof Step];
 
 /**
+ * StepLoan
+ */
+export type StepLoan = {
+    kind: FeeLoanKind;
+    amount: Money | null;
+    eligibility: EligibilityStatus;
+    application: AwardState;
+    review_state: RecordState;
+};
+
+/**
+ * StepOffer
+ */
+export type StepOffer = {
+    /**
+     * Role Class
+     */
+    role_class: string | null;
+    /**
+     * Accepted
+     */
+    accepted: boolean;
+};
+
+/**
  * StepOut
  */
 export type StepOut = {
@@ -9895,6 +10746,97 @@ export type StepOut = {
      * State
      */
     state: 'unresolved';
+};
+
+/**
+ * StepPayment
+ */
+export type StepPayment = {
+    /**
+     * Kind
+     */
+    kind: 'fee' | 'instalment' | 'extra';
+    amount: Money;
+    /**
+     * Month
+     *
+     * Its model month; null: before the start, or unset.
+     */
+    month: string | null;
+    /**
+     * Due
+     */
+    due: string | null;
+};
+
+/**
+ * StepQualification
+ *
+ * Why a step qualifies its route, from its own records (R9; Task 12b).
+ */
+export const StepQualification = {
+    PROPOSED_RECORD: 'proposed_record',
+    ACCEPTED_ASSUMPTION: 'accepted_assumption',
+    OWN_OPTION: 'own_option',
+    SUPPLIED_FIGURES: 'supplied_figures',
+    SYNTHETIC: 'synthetic'
+} as const;
+
+/**
+ * StepQualification
+ *
+ * Why a step qualifies its route, from its own records (R9; Task 12b).
+ */
+export type StepQualification = typeof StepQualification[keyof typeof StepQualification];
+
+/**
+ * StepRecurring
+ */
+export type StepRecurring = {
+    amount: Money;
+    /**
+     * At Least
+     */
+    at_least: boolean;
+    /**
+     * Count
+     */
+    count: number | null;
+};
+
+/**
+ * StepSupport
+ */
+export type StepSupport = {
+    /**
+     * Instrument Id
+     */
+    instrument_id: string;
+    kind: InstrumentKind;
+    amount: Money | null;
+    /**
+     * Covers Fees In Full
+     */
+    covers_fees_in_full: boolean;
+    /**
+     * Paid To
+     */
+    paid_to: 'provider' | 'person';
+    eligibility: EligibilityStatus;
+    award: AwardState;
+    review_state: RecordState;
+};
+
+/**
+ * StepWork
+ */
+export type StepWork = {
+    kind: WorkPatternKind;
+    /**
+     * Hours Per Week
+     */
+    hours_per_week: number;
+    net_income: Money;
 };
 
 /**
@@ -11966,6 +12908,26 @@ export type Verdict = typeof Verdict[keyof typeof Verdict];
 export type Wage = {
     net_income: Money;
     cited: Citation;
+};
+
+/**
+ * Wait
+ *
+ * Months before readiness in which no step is active.
+ */
+export type Wait = {
+    /**
+     * First Month
+     */
+    first_month: string;
+    /**
+     * Last Month
+     */
+    last_month: string;
+    /**
+     * Months
+     */
+    months: number;
 };
 
 /**
@@ -15814,6 +16776,176 @@ export type GetRouteSolveResponses = {
 };
 
 export type GetRouteSolveResponse = GetRouteSolveResponses[keyof GetRouteSolveResponses];
+
+export type GetRouteComparisonData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    query?: {
+        /**
+         * Pin
+         *
+         * Archive indexes of pinned routes: kept whatever the view or projection.
+         */
+        pin?: Array<number> | null;
+    };
+    url: '/v1/workspaces/{workspace_id}/planning/solves/{run_id}/comparison';
+};
+
+export type GetRouteComparisonErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetRouteComparisonError = GetRouteComparisonErrors[keyof GetRouteComparisonErrors];
+
+export type GetRouteComparisonResponses = {
+    /**
+     * Successful Response
+     */
+    200: ComparisonOut;
+};
+
+export type GetRouteComparisonResponse = GetRouteComparisonResponses[keyof GetRouteComparisonResponses];
+
+export type ListRouteSchedulesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    query?: {
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Min Months
+         */
+        min_months?: number | null;
+        /**
+         * Max Months
+         */
+        max_months?: number | null;
+        /**
+         * Min Cost Minor
+         */
+        min_cost_minor?: number | null;
+        /**
+         * Max Cost Minor
+         */
+        max_cost_minor?: number | null;
+        /**
+         * Layer
+         */
+        layer?: number | null;
+        /**
+         * Family Id
+         */
+        family_id?: string | null;
+        /**
+         * Rerank
+         *
+         * Explicit: layers within the view, beside the recorded ones.
+         */
+        rerank?: boolean;
+        /**
+         * Pin
+         *
+         * Archive indexes of pinned routes: kept whatever the view or projection.
+         */
+        pin?: Array<number> | null;
+    };
+    url: '/v1/workspaces/{workspace_id}/planning/solves/{run_id}/schedules';
+};
+
+export type ListRouteSchedulesErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type ListRouteSchedulesError = ListRouteSchedulesErrors[keyof ListRouteSchedulesErrors];
+
+export type ListRouteSchedulesResponses = {
+    /**
+     * Successful Response
+     */
+    200: SchedulePageOut;
+};
+
+export type ListRouteSchedulesResponse = ListRouteSchedulesResponses[keyof ListRouteSchedulesResponses];
+
+export type GetRouteScheduleData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Run Id
+         */
+        run_id: string;
+        /**
+         * Index
+         */
+        index: number;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/planning/solves/{run_id}/schedules/{index}';
+};
+
+export type GetRouteScheduleErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetRouteScheduleError = GetRouteScheduleErrors[keyof GetRouteScheduleErrors];
+
+export type GetRouteScheduleResponses = {
+    /**
+     * Successful Response
+     */
+    200: RouteDetail;
+};
+
+export type GetRouteScheduleResponse = GetRouteScheduleResponses[keyof GetRouteScheduleResponses];
 
 export type GetTaxonomyData = {
     body?: never;

@@ -1313,6 +1313,37 @@ export const BandSchema = {
     description: 'The rubric\'s ordinal bands (spec section 5). Never averaged, subtracted or read as\nprobabilities (AIR1-12).'
 } as const;
 
+export const BaselineFactSchema = {
+    properties: {
+        kind: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/BaselineKind'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Null: a fixture\'s own baseline.'
+        },
+        net_income_by_month: {
+            items: {
+                $ref: '#/components/schemas/Money'
+            },
+            type: 'array',
+            title: 'Net Income By Month'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'kind',
+        'net_income_by_month'
+    ],
+    title: 'BaselineFact',
+    description: 'The confirmed counterfactual the economic cost is measured against.'
+} as const;
+
 export const BaselineInputSchema = {
     properties: {
         kind: {
@@ -1682,6 +1713,28 @@ export const ChallengeSchema = {
         'recorded_at'
     ],
     title: 'Challenge'
+} as const;
+
+export const ChangedSchema = {
+    properties: {
+        planning_inputs: {
+            type: 'boolean',
+            title: 'Planning Inputs',
+            description: 'The planning inputs have a newer version.'
+        },
+        profile: {
+            type: 'boolean',
+            title: 'Profile',
+            description: 'The profile (its limits among it) has a newer version.'
+        }
+    },
+    type: 'object',
+    required: [
+        'planning_inputs',
+        'profile'
+    ],
+    title: 'Changed',
+    description: 'What changed since the solve read its inputs (STATE-06): its routes are shown as they\nwere, beside this, until the person asks for a new solve. Nothing is invalidated here.'
 } as const;
 
 export const CheckpointOutSchema = {
@@ -2323,6 +2376,284 @@ export const CommitmentKindSchema = {
     title: 'CommitmentKind'
 } as const;
 
+export const ComparatorSchema = {
+    properties: {
+        point_id: {
+            type: 'integer',
+            title: 'Point Id'
+        },
+        dominance: {
+            $ref: '#/components/schemas/DominanceReason'
+        },
+        months_sooner: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Months Sooner'
+        },
+        cost_less: {
+            $ref: '#/components/schemas/Money'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'point_id',
+        'dominance',
+        'months_sooner',
+        'cost_less'
+    ],
+    title: 'Comparator'
+} as const;
+
+export const ComparisonBasisSchema = {
+    properties: {
+        objective_basis: {
+            type: 'string',
+            enum: [
+                'economic',
+                'direct_spending'
+            ],
+            title: 'Objective Basis'
+        },
+        planning_start: {
+            type: 'string',
+            title: 'Planning Start',
+            description: 'The comparison\'s first month, YYYY-MM.'
+        },
+        horizon_months: {
+            type: 'integer',
+            title: 'Horizon Months'
+        },
+        currency: {
+            type: 'string',
+            const: 'GBP',
+            title: 'Currency'
+        },
+        scenario: {
+            $ref: '#/components/schemas/Scenario'
+        },
+        baseline: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/BaselineFact'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Null: no baseline; direct spending.'
+        },
+        synthetic: {
+            type: 'boolean',
+            title: 'Synthetic'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'objective_basis',
+        'planning_start',
+        'horizon_months',
+        'currency',
+        'scenario',
+        'baseline',
+        'synthetic'
+    ],
+    title: 'ComparisonBasis',
+    description: 'One comparison\'s definitions, the same for every route in it (VIS2-01).'
+} as const;
+
+export const ComparisonOutSchema = {
+    properties: {
+        lead: {
+            $ref: '#/components/schemas/Lead'
+        },
+        code: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: [
+                        'SOLVE_LIMIT_REACHED',
+                        'NO_ROUTE_IN_BOUNDED_MODEL'
+                    ]
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Code',
+            description: 'Spec section 18\'s code: null when the lead is longer_than_model.'
+        },
+        coverage: {
+            $ref: '#/components/schemas/SearchCoverage'
+        },
+        stop_reason: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/StopReason'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        outcome: {
+            $ref: '#/components/schemas/Outcome'
+        },
+        layers_exact: {
+            type: 'boolean',
+            title: 'Layers Exact'
+        },
+        comparator_rule: {
+            type: 'string',
+            const: 'soonest_dominator_in_the_layer_above',
+            title: 'Comparator Rule'
+        },
+        basis: {
+            $ref: '#/components/schemas/ComparisonBasis'
+        },
+        label: {
+            $ref: '#/components/schemas/CatalogueLabel'
+        },
+        limits: {
+            $ref: '#/components/schemas/M0SearchLimits'
+        },
+        instance: {
+            $ref: '#/components/schemas/InstanceSize'
+        },
+        narrowings: {
+            items: {
+                $ref: '#/components/schemas/Narrowing'
+            },
+            type: 'array',
+            title: 'Narrowings'
+        },
+        completes_at: {
+            items: {
+                $ref: '#/components/schemas/MeasuredCompletion'
+            },
+            type: 'array',
+            title: 'Completes At',
+            description: 'When stopped: sizes measured to complete, beside the narrowings.'
+        },
+        longer_than_model: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Longer Than Model',
+            description: 'Options whose completion falls beyond the 24-month model, by variant.'
+        },
+        beyond_horizon: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Beyond Horizon',
+            description: 'Options within the model whose completion falls beyond this horizon.'
+        },
+        blocking_inputs: {
+            items: {
+                $ref: '#/components/schemas/Finding'
+            },
+            type: 'array',
+            title: 'Blocking Inputs'
+        },
+        starting_violations: {
+            items: {
+                $ref: '#/components/schemas/Finding'
+            },
+            type: 'array',
+            title: 'Starting Violations'
+        },
+        set_aside: {
+            items: {
+                $ref: '#/components/schemas/SetAside'
+            },
+            type: 'array',
+            title: 'Set Aside'
+        },
+        feasible_without_milestone: {
+            type: 'integer',
+            title: 'Feasible Without Milestone'
+        },
+        readiness_unknown: {
+            type: 'integer',
+            title: 'Readiness Unknown'
+        },
+        schedules_total: {
+            type: 'integer',
+            title: 'Schedules Total'
+        },
+        points_total: {
+            type: 'integer',
+            title: 'Points Total'
+        },
+        points_shown: {
+            type: 'integer',
+            title: 'Points Shown'
+        },
+        families_total: {
+            type: 'integer',
+            title: 'Families Total'
+        },
+        families_shown: {
+            type: 'integer',
+            title: 'Families Shown'
+        },
+        points: {
+            items: {
+                $ref: '#/components/schemas/PointOut'
+            },
+            type: 'array',
+            title: 'Points'
+        },
+        families: {
+            items: {
+                $ref: '#/components/schemas/FamilyOut'
+            },
+            type: 'array',
+            title: 'Families'
+        },
+        changed_since: {
+            $ref: '#/components/schemas/Changed'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'lead',
+        'code',
+        'coverage',
+        'stop_reason',
+        'outcome',
+        'layers_exact',
+        'comparator_rule',
+        'basis',
+        'label',
+        'limits',
+        'instance',
+        'narrowings',
+        'completes_at',
+        'longer_than_model',
+        'beyond_horizon',
+        'blocking_inputs',
+        'starting_violations',
+        'set_aside',
+        'feasible_without_milestone',
+        'readiness_unknown',
+        'schedules_total',
+        'points_total',
+        'points_shown',
+        'families_total',
+        'families_shown',
+        'points',
+        'families',
+        'changed_since'
+    ],
+    title: 'ComparisonOut'
+} as const;
+
 export const ConceptStartsSchema = {
     properties: {
         concept_id: {
@@ -2490,6 +2821,102 @@ export const ConversationModeSchema = {
     description: 'The tone the person chose (spec section 4, "Uncertainty and emotional comfort").'
 } as const;
 
+export const CostPartsSchema = {
+    properties: {
+        objective_basis: {
+            type: 'string',
+            enum: [
+                'economic',
+                'direct_spending'
+            ],
+            title: 'Objective Basis'
+        },
+        direct_cost: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        pay_difference: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SignedMoney'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Over the horizon: lost pay > 0.'
+        },
+        economic_cost: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SignedMoney'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        peak_monthly_payment: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        minimum_prefunded_cash: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SignedMoney'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        reserve: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        loans_to_repay: {
+            items: {
+                $ref: '#/components/schemas/LoanToRepay'
+            },
+            type: 'array',
+            title: 'Loans To Repay',
+            description: 'Fees a fee loan pays to the provider: a loan to repay, never spending.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'objective_basis',
+        'direct_cost',
+        'pay_difference',
+        'economic_cost',
+        'peak_monthly_payment',
+        'minimum_prefunded_cash',
+        'reserve',
+        'loans_to_repay'
+    ],
+    title: 'CostParts',
+    description: 'Each cost kept apart and named by code (H-13): what the person pays (direct spending),\nthe pay they lose or gain against the baseline, and the economic cost, their sum. Which one\nthe comparison plots is its `objective_basis`.'
+} as const;
+
 export const CountSchema = {
     properties: {
         mentioned: {
@@ -2652,6 +3079,29 @@ export const DataModeSchema = {
     description: 'Recorded on every workspace and run (Global Constraint 5, plan section 2).'
 } as const;
 
+export const DebtSchema = {
+    properties: {
+        debt_id: {
+            type: 'string',
+            title: 'Debt Id'
+        },
+        months: {
+            items: {
+                $ref: '#/components/schemas/DebtMonth'
+            },
+            type: 'array',
+            title: 'Months'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'debt_id',
+        'months'
+    ],
+    title: 'Debt'
+} as const;
+
 export const DebtInputSchema = {
     properties: {
         monthly_repayment: {
@@ -2689,6 +3139,58 @@ export const DebtInputSchema = {
     ],
     title: 'DebtInput',
     description: 'An existing debt: a fixed commitment whose repayments are outflows (spec section 10).'
+} as const;
+
+export const DebtMonthSchema = {
+    properties: {
+        month: {
+            type: 'string',
+            title: 'Month'
+        },
+        opening: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        interest: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        repayment: {
+            $ref: '#/components/schemas/Money'
+        },
+        closing: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'month',
+        'opening',
+        'interest',
+        'repayment',
+        'closing'
+    ],
+    title: 'DebtMonth'
 } as const;
 
 export const DecideStrengthSchema = {
@@ -3026,6 +3528,17 @@ export const DiscoveryProposalOutSchema = {
     ],
     title: 'DiscoveryProposalOut',
     description: 'The validated searches. They name no suggestion: the slate is computed from them.'
+} as const;
+
+export const DominanceReasonSchema = {
+    type: 'string',
+    enum: [
+        'sooner_and_cheaper',
+        'sooner_same_cost',
+        'cheaper_same_time'
+    ],
+    title: 'DominanceReason',
+    description: 'How the comparator betters a point, in the comparison\'s own cost basis.'
 } as const;
 
 export const DurationSchema = {
@@ -4089,6 +4602,81 @@ export const FamilyActionSchema = {
     title: 'FamilyAction'
 } as const;
 
+export const FamilyOutSchema = {
+    properties: {
+        family_id: {
+            type: 'string',
+            title: 'Family Id'
+        },
+        best_layer: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Best Layer',
+            description: 'The lowest layer of its schedules.'
+        },
+        schedule_count: {
+            type: 'integer',
+            title: 'Schedule Count'
+        },
+        best_schedule: {
+            type: 'integer',
+            title: 'Best Schedule',
+            description: 'The first archive index at its best layer.'
+        },
+        actions: {
+            items: {
+                $ref: '#/components/schemas/FamilyAction'
+            },
+            type: 'array',
+            title: 'Actions'
+        },
+        precedence: {
+            items: {
+                prefixItems: [
+                    {
+                        type: 'integer'
+                    },
+                    {
+                        type: 'integer'
+                    }
+                ],
+                type: 'array',
+                maxItems: 2,
+                minItems: 2
+            },
+            type: 'array',
+            title: 'Precedence'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'family_id',
+        'best_layer',
+        'schedule_count',
+        'best_schedule',
+        'actions',
+        'precedence'
+    ],
+    title: 'FamilyOut'
+} as const;
+
+export const FeasibilitySchema = {
+    type: 'string',
+    enum: [
+        'feasible',
+        'not_feasible_in_this_model',
+        'unresolved'
+    ],
+    title: 'Feasibility'
+} as const;
+
 export const FeeLoanKindSchema = {
     type: 'string',
     enum: [
@@ -4632,6 +5220,62 @@ export const GapKindSchema = {
         'preference_conflict'
     ],
     title: 'GapKind'
+} as const;
+
+export const GateSchema = {
+    properties: {
+        kind: {
+            type: 'string',
+            enum: [
+                'offer',
+                'award',
+                'application',
+                'loan'
+            ],
+            title: 'Kind'
+        },
+        variant_id: {
+            type: 'string',
+            title: 'Variant Id'
+        },
+        instrument_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Instrument Id'
+        },
+        verification: {
+            type: 'string',
+            title: 'Verification'
+        },
+        month: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Month',
+            description: 'The step\'s start month: the gate comes before it.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'kind',
+        'variant_id',
+        'instrument_id',
+        'verification',
+        'month'
+    ],
+    title: 'Gate'
 } as const;
 
 export const GateInfoSchema = {
@@ -5504,6 +6148,50 @@ export const LabelMatchOutSchema = {
     title: 'LabelMatchOut'
 } as const;
 
+export const LeadSchema = {
+    type: 'string',
+    enum: [
+        'best_trade_offs_found',
+        'none_found_before_limit',
+        'unresolved',
+        'longer_than_model',
+        'no_route_in_bounded_model'
+    ],
+    title: 'Lead',
+    description: 'What the Routes chapter leads with, one code per result.'
+} as const;
+
+export const LiabilitySchema = {
+    properties: {
+        variant_id: {
+            type: 'string',
+            title: 'Variant Id'
+        },
+        due: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Due'
+        },
+        amount: {
+            $ref: '#/components/schemas/Money'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'variant_id',
+        'due',
+        'amount'
+    ],
+    title: 'Liability'
+} as const;
+
 export const LoanToRepaySchema = {
     properties: {
         variant_id: {
@@ -6165,6 +6853,38 @@ export const MatrixSourcesSchema = {
     title: 'MatrixSources'
 } as const;
 
+export const MeasuredCompletionSchema = {
+    properties: {
+        horizon_months: {
+            type: 'integer',
+            title: 'Horizon Months'
+        },
+        starts_per_concept: {
+            type: 'integer',
+            title: 'Starts Per Concept'
+        },
+        concepts: {
+            type: 'integer',
+            title: 'Concepts'
+        },
+        measured_on: {
+            type: 'string',
+            format: 'date',
+            title: 'Measured On'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'horizon_months',
+        'starts_per_concept',
+        'concepts',
+        'measured_on'
+    ],
+    title: 'MeasuredCompletion',
+    description: 'A size Task 13a measured to complete with no limit binding.'
+} as const;
+
 export const MethodSchema = {
     type: 'string',
     enum: [
@@ -6173,6 +6893,35 @@ export const MethodSchema = {
         'assessment'
     ],
     title: 'Method'
+} as const;
+
+export const MilestoneSchema = {
+    properties: {
+        kind: {
+            type: 'string',
+            enum: [
+                'readiness',
+                'verify_assessed_completion'
+            ],
+            title: 'Kind'
+        },
+        month: {
+            type: 'string',
+            title: 'Month'
+        },
+        months_to_readiness: {
+            type: 'integer',
+            title: 'Months To Readiness'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'kind',
+        'month',
+        'months_to_readiness'
+    ],
+    title: 'Milestone'
 } as const;
 
 export const MissingFactSchema = {
@@ -6430,6 +7179,152 @@ export const MoneyInputSchema = {
         'state'
     ],
     title: 'MoneyInput'
+} as const;
+
+export const MonthRowSchema = {
+    properties: {
+        month: {
+            type: 'string',
+            title: 'Month'
+        },
+        payments: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        paid_to_provider: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        support: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        baseline_income: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        route_income: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        pay_difference: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SignedMoney'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Baseline less route: lost pay > 0.'
+        },
+        opening: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SignedMoney'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        early_receipts: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        living: {
+            $ref: '#/components/schemas/Money'
+        },
+        debt_service: {
+            $ref: '#/components/schemas/Money'
+        },
+        lower_bound: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SignedMoney'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        later_receipts: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        closing: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SignedMoney'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'month',
+        'payments',
+        'paid_to_provider',
+        'support',
+        'baseline_income',
+        'route_income',
+        'pay_difference',
+        'opening',
+        'early_receipts',
+        'living',
+        'debt_service',
+        'lower_bound',
+        'later_receipts',
+        'closing'
+    ],
+    title: 'MonthRow',
+    description: 'One month of the route\'s money: null where it rests on an amount not known.'
 } as const;
 
 export const MoreDepthSchema = {
@@ -8969,6 +9864,26 @@ export const PersonQualificationSchema = {
     description: 'A qualification the person gave (Task 6f), in their words.'
 } as const;
 
+export const PinnedScheduleSchema = {
+    properties: {
+        schedule: {
+            $ref: '#/components/schemas/ScheduleOut'
+        },
+        in_view: {
+            type: 'boolean',
+            title: 'In View',
+            description: 'False: pinned outside the view, kept with its badge.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'schedule',
+        'in_view'
+    ],
+    title: 'PinnedSchedule'
+} as const;
+
 export const PlaceListSchema = {
     properties: {
         country_code: {
@@ -9626,6 +10541,78 @@ export const PlanningInputsOutSchema = {
     ],
     title: 'PlanningInputsOut',
     description: 'The person\'s stored planning inputs, with the profile\'s two spending caps beside them\n(read-only here: they are the profile\'s answers) and what a solve still needs.'
+} as const;
+
+export const PointOutSchema = {
+    properties: {
+        point_id: {
+            type: 'integer',
+            title: 'Point Id',
+            description: 'Its place in the result\'s equal points.'
+        },
+        months_to_readiness: {
+            type: 'integer',
+            title: 'Months To Readiness'
+        },
+        objective_cost: {
+            $ref: '#/components/schemas/SignedMoney'
+        },
+        layer: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Layer'
+        },
+        schedule_count: {
+            type: 'integer',
+            title: 'Schedule Count'
+        },
+        schedules: {
+            items: {
+                type: 'integer'
+            },
+            type: 'array',
+            title: 'Schedules',
+            description: 'The first archive indexes at this point.'
+        },
+        comparator: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Comparator'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Null: in F1, bettered by nothing.'
+        },
+        dominators: {
+            items: {
+                type: 'integer'
+            },
+            type: 'array',
+            title: 'Dominators',
+            description: 'Every point of the layer above that betters it, by point_id.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'point_id',
+        'months_to_readiness',
+        'objective_cost',
+        'layer',
+        'schedule_count',
+        'schedules',
+        'comparator',
+        'dominators'
+    ],
+    title: 'PointOut'
 } as const;
 
 export const PoolQueryOutSchema = {
@@ -11367,6 +12354,36 @@ export const RecordPartSchema = {
     title: 'RecordPart'
 } as const;
 
+export const RecordReviewSchema = {
+    properties: {
+        record: {
+            type: 'string',
+            enum: [
+                'concept',
+                'offering',
+                'support',
+                'fee_loan'
+            ],
+            title: 'Record'
+        },
+        record_id: {
+            type: 'string',
+            title: 'Record Id'
+        },
+        review_state: {
+            $ref: '#/components/schemas/RecordState'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'record',
+        'record_id',
+        'review_state'
+    ],
+    title: 'RecordReview'
+} as const;
+
 export const RecordStateSchema = {
     type: 'string',
     enum: [
@@ -12369,6 +13386,125 @@ export const RoleStateSchema = {
     description: 'What the person\'s current or last role names in ESCO.'
 } as const;
 
+export const RouteDetailSchema = {
+    properties: {
+        schedule: {
+            $ref: '#/components/schemas/ScheduleOut'
+        },
+        label: {
+            $ref: '#/components/schemas/CatalogueLabel'
+        },
+        basis: {
+            $ref: '#/components/schemas/ComparisonBasis'
+        },
+        costs: {
+            $ref: '#/components/schemas/CostParts'
+        },
+        months: {
+            items: {
+                $ref: '#/components/schemas/MonthRow'
+            },
+            type: 'array',
+            title: 'Months'
+        },
+        beyond_horizon: {
+            items: {
+                $ref: '#/components/schemas/Liability'
+            },
+            type: 'array',
+            title: 'Beyond Horizon'
+        },
+        unscheduled: {
+            items: {
+                $ref: '#/components/schemas/Liability'
+            },
+            type: 'array',
+            title: 'Unscheduled'
+        },
+        before_start: {
+            items: {
+                $ref: '#/components/schemas/Liability'
+            },
+            type: 'array',
+            title: 'Before Start'
+        },
+        debts: {
+            items: {
+                $ref: '#/components/schemas/Debt'
+            },
+            type: 'array',
+            title: 'Debts'
+        },
+        steps: {
+            items: {
+                $ref: '#/components/schemas/RouteStep'
+            },
+            type: 'array',
+            title: 'Steps'
+        },
+        gates: {
+            items: {
+                $ref: '#/components/schemas/Gate'
+            },
+            type: 'array',
+            title: 'Gates'
+        },
+        waits: {
+            items: {
+                $ref: '#/components/schemas/Wait'
+            },
+            type: 'array',
+            title: 'Waits'
+        },
+        milestones: {
+            items: {
+                $ref: '#/components/schemas/Milestone'
+            },
+            type: 'array',
+            title: 'Milestones'
+        },
+        scenarios: {
+            items: {
+                $ref: '#/components/schemas/ScenarioCheck'
+            },
+            type: 'array',
+            title: 'Scenarios',
+            description: 'The stress cases, the base apart.'
+        },
+        self_paid: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ScenarioCheck'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'With a fee loan not yet approved: the route where the person pays.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'schedule',
+        'label',
+        'basis',
+        'costs',
+        'months',
+        'beyond_horizon',
+        'unscheduled',
+        'before_start',
+        'debts',
+        'steps',
+        'gates',
+        'waits',
+        'milestones',
+        'scenarios',
+        'self_paid'
+    ],
+    title: 'RouteDetail'
+} as const;
+
 export const RouteQualificationSchema = {
     type: 'string',
     enum: [
@@ -12384,6 +13520,302 @@ export const RouteQualificationSchema = {
         'own_options'
     ],
     title: 'RouteQualification'
+} as const;
+
+export const RouteStepSchema = {
+    properties: {
+        variant_id: {
+            type: 'string',
+            title: 'Variant Id'
+        },
+        concept_id: {
+            type: 'string',
+            title: 'Concept Id'
+        },
+        offering_id: {
+            type: 'string',
+            title: 'Offering Id'
+        },
+        kind: {
+            $ref: '#/components/schemas/ActionKind'
+        },
+        title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Title'
+        },
+        provider: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Provider'
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        finish_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Finish Date'
+        },
+        start_month: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Month'
+        },
+        finish_month: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Finish Month'
+        },
+        usable_month: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Usable Month',
+            description: 'From when what it grants is usable.'
+        },
+        active_months: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Active Months',
+            description: 'Every month it touches, beyond the horizon too.'
+        },
+        weekly_hours: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Weekly Hours'
+        },
+        payments: {
+            items: {
+                $ref: '#/components/schemas/StepPayment'
+            },
+            type: 'array',
+            title: 'Payments'
+        },
+        recurring: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/StepRecurring'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        supports: {
+            items: {
+                $ref: '#/components/schemas/StepSupport'
+            },
+            type: 'array',
+            title: 'Supports'
+        },
+        fee_loan: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/StepLoan'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        work_pattern: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/StepWork'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        wage: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'Net pay a month after an accepted offer.'
+        },
+        offer: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/StepOffer'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        application_deadline: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Deadline'
+        },
+        prerequisites: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Prerequisites'
+        },
+        grants: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Grants'
+        },
+        records: {
+            items: {
+                $ref: '#/components/schemas/RecordReview'
+            },
+            type: 'array',
+            title: 'Records'
+        },
+        as_of: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'As Of',
+            description: 'Its evidence\'s retrieval date: never current.'
+        },
+        supplied: {
+            items: {
+                $ref: '#/components/schemas/SuppliedFact'
+            },
+            type: 'array',
+            title: 'Supplied'
+        },
+        added_by_person: {
+            type: 'boolean',
+            title: 'Added By Person'
+        },
+        synthetic: {
+            type: 'boolean',
+            title: 'Synthetic'
+        },
+        qualified_by: {
+            items: {
+                $ref: '#/components/schemas/StepQualification'
+            },
+            type: 'array',
+            title: 'Qualified By'
+        },
+        sources: {
+            items: {
+                $ref: '#/components/schemas/Citation'
+            },
+            type: 'array',
+            title: 'Sources',
+            description: 'The cited spans of its source values.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'variant_id',
+        'concept_id',
+        'offering_id',
+        'kind',
+        'title',
+        'provider',
+        'start_date',
+        'finish_date',
+        'start_month',
+        'finish_month',
+        'usable_month',
+        'active_months',
+        'weekly_hours',
+        'payments',
+        'recurring',
+        'supports',
+        'fee_loan',
+        'work_pattern',
+        'wage',
+        'offer',
+        'application_deadline',
+        'prerequisites',
+        'grants',
+        'records',
+        'as_of',
+        'supplied',
+        'added_by_person',
+        'synthetic',
+        'qualified_by',
+        'sources'
+    ],
+    title: 'RouteStep',
+    description: 'One action of the route: a step card\'s facts and the Gantt\'s band.'
 } as const;
 
 export const RowAssessmentSchema = {
@@ -13337,6 +14769,99 @@ export const ScenarioSchema = {
     title: 'Scenario'
 } as const;
 
+export const ScenarioCheckSchema = {
+    properties: {
+        scenario: {
+            $ref: '#/components/schemas/Scenario'
+        },
+        feasibility: {
+            $ref: '#/components/schemas/Feasibility'
+        },
+        verdict: {
+            $ref: '#/components/schemas/Verdict'
+        },
+        months_to_readiness: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Months To Readiness'
+        },
+        readiness_month: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Readiness Month'
+        },
+        objective_cost: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SignedMoney'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        direct_cost: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        economic_cost: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SignedMoney'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        findings: {
+            items: {
+                $ref: '#/components/schemas/Finding'
+            },
+            type: 'array',
+            title: 'Findings'
+        },
+        same_as_base: {
+            type: 'boolean',
+            title: 'Same As Base'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'scenario',
+        'feasibility',
+        'verdict',
+        'months_to_readiness',
+        'readiness_month',
+        'objective_cost',
+        'direct_cost',
+        'economic_cost',
+        'findings',
+        'same_as_base'
+    ],
+    title: 'ScenarioCheck',
+    description: 'The route under one stress case: no point is invented for one that fails or is unknown.'
+} as const;
+
 export const ScheduleSchema = {
     properties: {
         route: {
@@ -13442,6 +14967,203 @@ export const ScheduleSchema = {
     ],
     title: 'Schedule',
     description: 'One feasible schedule reaching the milestone: its identity, objectives and check.'
+} as const;
+
+export const ScheduleOutSchema = {
+    properties: {
+        index: {
+            type: 'integer',
+            title: 'Index',
+            description: 'Its place in the archive: stable within a solve.'
+        },
+        route: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Route'
+        },
+        family_id: {
+            type: 'string',
+            title: 'Family Id'
+        },
+        point_id: {
+            type: 'integer',
+            title: 'Point Id'
+        },
+        months_to_readiness: {
+            type: 'integer',
+            title: 'Months To Readiness'
+        },
+        readiness_month: {
+            type: 'string',
+            title: 'Readiness Month'
+        },
+        objective_cost: {
+            $ref: '#/components/schemas/SignedMoney'
+        },
+        direct_cost: {
+            $ref: '#/components/schemas/Money'
+        },
+        economic_cost: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SignedMoney'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        verdict: {
+            $ref: '#/components/schemas/Verdict'
+        },
+        qualifications: {
+            items: {
+                anyOf: [
+                    {
+                        $ref: '#/components/schemas/RouteQualification'
+                    },
+                    {
+                        $ref: '#/components/schemas/Qualification'
+                    }
+                ]
+            },
+            type: 'array',
+            title: 'Qualifications'
+        },
+        conditions: {
+            items: {
+                $ref: '#/components/schemas/Condition'
+            },
+            type: 'array',
+            title: 'Conditions'
+        },
+        preferences: {
+            items: {
+                $ref: '#/components/schemas/Finding'
+            },
+            type: 'array',
+            title: 'Preferences'
+        },
+        loans_to_repay: {
+            items: {
+                $ref: '#/components/schemas/LoanToRepay'
+            },
+            type: 'array',
+            title: 'Loans To Repay'
+        },
+        layer: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Layer',
+            description: 'As the search ranked it: never changed by a view.'
+        },
+        view_layer: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'View Layer',
+            description: 'Only when reranked: its layer within the view\'s schedules alone.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'index',
+        'route',
+        'family_id',
+        'point_id',
+        'months_to_readiness',
+        'readiness_month',
+        'objective_cost',
+        'direct_cost',
+        'economic_cost',
+        'verdict',
+        'qualifications',
+        'conditions',
+        'preferences',
+        'loans_to_repay',
+        'layer',
+        'view_layer'
+    ],
+    title: 'ScheduleOut'
+} as const;
+
+export const SchedulePageOutSchema = {
+    properties: {
+        rank_scope: {
+            type: 'string',
+            enum: [
+                'recorded',
+                'within_view'
+            ],
+            title: 'Rank Scope'
+        },
+        layers_exact: {
+            type: 'boolean',
+            title: 'Layers Exact'
+        },
+        retained: {
+            type: 'integer',
+            title: 'Retained',
+            description: 'Every schedule the archive holds.'
+        },
+        total: {
+            type: 'integer',
+            title: 'Total',
+            description: 'The schedules the view holds.'
+        },
+        items: {
+            items: {
+                $ref: '#/components/schemas/ScheduleOut'
+            },
+            type: 'array',
+            title: 'Items'
+        },
+        next_cursor: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Next Cursor',
+            description: 'Opaque: the next page, or null at the end.'
+        },
+        pinned: {
+            items: {
+                $ref: '#/components/schemas/PinnedSchedule'
+            },
+            type: 'array',
+            title: 'Pinned'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'rank_scope',
+        'layers_exact',
+        'retained',
+        'total',
+        'items',
+        'next_cursor',
+        'pinned'
+    ],
+    title: 'SchedulePageOut'
 } as const;
 
 export const SchemeFactsSchema = {
@@ -15944,6 +17666,70 @@ export const StepSchema = {
     description: 'The generic steps between here and a plan, each unresolved until a later chapter\nresolves it.'
 } as const;
 
+export const StepLoanSchema = {
+    properties: {
+        kind: {
+            $ref: '#/components/schemas/FeeLoanKind'
+        },
+        amount: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        eligibility: {
+            $ref: '#/components/schemas/EligibilityStatus'
+        },
+        application: {
+            $ref: '#/components/schemas/AwardState'
+        },
+        review_state: {
+            $ref: '#/components/schemas/RecordState'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'kind',
+        'amount',
+        'eligibility',
+        'application',
+        'review_state'
+    ],
+    title: 'StepLoan'
+} as const;
+
+export const StepOfferSchema = {
+    properties: {
+        role_class: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Role Class'
+        },
+        accepted: {
+            type: 'boolean',
+            title: 'Accepted'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'role_class',
+        'accepted'
+    ],
+    title: 'StepOffer'
+} as const;
+
 export const StepOutSchema = {
     properties: {
         step: {
@@ -15962,6 +17748,179 @@ export const StepOutSchema = {
         'state'
     ],
     title: 'StepOut'
+} as const;
+
+export const StepPaymentSchema = {
+    properties: {
+        kind: {
+            type: 'string',
+            enum: [
+                'fee',
+                'instalment',
+                'extra'
+            ],
+            title: 'Kind'
+        },
+        amount: {
+            $ref: '#/components/schemas/Money'
+        },
+        month: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Month',
+            description: 'Its model month; null: before the start, or unset.'
+        },
+        due: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Due'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'kind',
+        'amount',
+        'month',
+        'due'
+    ],
+    title: 'StepPayment'
+} as const;
+
+export const StepQualificationSchema = {
+    type: 'string',
+    enum: [
+        'proposed_record',
+        'accepted_assumption',
+        'own_option',
+        'supplied_figures',
+        'synthetic'
+    ],
+    title: 'StepQualification',
+    description: 'Why a step qualifies its route, from its own records (R9; Task 12b).'
+} as const;
+
+export const StepRecurringSchema = {
+    properties: {
+        amount: {
+            $ref: '#/components/schemas/Money'
+        },
+        at_least: {
+            type: 'boolean',
+            title: 'At Least'
+        },
+        count: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Count'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'amount',
+        'at_least',
+        'count'
+    ],
+    title: 'StepRecurring'
+} as const;
+
+export const StepSupportSchema = {
+    properties: {
+        instrument_id: {
+            type: 'string',
+            title: 'Instrument Id'
+        },
+        kind: {
+            $ref: '#/components/schemas/InstrumentKind'
+        },
+        amount: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        covers_fees_in_full: {
+            type: 'boolean',
+            title: 'Covers Fees In Full'
+        },
+        paid_to: {
+            type: 'string',
+            enum: [
+                'provider',
+                'person'
+            ],
+            title: 'Paid To'
+        },
+        eligibility: {
+            $ref: '#/components/schemas/EligibilityStatus'
+        },
+        award: {
+            $ref: '#/components/schemas/AwardState'
+        },
+        review_state: {
+            $ref: '#/components/schemas/RecordState'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'instrument_id',
+        'kind',
+        'amount',
+        'covers_fees_in_full',
+        'paid_to',
+        'eligibility',
+        'award',
+        'review_state'
+    ],
+    title: 'StepSupport'
+} as const;
+
+export const StepWorkSchema = {
+    properties: {
+        kind: {
+            $ref: '#/components/schemas/WorkPatternKind'
+        },
+        hours_per_week: {
+            type: 'integer',
+            title: 'Hours Per Week'
+        },
+        net_income: {
+            $ref: '#/components/schemas/Money'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'kind',
+        'hours_per_week',
+        'net_income'
+    ],
+    title: 'StepWork'
 } as const;
 
 export const StopReasonSchema = {
@@ -19300,6 +21259,32 @@ export const WageSchema = {
     ],
     title: 'Wage',
     description: 'A job\'s or an apprenticeship\'s take-home pay a month, as the person confirmed it: it\nstarts at the offer gate and never funds a payment before it arrives.'
+} as const;
+
+export const WaitSchema = {
+    properties: {
+        first_month: {
+            type: 'string',
+            title: 'First Month'
+        },
+        last_month: {
+            type: 'string',
+            title: 'Last Month'
+        },
+        months: {
+            type: 'integer',
+            title: 'Months'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'first_month',
+        'last_month',
+        'months'
+    ],
+    title: 'Wait',
+    description: 'Months before readiness in which no step is active.'
 } as const;
 
 export const WorkModeSchema = {

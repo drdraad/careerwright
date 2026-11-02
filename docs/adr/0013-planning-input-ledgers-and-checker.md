@@ -484,3 +484,18 @@ Backend and API only; the Options chapter's screens are Task 12b's second half (
 Known limits: a figure is the person's statement and is not reviewed; Careerwright does not
 read a date or an amount from pasted words (a new language rule, R11), so figures are typed,
 each optionally citing its span.
+
+## Amendment, 2026-11-02 (Task 14, backend half): the solve's stage checks
+
+The solve's stage checks (API-05; spec section 18, "a budget-qualified solve needs confirmed
+budget semantics; an economic solve needs a horizon and baseline"):
+
+1. **Both limits and an economic baseline block a solve.** `needs` names the direct-spend cap
+   and the monthly payment cap as `blocks_a_solve`, and the baseline too when the comparison is
+   economic; `prepare` refuses a solve without them (`inputs_missing`, naming each), so nothing
+   runs only to be unresolved for a reason known before it starts. The horizon is part of every
+   solve request (1 to 24 months). **Ruling (not R6):** this replaces Task 12a's "leaves every
+   route unresolved" for these three; the reserve, weekly availability, work rights and a
+   deficit cap's baseline under direct spending still leave every route unresolved.
+2. The checker's own rule is unchanged: a monthly input without a hard limit leaves a route
+   unresolved, never passed (`limit_unknown`), for any caller that compiles one directly.
