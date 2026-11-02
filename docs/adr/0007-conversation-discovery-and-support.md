@@ -1092,3 +1092,19 @@ space; this ADR changes as follows.
   who it is for in Childline's own words; it states no age limit, which that page did not.
   The screen's words, lists and windows are unchanged. Not yet reviewed as built
   (`REVIEW_STATUS`; H-12, session W2).
+- **Amendment line, Task W2F slice C (2026-11-02): removing a target keeps the slate current**
+  (STATE-10; session W2, finding 2: there was no visible way to remove a target, and the buried
+  one made the paid Suggest again the bright action). Task W2E's rule widens: a discovery stays
+  made from the current answers while every later version changed only the targets and gained
+  none but the person's choices from its slate or a title the pinned version or such a choice
+  held (`exploration.stays_current`, before `changed_only_by_choices`; tested in
+  `test_discovery_contract.py` and `test_discovery.py`). So a target removed, the last one
+  included, or put back (an Undo, or the same title typed again) asks the slate nothing new;
+  a new target typed in, or any other answer, still marks it "based on your earlier answers".
+  Remove is offered beside each target in What we know and on a saved suggestion; it is the
+  profile's own save, and its Undo the profile's revert, never a command of its own.
+  **Ruling (Task W2F):** removing the last target leaves the target roles answered Unknown:
+  the person was asked and has none for now, so it is neither "Not asked yet" (which would
+  list it as unasked and have the demo interviewer ask again) nor "Skipped". A slate kept
+  current after a removal still holds what its searches found from the removed title, and its
+  written note may still quote it: both describe the answers it was made from.

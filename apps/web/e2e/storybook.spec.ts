@@ -91,7 +91,7 @@ test("[UI-11] What we know's long answers: no label is printed over its value at
   }
 });
 
-test("[UI-12] the answer form's Save stays in reach while the form is open (session W2, finding 9)", async ({
+test("[UI-06][UI-09] the answer form's Save stays in reach while the form is open (session W2, finding 9)", async ({
   browser,
 }) => {
   for (const viewport of WIDTHS) {
