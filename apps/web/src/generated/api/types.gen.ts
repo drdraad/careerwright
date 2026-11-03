@@ -2857,7 +2857,9 @@ export const ExclusionReason = {
     HOST_NOT_ALLOWED: 'host_not_allowed',
     ADDRESS_NOT_ALLOWED: 'address_not_allowed',
     SOURCE_NOT_PERMITTED: 'source_not_permitted',
-    OVER_THE_LIMIT: 'over_the_limit'
+    OVER_THE_LIMIT: 'over_the_limit',
+    SITE_ROOT: 'site_root',
+    NOT_RETURNED_BY_SEARCH: 'not_returned_by_search'
 } as const;
 
 /**

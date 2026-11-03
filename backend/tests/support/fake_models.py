@@ -463,6 +463,8 @@ def fake_model_builder(
             strengthening = _strength_context(messages)
             searching = _search_request(messages)
             reading = _page_text(messages)
+            # Past the source search kind's one reservation: eight tool calls (role research's
+            # deeper search), whatever the search's purpose.
             if searching is not None and failure is FakeFailure.SEARCH_OVERRUN_INVALID:
                 return ModelResponse(
                     parts=[TextPart('{"candidates": "not a list"}')],
@@ -470,7 +472,7 @@ def fake_model_builder(
                     usage=RequestUsage(
                         input_tokens=20_000,
                         output_tokens=300,
-                        details={"web_search_requests": 3},
+                        details={"web_search_requests": 9},
                     ),
                 )
             if searching is not None and failure is FakeFailure.SEARCH_OVERRUN:
@@ -480,7 +482,7 @@ def fake_model_builder(
                     usage=RequestUsage(
                         input_tokens=20_000,
                         output_tokens=300,
-                        details={"web_search_requests": 3},
+                        details={"web_search_requests": 9},
                     ),
                 )
             if searching is not None:

@@ -249,7 +249,7 @@ def read_role_pages(
     deps: Deps,
     key: IdempotencyKey,
 ) -> JSONResponse:
-    """Read the search's pages, up to five, through the restricted acquisition worker (202);
+    """Read the search's pages, up to twenty, through the restricted acquisition worker (202);
     200 with the same research when its reading has started already. It calls no model. A
     repeat with the same Idempotency-Key answers with the research as it is now."""
 

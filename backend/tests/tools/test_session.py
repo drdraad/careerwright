@@ -46,7 +46,7 @@ def test_the_session_is_the_normal_live_stack_with_wonder_and_the_session_s_caps
     assert env == {
         "CAREERWRIGHT_META_PRODUCTION_MODEL": "muse-wonder-1.0",
         "CAREERWRIGHT_SYNTHETIC_MODEL_ROLE": "test",
-        "CAREERWRIGHT_DEFAULT_RUN_SPEND_LIMIT_NANO_USD": "750000000",
+        "CAREERWRIGHT_DEFAULT_RUN_SPEND_LIMIT_NANO_USD": "1600000000",
         "CAREERWRIGHT_DEFAULT_PERIOD_SPEND_LIMIT_NANO_USD": "5000000000",
     }
     # The test model is never touched: synthetic workspaces keep it.
@@ -128,7 +128,7 @@ def spend(committed: int, version: int = 3) -> dict[str, Any]:
 def test_the_session_adds_five_dollars_to_what_the_workspace_s_month_has_committed() -> None:
     assert session_limits(spend(420_000_000)) == {
         "expected_version": 3,  # an expected-version command: a change meanwhile is refused
-        "run_limit_nano_usd": 750_000_000,
+        "run_limit_nano_usd": 1_600_000_000,
         "period_limit_nano_usd": 5_420_000_000,
     }
 
@@ -139,19 +139,19 @@ def test_the_start_summary_says_the_caps_are_per_workspace_with_the_session_s_ce
     ceiling is $5 for each workspace capped at start, and each workspace whose key is stored
     during the session adds $5."""
     capped = [
-        SessionCap("w-1", "Ada's search", 420_000_000, 750_000_000, 5_420_000_000),
-        SessionCap("w-2", "Second look", 0, 750_000_000, 5_000_000_000),
+        SessionCap("w-1", "Ada's search", 420_000_000, 1_600_000_000, 5_420_000_000),
+        SessionCap("w-2", "Second look", 0, 1_600_000_000, 5_000_000_000),
     ]
 
     assert session_summary("http://127.0.0.1:53000", capped).splitlines() == [
         "Careerwright: http://127.0.0.1:53000  (open this in a browser)",
         "Workspaces not marked synthetic run muse-wonder-1.0; synthetic ones keep the test model.",
-        "The caps are per workspace: each run may reserve at most $0.750000, and each "
+        "The caps are per workspace: each run may reserve at most $1.600000, and each "
         "workspace may spend at most $5.000000 more this month.",
         "  Ada's search: $0.420000 committed this month, limit now $5.420000, each run at "
-        "most $0.750000",
+        "most $1.600000",
         "  Second look: $0.000000 committed this month, limit now $5.000000, each run at most "
-        "$0.750000",
+        "$1.600000",
         "So this session can spend at most $10.000000 in all: $5.000000 for each of the 2 "
         "workspaces capped now. Each workspace whose key is stored during the session adds "
         "$5.000000.",

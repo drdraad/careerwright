@@ -1,7 +1,7 @@
 "use client";
 // "Research this role" (Task 6e, S2.9; ADR 0015 decision 2): for a title no list holds, the
 // person's own words or a title Careerwright thought of and hasn't found. One bounded search,
-// told only the title and "England", then up to five of its pages read and checked by code.
+// told only the title and "England", then up to twenty of its pages read and checked by code.
 // The API decides every state and count; this only words them (R11). Live workspaces only: a
 // demo workspace never searches.
 import { useEffect, useState } from "react";

@@ -254,7 +254,7 @@ def test_an_untouched_old_default_run_limit_upgrades_to_the_new_default(infra: I
                     {"ws": workspaces[name], "run": run_limit, "v": version},
                 )
 
-        migrate_app(engine)
+        migrate_app(engine, "0009")  # 0047 moves the next default on (its own test)
     finally:
         engine.dispose()
 
@@ -270,6 +270,54 @@ def test_an_untouched_old_default_run_limit_upgrades_to_the_new_default(infra: I
     assert limits == {
         "untouched": {"run": 150_000_000, "period": 1_000_000_000, "version": 1},
         "chosen": {"run": 100_000_000, "period": 1_000_000_000, "version": 2},
+        "lower": {"run": 50_000_000, "period": 1_000_000_000, "version": 1},
+    }
+
+
+@pytest.mark.req("MODEL-08", "MODEL-04")
+def test_0047_moves_an_untouched_15_cent_run_limit_to_the_new_50_cent_default(
+    infra: Infra,
+) -> None:
+    # The product owner, 3 November 2026: role research's deeper search makes a source search
+    # the costliest run kind ($0.161 on Standard), so three attempts need $0.50 a run.
+    database = f"careerwright_limits_{uuid.uuid4().hex[:8]}"
+    infra.create_database(database)
+    engine = migrator_engine(infra, database)
+    try:
+        migrate_app(engine, "0046")
+        seed_fixture(engine, infra.ops_settings(database))
+        with engine.begin() as tx:
+            rows = {
+                "untouched": (150_000_000, 1),  # the old default, never edited
+                "chosen": (150_000_000, 2),  # the person set $0.15 themselves
+                "session": (750_000_000, 1),  # keyed during a live session, its default
+                "lower": (50_000_000, 1),  # created under another configured default
+            }
+            workspaces = {name: add_edited_workspace(tx) for name in rows}
+            for name, (run_limit, version) in rows.items():
+                tx.exec_driver_sql(
+                    "INSERT INTO careerwright.spend_limits (workspace_id, run_limit_nano_usd, "
+                    "period_limit_nano_usd, version) VALUES (%(ws)s, %(run)s, 1000000000, %(v)s)",
+                    {"ws": workspaces[name], "run": run_limit, "v": version},
+                )
+
+        migrate_app(engine)
+    finally:
+        engine.dispose()
+
+    limits = {
+        name: infra.query(
+            "SELECT run_limit_nano_usd AS run, period_limit_nano_usd AS period, version "
+            "FROM careerwright.spend_limits WHERE workspace_id = %s",
+            (workspace,),
+            database=database,
+        )[0]
+        for name, workspace in workspaces.items()
+    }
+    assert limits == {
+        "untouched": {"run": 500_000_000, "period": 1_000_000_000, "version": 1},
+        "chosen": {"run": 150_000_000, "period": 1_000_000_000, "version": 2},
+        "session": {"run": 750_000_000, "period": 1_000_000_000, "version": 1},
         "lower": {"run": 50_000_000, "period": 1_000_000_000, "version": 1},
     }
 

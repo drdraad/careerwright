@@ -9,7 +9,8 @@ worst case in all, the test model only) as soon as it returns, before any page i
 what the search proposed in the row's notes; then the requests sent, the result and the row
 are scanned for the key.
 
-Then up to five of its candidate pages (`role_research.pages_to_read`) are read with the
+Then up to twenty of its candidate pages (`role_research.pages_to_read`: only pages the search
+returned, never a site's home page) are read with the
 restricted acquisition worker's own code (`acquire_page`: the URL checks, the source manifest,
 robots.txt, pacing, redaction; each page's class from the manifest), and the title is checked
 on each by the product's own corroboration code (`check_title`, `corroborate`). No model reads
@@ -81,7 +82,7 @@ ROLE_RESEARCH = SmokeKind(
     search.MAX_REQUESTS,
     search.worst_case_nano_usd,
     "role research in process: one search told only a synthetic title and England (the "
-    "product's own task code and bound check), then up to five of its pages read in this "
+    "product's own task code and bound check), then up to twenty of its pages read in this "
     "process (not through the restricted worker's boundary) with the guarded fetcher and the "
     "title checked on each by code (no model reads a page; page results printed, not ledgered)",
 )

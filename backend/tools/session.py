@@ -60,10 +60,11 @@ from tools.stack import CORE_SERVICES, Stack, ports_from_env, project_from_env
 from tools.usage_ledger import CallOutcome, Ledger, LiveCallEntry, LiveCallRecord
 
 # The session's caps, each per workspace (the audit's Muse Wonder notes; ADR 0003, amendment
-# and its qualification result; the product owner's ruling of 31 October 2026): $0.75 a run,
-# so every run kind's three attempts fit on Wonder ($0.552 at most, a slate's written note),
-# and $5 per workspace on top of what its month has committed.
-SESSION_RUN_LIMIT_NANO_USD = 750_000_000
+# and its qualification result; the product owner's rulings of 31 October and 3 November
+# 2026): $1.60 a run, so every run kind's three attempts fit on Wonder ($1.488 at most, a
+# source search at role research's deeper search), and $5 per workspace on top of what its
+# month has committed.
+SESSION_RUN_LIMIT_NANO_USD = 1_600_000_000
 SESSION_SPEND_PER_WORKSPACE_NANO_USD = 5_000_000_000
 # The ledger copy's scope: every attempt in the live stack's database, by its UTC date.
 LEDGER_SCOPE_PREFIX = "live-app"

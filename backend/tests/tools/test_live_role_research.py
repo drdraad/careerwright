@@ -4,12 +4,19 @@ title and pages are synthetic."""
 
 import json
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pydantic import SecretStr
-from pydantic_ai.messages import ModelMessage, ModelResponse, UserPromptPart
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelResponse,
+    NativeToolReturnPart,
+    UserPromptPart,
+)
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.usage import RequestUsage
 
@@ -24,6 +31,18 @@ from tools.live_smoke import SmokeSettings
 from tools.usage_ledger import CallOutcome, Ledger
 
 TITLE = "Orbital hydroponics technician"
+BOARD = "https://jobs.board.example/ad/9"
+
+
+def _role_search_parts() -> list[Any]:
+    """The fake search with both its pages returned by the search: role research reads only
+    those (a page it never returned is a guess)."""
+    sources = [{"type": "url", "url": url} for url in (SEARCHED, BOARD)]
+    returned = {"status": "completed", "sources": sources}
+    return [
+        replace(part, content=returned) if isinstance(part, NativeToolReturnPart) else part
+        for part in search_parts({"role": TITLE, "country": "England"}, "")
+    ]
 
 
 def _meta(sent: list[str]) -> Callable[[str, SecretStr], FunctionModel]:
@@ -36,8 +55,7 @@ def _meta(sent: list[str]) -> Callable[[str, SecretStr], FunctionModel]:
             usage = RequestUsage(
                 input_tokens=9_000, output_tokens=200, details={"web_search_requests": 1}
             )
-            asked: dict[str, object] = {"role": TITLE, "country": "England"}
-            return ModelResponse(parts=search_parts(asked, ""), usage=usage)
+            return ModelResponse(parts=_role_search_parts(), usage=usage)
 
         return FunctionModel(respond)
 
@@ -77,7 +95,7 @@ def test_one_search_is_sent_only_the_title_and_its_pages_are_checked_and_ledgere
     [row] = ledger.records()
     assert code == 0
     assert json.loads(sent[0].partition("\n")[2]) == {"role": TITLE, "country": "England"}
-    assert read == [SEARCHED, "https://jobs.board.example/ad/9"]  # grounded first, at most 5
+    assert read == [SEARCHED, BOARD]  # only pages the search returned, at most 20
     assert (row.budget_scope, row.outcome, row.is_production_model) == (
         ROLE_SCOPE,
         CallOutcome.OK,

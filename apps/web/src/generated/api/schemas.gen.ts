@@ -4308,7 +4308,9 @@ export const ExclusionReasonSchema = {
         'host_not_allowed',
         'address_not_allowed',
         'source_not_permitted',
-        'over_the_limit'
+        'over_the_limit',
+        'site_root',
+        'not_returned_by_search'
     ],
     title: 'ExclusionReason',
     description: 'Why a proposed page is not a candidate: the URL checks\' refusals, or these.'

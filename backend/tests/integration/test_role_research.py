@@ -339,10 +339,35 @@ def test_the_search_is_told_only_the_title_and_england_and_reserved_at_its_bound
     assert started.status_code == 202, started.text
     assert run["status"] == "complete"
     assert shown["state"] == "ready_to_read"
-    assert shown["candidates"] == 2
+    assert shown["candidates"] == 1  # the page the search returned; never a guess
     [attempt] = scenario.attempts(research["search"]["run_id"])
-    assert attempt["reserved_nano_usd"] == 8_000_000  # one request at its bounds, test model
+    # One request at its bounds, test model: 8 tool calls, 99,000 tokens in, 4,000 out.
+    assert attempt["reserved_nano_usd"] == 30_700_000
     assert scenario.leaks() == []  # the profile's private text reached no journal or log
+
+
+@pytest.mark.req("DIV1-15", "STATE-02")
+def test_a_search_that_proposed_only_home_pages_reads_nothing_and_says_so(
+    infra: Infra, api: ApiClient, ada: str, sources: SourceServer, tmp_path: Path
+) -> None:
+    # The product owner's run (3 November 2026) read five home pages, sealed before the rule.
+    scenario = make_scenario(infra, api, ada, tmp_path)
+    research = start(api, scenario).json()
+    searched(
+        infra,
+        scenario,
+        research,
+        [page(sources, "careers.northwind.example", "/"), page(sources, "jobs.board.example", "")],
+    )
+    base = f"/v1/workspaces/{scenario.workspace_id}/role-research/{research['research_id']}"
+    shown = api.get(base, scenario.token).json()
+    reading = api.write("POST", f"{base}/reading", scenario.token)
+
+    assert shown["state"] == "no_pages"  # never "not yet found"
+    assert shown["pages"] == []
+    assert reading.status_code == 409, reading.text
+    assert reading.json()["error"]["code"] == "PROPOSAL_NOT_AVAILABLE"
+    assert reading.json()["error"]["details"] == {"reason": "no_pages"}
 
 
 @pytest.mark.req("DIV1-15")
