@@ -585,8 +585,8 @@ def test_a_title_coded_to_several_groups_shows_every_group_none_picked(
     assert [g["code"] for g in role["uk_groups"]] == ["3512"]
 
 
-@pytest.mark.req("DIV1-04", "TEST1-15", "REC1-06")
-def test_a_title_idea_the_uk_index_lists_is_a_suggestion_beside_the_slate_never_in_it(
+@pytest.mark.req("DIV1-04", "TEST1-15", "REC1-06", "DIV1-16")
+def test_a_title_idea_the_uk_index_lists_is_a_suggestion_in_its_set_never_in_the_pool(
     infra: Infra,
 ) -> None:
     case = Case(
@@ -629,6 +629,16 @@ def test_a_title_idea_the_uk_index_lists_is_a_suggestion_beside_the_slate_never_
     shown = {s["title"] for s in observed["suggestions"]}
     assert "data analyst" in shown
     assert not {"Prompt engineer", "orbital gardener"} & shown  # never in the slate's pool
+    # Task 6g slice B: placed by the one group ONS codes it to (2512, software developers, level
+    # 4): with no role, ISCO's bands put it in Aim higher, among that set's suggestions.
+    assert (prompt["groups"], prompt["skill_level"], prompt["horizon"], prompt["left_out"]) == (
+        [{"code": "2512", "label": prompt["groups"][0]["label"]}],
+        4,
+        "aim_higher",
+        False,
+    )
+    aim_higher = [s for s in observed["suggestions"] if s["horizon"] == "aim_higher"]
+    assert prompt["position"] in range(len(aim_higher) + 1)
 
 
 @pytest.mark.req("PROF-10", "MAP1-05", "DIV1-13")

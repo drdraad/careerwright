@@ -2241,6 +2241,12 @@ export type DiscoveryProposalOut = {
      * Hypotheses
      */
     hypotheses: Array<HypothesisOut>;
+    /**
+     * Aim Higher
+     *
+     * Titles the model thought of as work that usually needs more training than the person's (Task 6g); code confirms each and places it by its job group's level, so one may be in either set or in none.
+     */
+    aim_higher: Array<HypothesisOut>;
 };
 
 /**
@@ -2838,7 +2844,7 @@ export type ExcludedOut = {
     /**
      * Families
      *
-     * Pooled occupations your excluded kinds of work removed.
+     * Pooled occupations, and title ideas the UK job-title index lists, your excluded kinds of work removed.
      */
     families: number;
 };
@@ -3834,6 +3840,24 @@ export type JobDetailOut = {
      * Claims
      */
     claims: Array<SourceClaimOut>;
+};
+
+/**
+ * JobGroup
+ *
+ * An ISCO-08 unit group the UK job-title index codes a title to.
+ */
+export type JobGroup = {
+    /**
+     * Code
+     */
+    code: string;
+    /**
+     * Label
+     *
+     * ESCO's label for the group; null where none is held.
+     */
+    label: string | null;
 };
 
 /**
@@ -10115,7 +10139,7 @@ export type SlateOut = {
     /**
      * Suggestions
      *
-     * Next step's, then Aim higher's (each suggestion's `horizon`).
+     * Next step's, then Aim higher's (each suggestion's `horizon`). A set may also hold title ideas the UK job-title index lists (`title_ideas`, each with its `horizon` and `position`), which take their place among these.
      */
     suggestions: Array<SuggestionOut>;
     /**
@@ -10170,7 +10194,7 @@ export type SlateOut = {
     /**
      * Title Ideas
      *
-     * Titles Careerwright thought of, each with what it did with it (`reason`): one ESCO holds as a label joins the slate's pool; one the UK job-title index lists (exactly) is a suggestion in its own list beside the slate, never in it; one no list holds is not yet found and never suggested.
+     * Titles Careerwright thought of (the model's hypotheses, then its aim higher ideas), each with what it did with it (`reason`): one ESCO holds as a label joins the slate's pool; one the UK job-title index lists (exactly) is a suggestion, never in the pool: in the set its job groups place it in (`horizon`), else in its own list beside the slate, unless the person's exclusions or a filter left it out; one no list holds is not yet found and never suggested.
      */
     title_ideas: Array<TitleIdea>;
     /**
@@ -12112,6 +12136,34 @@ export type TitleIdea = {
      * Occupations matching it in ESCO; null when it wasn't searched.
      */
     occupations: number | null;
+    /**
+     * Groups
+     *
+     * Every ISCO-08 group the UK job-title index codes it to (`in_uk_title_index` only).
+     */
+    groups: Array<JobGroup>;
+    /**
+     * Skill Level
+     *
+     * Its job groups' usual ISCO-08 skill level, when they are all at one level: a job group's, never the person's, pay or status.
+     */
+    skill_level: 1 | 2 | 3 | 4 | null;
+    /**
+     * The set of the slate it is shown in, among the suggestions; null: in no set. One the UK job-title index lists that is in no set and not `left_out` is shown in the list beside the slate (its groups differ in level, or its set held others first).
+     */
+    horizon: Horizon | null;
+    /**
+     * Position
+     *
+     * Its place in its set, among the set's suggestions and titles, from 0.
+     */
+    position: number | null;
+    /**
+     * Left Out
+     *
+     * The person's exclusions or a hard filter (unscored work left out) took it out of the slate, as they take an occupation: shown nowhere.
+     */
+    left_out: boolean;
 };
 
 /**
@@ -13191,7 +13243,7 @@ export type WorkspaceExport = {
     /**
      * Format Version
      */
-    format_version?: 4;
+    format_version?: 5;
     /**
      * Exported At
      */

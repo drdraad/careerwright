@@ -14,7 +14,8 @@ level-4 reference, level-4 work in another ISCO-08 major group. With the referen
 ISCO's own bands decide: levels 1 and 2 are Next step, 3 and 4 Aim higher. A level is a job
 group's usual training, never pay, popularity or status (spec section 4: never optimise for
 prestige), and Aim higher says nothing about whether work suits the person or whether they
-are ready for it.
+are ready for it. A title the UK job-title index lists is placed by every group ONS codes it
+to, only when they agree (`place_title`; Task 6g slice B).
 """
 
 from collections.abc import Sequence
@@ -77,3 +78,15 @@ def place(isco_code: str, reference: Reference) -> Horizon:
         level == reference.level == 4 and isco_code[0] not in reference.major_groups
     )
     return Horizon.AIM_HIGHER if above or elsewhere_at_the_top else Horizon.NEXT_STEP
+
+
+def place_title(isco_codes: Sequence[str], reference: Reference) -> Horizon | None:
+    """Where a title the UK job-title index lists is placed (Task 6g slice B): by the ISCO-08
+    groups ONS codes it to, only when they are all at one level and in one set. None when they
+    disagree (or there are none): the title goes in neither set."""
+    levels = {skill_level(code) for code in isco_codes}
+    horizons = {place(code, reference) for code in isco_codes}
+    if len(levels) != 1 or len(horizons) != 1:
+        return None
+    [horizon] = horizons
+    return horizon

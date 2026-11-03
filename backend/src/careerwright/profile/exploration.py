@@ -126,6 +126,7 @@ from careerwright.profile.slate import (
     Candidate,
     Direction,
     Hit,
+    ListedTitle,
     NotIncluded,
     Occupation,
     Pool,
@@ -136,6 +137,7 @@ from careerwright.profile.slate import (
     build_pool,
     choose_first_scatter,
     choose_slate,
+    listed_title,
     skill_join,
     too_general,
 )
@@ -149,6 +151,7 @@ from careerwright.profile.slate_facts import (
     AnswerFoundNoWork,
     AnswerSearch,
     FewerReason,
+    JobGroup,
     JoinedBySharedSkills,
     JoinKeptBest,
     NoSharedOccupation,
@@ -262,17 +265,23 @@ class DiscoveryView:
 _UNREAD_BY_SUGGESTIONS = frozenset({ProfileField.DISLIKED_TASKS.value})
 
 
-def stays_current(documents: Sequence[ProfileDocument], choices: Collection[uuid.UUID]) -> bool:
+def stays_current(
+    documents: Sequence[ProfileDocument],
+    choices: Collection[uuid.UUID],
+    ideas: Collection[str] = (),
+) -> bool:
     """Whether a discovery made from the first profile version (the one it pinned; oldest
     first) is still made from the current answers: each later version changed only its
     targets, and gained none but the person's choices from that discovery's slate (a version
-    citing one of `choices`) or a title the pinned version or such a choice held. Choosing a
-    suggestion confirms it (Task W2E), and removing a target, the last one included, or
-    putting one back asks the slate nothing new (Task W2F): none makes it "based on earlier
-    answers" (STATE-10; ADR 0007's amendments). Nor does a change to an answer no suggestion
-    reads (`_UNREAD_BY_SUGGESTIONS`). Any other change, a new target typed in included, means
-    the answers changed."""
+    citing one of `choices`), one of its own title ideas (`ideas`, exactly as the model wrote
+    it: made a target through the profile's save, Task 6g slice B) or a title the pinned
+    version or such a choice held. Choosing a suggestion confirms it (Task W2E), and removing a
+    target, the last one included, or putting one back asks the slate nothing new (Task W2F):
+    none makes it "based on earlier answers" (STATE-10; ADR 0007's amendments). Nor does a
+    change to an answer no suggestion reads (`_UNREAD_BY_SUGGESTIONS`). Any other change, a new
+    target typed in included, means the answers changed."""
     held = set(_provided(documents[0], ProfileField.TARGET_TITLES)) if documents else set()
+    held.update(ideas)
     for before, after in pairwise(documents):
         if any(
             getattr(before, name) != getattr(after, name)
@@ -288,8 +297,9 @@ def stays_current(documents: Sequence[ProfileDocument], choices: Collection[uuid
     return True
 
 
-def answers_current(tx: Tx, run: Run) -> bool:
-    """Whether a discovery was made from the current answers (`stays_current`)."""
+def answers_current(tx: Tx, run: Run, proposal: DiscoveryProposal | None) -> bool:
+    """Whether a discovery was made from the current answers (`stays_current`), its
+    `proposal`'s title ideas among the titles it suggested."""
     pinned = run.profile_version or 0
     latest = profile_store.current_profile(tx, run.workspace_id)
     if latest is None or latest.version == pinned:
@@ -310,7 +320,8 @@ def answers_current(tx: Tx, run: Run) -> bool:
         and source.kind is SourceKind.OCCUPATION_CHOICE
         and source.run_id == run.run_id
     }
-    return stays_current(documents, chosen_here)
+    ideas = [idea.title for idea in proposal.title_ideas] if proposal else []
+    return stays_current(documents, chosen_here, ideas)
 
 
 @dataclass(frozen=True)
@@ -388,6 +399,14 @@ class AiFilterView:
     synthetic: bool = False
 
 
+@dataclass(frozen=True)
+class _Filtered:
+    left_out: dict[uuid.UUID, NotIncluded]
+    floor: FloorCounts | None
+    ai_filter: AiFilterView
+    titles: list[ListedTitle]  # the listed titles no hard filter leaves out
+
+
 def _hard_filters(
     tx: Tx,
     pool: Pool,
@@ -395,10 +414,14 @@ def _hard_filters(
     controls: SlateControls,
     hard: HardFilterInput,
     esco_uris: dict[uuid.UUID, str],
-) -> tuple[dict[uuid.UUID, NotIncluded], FloorCounts | None, AiFilterView]:
+    listed: Sequence[ListedTitle] = (),
+) -> _Filtered:
     """The occupations the salary floor and the AI Resilience filter leave out, decided by
     deterministic code over the evidence, with each filter's counts. Only the distinct
-    occupations the person did not exclude themselves are considered."""
+    occupations the person did not exclude themselves are considered. A title only the UK
+    job-title index lists (Task 6g slice B) has no reviewed pay mapping and no assessment, so
+    its pay is unknown (kept, counted) and it is unscored (kept or left out as the filter says,
+    never read as 0 or 10)."""
     considered = [
         c.occupation.concept_id
         for c in pool
@@ -406,6 +429,7 @@ def _hard_filters(
         and c.occupation.concept_id not in controls.exclude_concepts
         and c.occupation.family_code not in controls.exclude_families
     ]
+    titles = [t for t in listed if t.family_code not in controls.exclude_families]
     left_out: dict[uuid.UUID, NotIncluded] = {}
     floor = salary_floor(document)
     counts = None
@@ -418,7 +442,10 @@ def _hard_filters(
             )
             for c in considered
         }
-        counts = floor_counts(floor, verdicts.values())
+        unmapped = modelled_floor_verdict(
+            floor, ModelledPayUnavailable.NO_REVIEWED_MAPPING, regions
+        )
+        counts = floor_counts(floor, [*verdicts.values(), *(unmapped for _ in titles)])
         left_out = {
             c: NotIncluded.BELOW_SALARY_FLOOR
             for c, (verdict, _) in verdicts.items()
@@ -433,7 +460,12 @@ def _hard_filters(
             left_out[concept] = NotIncluded.BELOW_AI_RESILIENCE_MINIMUM
         elif outcome is FilterOutcome.UNSCORED_EXCLUDED:
             left_out[concept] = NotIncluded.AI_RESILIENCE_UNSCORED_EXCLUDED
-    found = list(outcomes.values())
+    unscored_title = (
+        FilterOutcome.UNSCORED_KEPT
+        if hard.ai_filter.include_unscored
+        else FilterOutcome.UNSCORED_EXCLUDED
+    )
+    found = [*outcomes.values(), *(unscored_title for _ in titles)]
     unscored = (FilterOutcome.UNSCORED_KEPT, FilterOutcome.UNSCORED_EXCLUDED)
     view = AiFilterView(
         chosen=hard.ai_filter,
@@ -445,7 +477,9 @@ def _hard_filters(
         unscored_excluded=found.count(FilterOutcome.UNSCORED_EXCLUDED),
         synthetic=any(a.synthetic and outcomes[c] not in unscored for c, a in assessments.items()),
     )
-    return left_out, counts, view
+    # The person's own exclusions are the slate's to apply and count (`choose_slate`).
+    kept = list(listed) if unscored_title is FilterOutcome.UNSCORED_KEPT else []
+    return _Filtered(left_out, counts, view, kept)
 
 
 def _proposal(tx: Tx, keyring: Keyring, run: Run) -> DiscoveryProposal | None:
@@ -478,11 +512,12 @@ def _explanation(tx: Tx, keyring: Keyring, discovery_run: Run) -> ExplanationVie
 
 
 def _view(tx: Tx, keyring: Keyring, run: Run) -> DiscoveryView:
+    proposal = _proposal(tx, keyring, run)
     return DiscoveryView(
         run,
-        _proposal(tx, keyring, run),
+        proposal,
         _explanation(tx, keyring, run),
-        current=answers_current(tx, run),
+        current=answers_current(tx, run, proposal),
     )
 
 
@@ -833,60 +868,9 @@ def compute_slate(
         queries.append(
             PoolQuery(f"t{index}", target.text, SlateChannel.USER_PROPOSED, (item,), hits)
         )
-    ideas: list[TitleIdea] = []
-    # A title idea ESCO doesn't hold is a suggestion only where the UK job-title index lists it
-    # (ADR 0015 decision 2), in its own list: never in the slate's pool.
-    listed = uk_titles.listed(tx, [h.title for h in proposal.hypotheses])
-    for index, hypothesis in enumerate(proposal.hypotheses, start=1):
-        based_on = list(hypothesis.based_on)
-        if _one_word_style(hypothesis.based_on):
-            styles += [item.text for item in hypothesis.based_on]
-            ideas.append(
-                TitleIdea(
-                    title=hypothesis.title,
-                    based_on=based_on,
-                    reason=TitleIdeaReason.NOT_SEARCHED,
-                    outcome=Outcome.NOT_SEARCHED,
-                    occupations=None,
-                )
-            )
-            continue
-        hits = _label_hits(tx, hypothesis.title)
-        matched = len({hit.concept_id for hit in hits})
-        outcome = (
-            Outcome.NOT_MATCHED
-            if matched == 0
-            else Outcome.MATCHED
-            if matched == 1
-            else Outcome.MATCHED_SEVERAL
-        )
-        reason = (
-            TitleIdeaReason.IN_ESCO
-            if matched
-            else TitleIdeaReason.IN_UK_TITLE_INDEX
-            if hypothesis.title in listed
-            else TitleIdeaReason.NOT_YET_FOUND
-        )
-        ideas.append(
-            TitleIdea(
-                title=hypothesis.title,
-                based_on=based_on,
-                reason=reason,
-                outcome=outcome,
-                occupations=matched,
-            )
-        )
-        if not hits:
-            continue
-        queries.append(
-            PoolQuery(
-                f"h{index}",
-                hypothesis.title,
-                SlateChannel.HYPOTHESIS,
-                tuple(hypothesis.based_on),
-                hits,
-            )
-        )
+    ideas = _title_ideas(tx, proposal)
+    styles += ideas.styles
+    queries += ideas.queries
     found = {hit.concept_id for q in queries if not q.too_general for hit in q.hits}
     queries = [_adding(tx, q, general[q.query_id], found) if q.too_general else q for q in queries]
     facts = taxonomy_store.occupation_facts(tx, found, skills_shown=SKILLS_SHOWN)
@@ -894,9 +878,18 @@ def compute_slate(
     familiar_families = frozenset(facts[c].family.code for c in familiar if c in facts)
     pool = build_pool(queries, occupations, familiar_families)
     esco_uris = {concept_id: fact.esco_uri for concept_id, fact in facts.items()}
-    left_out, floor, ai_filter = _hard_filters(tx, pool, document, controls, hard, esco_uris)
+    listed = [
+        listed_title(idea.title, idea.based_on, codes, familiar_families)
+        for idea in ideas.facts
+        if (codes := [group.code for group in idea.groups])
+    ]
+    filtered = _hard_filters(tx, pool, document, controls, hard, esco_uris, listed)
     reference = _reference(role, role_title, facts)
-    slate = choose_slate(pool, controls, left_out, reference=reference)
+    slate = choose_slate(
+        pool, controls, filtered.left_out, reference=reference, listed=filtered.titles
+    )
+    floor, ai_filter = filtered.floor, filtered.ai_filter
+    shown = len(slate.suggestions) + len(slate.titles)
     changed = release_note(proposal.release, release.dataset_id)
     notes: list[SlateNote] = [] if changed is None else [changed]
     notes += _missed_notes(queries, unsearchable, styles, frozenset(joins))
@@ -908,12 +901,12 @@ def compute_slate(
     notes += _distinct(_join_note(query) for query in queries if query.unkept)
     # The pool's target is soft: where evidence doesn't permit it, a full slate says so (a
     # short one already says why it is short).
-    if slate.pool_size < POOL_TARGET and len(slate.suggestions) == SLATE_SIZE:
+    if slate.pool_size < POOL_TARGET and shown == SLATE_SIZE:
         notes.append(SmallPool(pool_size=slate.pool_size, pool_target=POOL_TARGET))
     slate = replace(slate, notes=[*notes, *slate.notes])
     unmatched = [t for t in mine if not t.occupations]
     ambiguous = [t for t in mine if len(t.occupations) > 1]
-    if (unmatched or ambiguous) and len(slate.suggestions) < SLATE_SIZE:
+    if (unmatched or ambiguous) and shown < SLATE_SIZE:
         reasons: list[FewerReason] = [
             *(
                 TitleKeptAsOwn(title=t.text)
@@ -933,7 +926,7 @@ def compute_slate(
         slate=slate,
         suggestions=_suggestions(tx, slate, facts, bool(familiar_families)),
         queries=queries,
-        title_ideas=ideas,
+        title_ideas=_placed(ideas.facts, slate, listed, filtered.titles, controls),
         unsearchable_queries=[query.text for query in unsearchable],
         titles={concept_id: occupation.title for concept_id, occupation in occupations.items()},
         salary_floor=floor,
@@ -942,6 +935,106 @@ def compute_slate(
         ambiguous_titles=[t.text for t in ambiguous],
         familiarity_known=bool(familiar_families),
     )
+
+
+@dataclass(frozen=True)
+class _Ideas:
+    facts: list[TitleIdea]
+    queries: list[PoolQuery]  # each idea ESCO holds, as its occupations' label hits
+    styles: list[str]  # one-word work-style answers an idea rested on: not looked up
+
+
+def _title_ideas(tx: Tx, proposal: DiscoveryProposal) -> _Ideas:
+    """What Careerwright did with each title the model thought of, its hypotheses (`h1`...)
+    then its aim higher ideas (`a1`...; Task 6g slice B), by one rule (ADR 0015 decision 2):
+    one ESCO holds as a label joins the slate's pool through its occupations; one only the UK
+    job-title index lists carries the ISCO-08 groups ONS codes it to, which place it; one no
+    list holds is not yet found, never a suggestion. One resting only on one-word answers about
+    how the person likes to work is not looked up."""
+    numbered = [
+        *((f"h{n}", idea) for n, idea in enumerate(proposal.hypotheses, start=1)),
+        *((f"a{n}", idea) for n, idea in enumerate(proposal.aim_higher, start=1)),
+    ]
+    index = uk_titles.listed(tx, [idea.title for _, idea in numbered])
+    codes = sorted({group.code for title in index.values() for group in title.isco_groups})
+    labels = taxonomy_store.isco_labels(tx, codes) if codes else {}
+    ideas = _Ideas([], [], [])
+    for query_id, idea in numbered:
+        based_on = list(idea.based_on)
+        if _one_word_style(idea.based_on):
+            ideas.styles.extend(item.text for item in idea.based_on)
+            ideas.facts.append(
+                TitleIdea(
+                    title=idea.title,
+                    based_on=based_on,
+                    reason=TitleIdeaReason.NOT_SEARCHED,
+                    outcome=Outcome.NOT_SEARCHED,
+                    occupations=None,
+                )
+            )
+            continue
+        hits = _label_hits(tx, idea.title)
+        matched = len({hit.concept_id for hit in hits})
+        outcome = (
+            Outcome.NOT_MATCHED
+            if matched == 0
+            else Outcome.MATCHED
+            if matched == 1
+            else Outcome.MATCHED_SEVERAL
+        )
+        uk = None if matched else index.get(idea.title)
+        groups = (
+            [JobGroup(code=g.code, label=labels.get(g.code)) for g in uk.isco_groups] if uk else []
+        )
+        levels = {skill_level(group.code) for group in groups}
+        ideas.facts.append(
+            TitleIdea(
+                title=idea.title,
+                based_on=based_on,
+                reason=TitleIdeaReason.IN_ESCO
+                if matched
+                else TitleIdeaReason.IN_UK_TITLE_INDEX
+                if uk
+                else TitleIdeaReason.NOT_YET_FOUND,
+                outcome=outcome,
+                occupations=matched,
+                groups=groups,
+                skill_level=next(iter(levels)) if len(levels) == 1 else None,
+            )
+        )
+        if hits:
+            ideas.queries.append(
+                PoolQuery(query_id, idea.title, SlateChannel.HYPOTHESIS, tuple(based_on), hits)
+            )
+    return ideas
+
+
+def _placed(
+    ideas: list[TitleIdea],
+    slate: Slate,
+    listed: list[ListedTitle],
+    kept: list[ListedTitle],
+    controls: SlateControls,
+) -> list[TitleIdea]:
+    """Each idea only the UK job-title index lists, with where the slate shows it: its set and
+    its place there, or left out by the person's exclusions or a hard filter. Any other is in
+    the list beside the slate (its groups differ in level, or its set held others first)."""
+    shown = {placed.listed.title: placed for placed in slate.titles}
+    kept_titles = {title.title for title in kept}
+    left_out = {
+        title.title
+        for title in listed
+        if title.title not in kept_titles or title.family_code in controls.exclude_families
+    }
+    placed_ideas: list[TitleIdea] = []
+    for idea in ideas:
+        placed = shown.get(idea.title)
+        if placed is not None:
+            idea = idea.model_copy(update={"horizon": placed.horizon, "position": placed.position})
+        elif idea.title in left_out:
+            idea = idea.model_copy(update={"left_out": True})
+        placed_ideas.append(idea)
+    return placed_ideas
 
 
 def _reference(
@@ -1740,8 +1833,9 @@ def first_slate(
     pool = build_pool([join], _occupations(facts), familiar)
     esco_uris = {concept_id: fact.esco_uri for concept_id, fact in facts.items()}
     controls = SlateControls()
-    left_out, floor, _ = _hard_filters(tx, pool, profile.document, controls, hard, esco_uris)
-    slate = choose_first_scatter(pool, left_out, reference=_reference(role, record, facts))
+    filtered = _hard_filters(tx, pool, profile.document, controls, hard, esco_uris)
+    floor = filtered.floor
+    slate = choose_first_scatter(pool, filtered.left_out, reference=_reference(role, record, facts))
     if not join.hits:
         title = facts[concept].preferred_label
         slate = replace(

@@ -19,6 +19,7 @@ from careerwright.profile.exploration import (
 from careerwright.profile.horizons import UNKNOWN_REFERENCE, Horizon, reference_level
 from careerwright.profile.interview import ProfileField
 from careerwright.profile.slate import (
+    DEEPER_FAMILY_LIMIT,
     FAMILY_LIMIT,
     FURTHER_QUERY_BONUS,
     HORIZON_SIZE,
@@ -29,8 +30,10 @@ from careerwright.profile.slate import (
     Direction,
     Emphasis,
     Hit,
+    ListedTitle,
     NotIncluded,
     Occupation,
+    PlacedTitle,
     Pool,
     PoolQuery,
     Slate,
@@ -39,6 +42,7 @@ from careerwright.profile.slate import (
     build_pool,
     choose_first_scatter,
     choose_slate,
+    listed_title,
     too_general,
 )
 from careerwright.profile.slate_facts import (
@@ -258,6 +262,116 @@ def test_next_step_keeps_no_slot_for_something_different() -> None:
         ("Bookmaker", Direction.LESS_FAMILIAR),
     ]
     assert {chosen.horizon(c) for c in chosen.suggestions} == {Horizon.NEXT_STEP}
+
+
+# Work found in different ways (Task 6g slice B): by a search only, by a title idea ESCO
+# holds, and by a join to a title of the person's.
+FOUND_BY = {
+    o.concept_id: o
+    for o in (
+        occupation("Equine dental technician", "324"),  # level 3
+        occupation("Human resources officer", "242"),  # level 4
+        occupation("Customer experience manager", "243"),  # level 4
+        occupation("Bookmaker", "421"),  # level 2
+        occupation("Receptionist", "422"),  # level 2
+    )
+}
+IDEA = EvidenceItem(field=ProfileField.ENJOYED_TASKS, text="helping customers on the phone")
+
+
+def joined(*scored: tuple[str, float]) -> tuple[Hit, ...]:
+    return tuple(
+        Hit(concept(name), score, label_match=False, shared_skills=4) for name, score in scored
+    )
+
+
+def found_by_each_way(*, idea: bool = True, join: bool = True) -> Pool:
+    queries = [
+        pool_query("q1", SlateChannel.TASKS, ("Equine dental technician", 1.0), ("Bookmaker", 1.0)),
+        pool_query("q2", SlateChannel.TASKS, ("Equine dental technician", 0.9)),
+    ]
+    if idea:  # a title idea ESCO holds as a label
+        named = (Hit(concept("Human resources officer"), 1.0, label_match=True),)
+        queries.append(PoolQuery("a1", "HR officer", SlateChannel.HYPOTHESIS, (IDEA,), named))
+    if join:
+        queries.append(
+            PoolQuery(
+                "j1",
+                "Client onboarding assistant",
+                SlateChannel.SHARED_SKILLS,
+                (ROLE,),
+                joined(("Customer experience manager", 0.5), ("Receptionist", 0.5)),
+            )
+        )
+    return build_pool(queries, FOUND_BY, frozenset())
+
+
+def listed(title: str, *codes: str) -> ListedTitle:
+    return listed_title(title, (IDEA,), codes, frozenset())
+
+
+def in_set(chosen: Slate, horizon: Horizon) -> list[str]:
+    return [c.occupation.title for c in chosen.suggestions if chosen.horizon(c) is horizon]
+
+
+@pytest.mark.req("DIV1-16", "DIV1-06")
+def test_within_aim_higher_work_found_by_a_title_ranks_before_work_found_only_by_searches() -> None:
+    # Task 6g slice B (a rule, evaluated on Sam's and Maya's cases): in Aim higher, a title idea
+    # code confirmed (in ESCO or the UK job-title index) and work joined to a title of the
+    # person's rank before work only searches found, however well those matched. The equine
+    # dental technician, found by two searches, matches best and is left out.
+    success = listed("Customer success manager", "3339")  # level 3, in the UK index only
+
+    chosen = choose_slate(found_by_each_way(), reference=UNKNOWN_REFERENCE, listed=[success])
+
+    assert set(in_set(chosen, Horizon.AIM_HIGHER)) == {
+        "Human resources officer",
+        "Customer experience manager",
+    }
+    assert [(p.listed, p.horizon) for p in chosen.titles] == [(success, Horizon.AIM_HIGHER)]
+    [left] = [n for n in chosen.not_included if n.candidate.occupation.title.startswith("Equine")]
+    assert left.reason is NotIncluded.LESS_RELEVANT
+    # Next step keeps relevance order: a search's better match before a join's.
+    assert in_set(chosen, Horizon.NEXT_STEP) == ["Bookmaker", "Receptionist"]
+    # Once no title found more, work only searches found fills the set.
+    fewer = choose_slate(found_by_each_way(join=False), reference=UNKNOWN_REFERENCE)
+    assert in_set(fewer, Horizon.AIM_HIGHER) == [
+        "Human resources officer",
+        "Equine dental technician",
+    ]
+
+
+@pytest.mark.req("DIV1-16", "DIV1-04", "REC1-08")
+def test_a_listed_title_takes_a_place_in_its_set_unless_its_groups_disagree() -> None:
+    # A title idea only the UK job-title index lists is an entry of its set, placed by the
+    # groups ONS codes it to and chosen by the same reranker; one whose groups disagree on level
+    # (account manager: 4 and 3) goes in neither set.
+    pool = build_pool(
+        [pool_query("q1", SlateChannel.TASKS, ("Bookmaker", 1.0))], FOUND_BY, frozenset()
+    )
+    payroll, success = listed("Payroll officer", "4313"), listed("Customer success manager", "3339")
+    titles = [payroll, success, listed("Account manager", "1330", "3313")]
+
+    chosen = choose_slate(pool, reference=UNKNOWN_REFERENCE, listed=titles)
+
+    assert chosen.titles == (
+        PlacedTitle(payroll, Horizon.NEXT_STEP, 1),  # after the bookmaker's better match
+        PlacedTitle(success, Horizon.AIM_HIGHER, 0),
+    )
+    assert in_set(chosen, Horizon.NEXT_STEP) == ["Bookmaker"]
+    assert chosen.fewer_reasons == [
+        FewMatched(count=2, horizon=Horizon.NEXT_STEP),
+        FewMatched(count=1, horizon=Horizon.AIM_HIGHER),
+    ]
+    # Excluding its kind of work (ISCO minor group 333) leaves it out, counted.
+    without = choose_slate(
+        pool,
+        SlateControls(exclude_families=frozenset({"333"})),
+        reference=UNKNOWN_REFERENCE,
+        listed=titles,
+    )
+    assert [placed.listed.title for placed in without.titles] == ["Payroll officer"]
+    assert without.excluded == {"occupations": 0, "families": 1}
 
 
 @pytest.mark.req("DIV1-06", "DIV1-11")
@@ -888,7 +1002,10 @@ def test_the_family_limit_is_soft_and_relaxed_visibly_when_depth_is_asked_for() 
     assert len(default.suggestions) == FAMILY_LIMIT
     assert any(n.reason is NotIncluded.FAMILY_LIMIT for n in default.not_included)
     assert len(deeper.suggestions) == 3
-    assert deeper.notes == [MoreDepth(family_limit=4)]  # the relaxation is stated, never silent
+    # The relaxation is stated, never silent, at what a set can show (Task 6g slice B): a kind
+    # of work is in one set, and a set holds three.
+    assert deeper.notes == [MoreDepth(family_limit=HORIZON_SIZE)]
+    assert DEEPER_FAMILY_LIMIT == HORIZON_SIZE
     # All three are next steps (level 2): Next step had three to choose from, Aim higher none.
     assert default.fewer_reasons == [
         FewMatched(count=0, horizon=Horizon.AIM_HIGHER),

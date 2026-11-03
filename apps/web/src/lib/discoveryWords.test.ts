@@ -13,6 +13,7 @@ import type {
 } from "@/generated/api";
 import {
   aiFilterWords,
+  aimHigherTraining,
   CLOSEST,
   ESCO_LISTS,
   ESCO_NAMED,
@@ -22,7 +23,6 @@ import {
   floorWords,
   HORIZON,
   HORIZON_ORDER,
-  kindOfWorkLine,
   REFERENCE_BASIS,
   RESEARCH_STATUS,
   RESOLUTION,
@@ -173,9 +173,10 @@ describe("[DIV1-06][DIV1-02] how the slate searched, in words", () => {
       "Casting wider: a lower bar for relevance and one suggestion per kind of work.",
     ],
     [
+      // Task 6g slice B: the most a set can show (slice A's review, Minor 5).
       "the deeper view",
-      { reason: "more_depth", family_limit: 4 },
-      "Showing up to 4 from one kind of work, because you asked for more depth.",
+      { reason: "more_depth", family_limit: 3 },
+      "Showing up to 3 from one kind of work, because you asked for more depth.",
     ],
   ])("words %s", (_, note, words) => {
     expect(slateNote(note)).toBe(words);
@@ -354,37 +355,35 @@ describe("[REC1-05][DIV1-06] why a suggestion could suit you, in words", () => {
 });
 
 describe("[DIV1-16][DIV1-12] the two sets, Next step and Aim higher, in words (Task 6g)", () => {
-  const card = (horizon: SuggestionOut["horizon"], level: SuggestionOut["skill_level"]) =>
-    kindOfWorkLine({
-      horizon,
-      skill_level: level,
-      family: { code: "221", label: "Medical doctors" },
-    } as SuggestionOut);
-
   it("heads the sets in the order they are listed", () => {
     expect(HORIZON_ORDER.map((horizon) => HORIZON[horizon])).toEqual(["Next step", "Aim higher"]);
   });
 
-  it("says what Careerwright checked about an Aim higher job group's usual training, in the kind of work's line", () => {
-    expect(card("aim_higher", 4)).toBe(
-      "Kind of work: Medical doctors. Most work in this job group usually needs a degree or equivalent training.",
+  // Task 6g slice B (slice A's review, Minor 1): once, under Aim higher, never on every card.
+  it("says once what Careerwright checked about Aim higher's job groups' usual training", () => {
+    expect(aimHigherTraining([4])).toBe(
+      "Most work in this job group usually needs a degree or equivalent training.",
     );
-    expect(card("aim_higher", 3)).toBe(
-      "Kind of work: Medical doctors. Most work in this job group usually needs one to three years of study after A-levels or similar.",
+    expect(aimHigherTraining([4, 4])).toBe(
+      "Most work in these job groups usually needs a degree or equivalent training.",
     );
-    expect(card("aim_higher", 2)).toBe(
-      "Kind of work: Medical doctors. Most work in this job group usually needs GCSEs or similar, sometimes A-levels or a vocational course.",
+    expect(aimHigherTraining([4, 3, 3])).toBe(
+      "Most work in these job groups usually needs one to three years of study after A-levels or similar, or a degree or equivalent training.",
     );
+    expect(aimHigherTraining([2])).toBe(
+      "Most work in this job group usually needs GCSEs or similar, sometimes A-levels or a vocational course.",
+    );
+    // Level 1 is above no other level, so it is never said; nothing to say says nothing.
+    expect(aimHigherTraining([1])).toBeNull();
+    expect(aimHigherTraining([])).toBeNull();
   });
 
-  it("says nothing of a Next step card's training, so no work is called basic", () => {
-    for (const level of [1, 2, 3, 4] as const) {
-      expect(card("next_step", level)).toBe("Kind of work: Medical doctors");
-    }
+  it("calls no work basic and judges no one", () => {
     const every = [
       ...Object.values(HORIZON),
       ...Object.values(REFERENCE_BASIS),
-      ...([1, 2, 3, 4] as const).map((level) => card("aim_higher", level)),
+      ...([1, 2, 3, 4] as const).map((level) => aimHigherTraining([level]) ?? ""),
+      aimHigherTraining([2, 3, 4]) ?? "",
     ].join(" ");
     // Never basic, never a judgement of the person, never pay or status.
     expect(every).not.toMatch(/basic|simple|low-skill|suit|ready|pays?\b|salary|prestig|status/i);
@@ -448,12 +447,18 @@ describe("[DIV1-07][AIR1-05] the hard filters and the title ideas, in words", ()
   // Task 6d slice B: what Careerwright did with each idea, by its reason, never by branching
   // on what matching in ESCO did. Changed: it now looks in the UK job-title index too, so an
   // idea no list holds is "not yet found" there as well (the card's last bullet).
-  const idea = (title: string, reason: TitleIdeaReason): TitleIdea => ({
+  const idea = (title: string, reason: TitleIdeaReason, more?: Partial<TitleIdea>): TitleIdea => ({
     title,
     based_on: [],
     reason,
     outcome: reason === "in_esco" ? "matched" : "not_matched",
     occupations: reason === "in_esco" ? 1 : 0,
+    groups: [],
+    skill_level: null,
+    horizon: null,
+    position: null,
+    left_out: false,
+    ...more,
   });
 
   it("names the title ideas no list holds as not yet found, and none ESCO or the index holds", () => {
@@ -470,12 +475,16 @@ describe("[DIV1-07][AIR1-05] the hard filters and the title ideas, in words", ()
     );
   });
 
-  it("lists only the ideas the UK job-title index lists, beside the slate", () => {
+  it("lists beside the slate only the ideas the UK job-title index lists that are in no set and not left out", () => {
     const ideas = [
       idea("dog groomer", "in_esco"),
       idea("Prompt engineer", "in_uk_title_index"),
       idea("orbital gardener", "not_yet_found"),
       idea("workshop technician", "not_searched"),
+      // Task 6g slice B: one in a set is shown there; one the person's exclusions or a filter
+      // left out is shown nowhere.
+      idea("Careers adviser", "in_uk_title_index", { horizon: "aim_higher", position: 0 }),
+      idea("Play therapist", "in_uk_title_index", { left_out: true }),
     ];
     expect(titleIdeasListed(ideas).map((i) => i.title)).toEqual(["Prompt engineer"]);
     expect(UK_TITLE_IDEAS).toEqual({

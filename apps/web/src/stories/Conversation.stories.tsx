@@ -907,6 +907,64 @@ export const SlateWithSalaryFloor: Story = {
     </Api>
   ),
 };
+/** Muse's Aim higher ideas (Task 6g slice B): two the UK job-title index lists, placed in Aim
+ *  higher at the places the API gave them beside ESCO's occupation, the set's usual training
+ *  said once under its heading; one whose job groups differ in level beside the slate. */
+const ukIdea = (
+  title: string,
+  groups: [string, string][],
+  more: Partial<SlateOut["title_ideas"][number]> = {},
+): SlateOut["title_ideas"][number] => ({
+  title,
+  based_on: [{ field: "enjoyed_tasks", text: "repairing physical objects" }],
+  reason: "in_uk_title_index",
+  outcome: "not_matched",
+  occupations: 0,
+  groups: groups.map(([code, label]) => ({ code, label })),
+  skill_level: null,
+  horizon: null,
+  position: null,
+  left_out: false,
+  ...more,
+});
+const withIdeas = full.slice(0, 4);
+export const SlateWithAimHigherIdeas: Story = {
+  render: () => (
+    <Api
+      routes={[
+        {
+          method: "GET",
+          path: /\/slate$/,
+          answer: {
+            ...slate(withIdeas),
+            title_ideas: [
+              ukIdea("Maintenance planner", [["3122", "Manufacturing supervisors"]], {
+                skill_level: 3,
+                horizon: "aim_higher",
+                position: 0,
+              }),
+              ukIdea("Reliability engineer", [["2141", "Industrial and production engineers"]], {
+                skill_level: 4,
+                horizon: "aim_higher",
+                position: 2,
+              }),
+              ukIdea("Account manager", [
+                ["1221", "Sales and marketing managers"],
+                ["3322", "Commercial sales representatives"],
+              ]),
+            ],
+          },
+        },
+      ]}
+    >
+      <Directions
+        workspaceId={WS}
+        profile={profile}
+        discovery={discoveryWith(note("complete", withIdeas, false))}
+      />
+    </Api>
+  ),
+};
 /** Asking for the note was refused because no answer has a word to quote: asking again
  *  would repeat it, so the person is told to change their answers (no Try again). */
 export const SlateNoteAnswersTooShort: Story = {

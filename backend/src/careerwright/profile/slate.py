@@ -35,7 +35,12 @@ relevance plus bonuses for a family, an ISCO major group and a direction its set
 shown as often as the set's balance asks (Next step: two close and one transferable, with no
 slot kept for something different; Aim higher: one of each), less a penalty per candidate
 already shown from its family; at most `FAMILY_LIMIT` per family, relaxed visibly when the
-person asks for depth. The world's first scatter (the origin's destinations) is one set of
+person asks for depth. A title idea only the UK job-title index lists (`ListedTitle`, Task 6g
+slice B) is an entry of the set its ISCO-08 groups place it in, and none when they disagree,
+weighed by the same reranker as a title idea ESCO holds. Within Aim higher, work found by a
+title (a title idea code confirmed, the person's own title, or a join to one by shared skills)
+ranks before work only searches found: product policy, evaluated on Sam's and Maya's cases.
+The world's first scatter (the origin's destinations) is one set of
 `SLATE_SIZE`, two of each direction: its near and far lines are a later slice. A relevance
 floor applies: a slot is never filled with a weak match, so a thin pool returns fewer
 suggestions with the reason, for each set short of its size (DIV1-06). The person's own
@@ -52,7 +57,7 @@ from enum import StrEnum
 
 from careerwright.catalogue.records import SkillNeighbour
 from careerwright.profile.discovery import EvidenceItem, QueryChannel
-from careerwright.profile.horizons import Horizon, Reference, place
+from careerwright.profile.horizons import Horizon, Reference, place, place_title
 from careerwright.profile.slate_facts import (
     CastingWider,
     ExclusionsRemoved,
@@ -67,7 +72,9 @@ from careerwright.profile.slate_facts import (
 SLATE_SIZE = 6
 HORIZON_SIZE = 3  # each of the slate's two sets, Next step and Aim higher
 FAMILY_LIMIT = 2
-DEEPER_FAMILY_LIMIT = 4
+# "More depth": a kind of work (an ISCO minor group) is in one set, and a set holds three, so
+# three is the most one kind can show (it was 4 before the two sets; Task 6g slice B).
+DEEPER_FAMILY_LIMIT = HORIZON_SIZE
 POOL_LIMIT = 120
 POOL_TARGET = 60  # the soft lower end of the working pool (spec section 4)
 RELEVANCE_FLOOR = 0.35  # best normalised rank in any query
@@ -327,6 +334,51 @@ class Left:
 
 
 @dataclass(frozen=True)
+class ListedTitle:
+    """A title idea ESCO doesn't hold that the UK job-title index lists (ADR 0015 decision 2),
+    as an entry of the slate (Task 6g slice B): placed by the ISCO-08 groups ONS codes it to,
+    never by its words."""
+
+    title: str  # as the model proposed it
+    based_on: tuple[EvidenceItem, ...]
+    isco_codes: tuple[str, ...]  # every unit group ONS codes it to, in ONS's order
+    direction: Direction
+
+    @property
+    def family_code(self) -> str:
+        return self.isco_codes[0][:3]
+
+    @property
+    def sector_code(self) -> str:
+        return self.isco_codes[0][:1]
+
+
+def listed_title(
+    title: str,
+    based_on: Iterable[EvidenceItem],
+    isco_codes: Iterable[str],
+    familiar: frozenset[str],
+) -> ListedTitle:
+    """A listed title's direction is a title idea's: close when its kind of work is one of the
+    person's, otherwise something different."""
+    codes = tuple(isco_codes)
+    family = codes[0][:3] if codes else ""
+    return ListedTitle(
+        title,
+        tuple(based_on),
+        codes,
+        _direction_of(family, frozenset({SlateChannel.HYPOTHESIS}), familiar),
+    )
+
+
+@dataclass(frozen=True)
+class PlacedTitle:
+    listed: ListedTitle
+    horizon: Horizon
+    position: int  # its place among its set's entries, suggestions and titles, from 0
+
+
+@dataclass(frozen=True)
 class Slate:
     suggestions: tuple[Candidate, ...]  # Next step's, then Aim higher's (one set: the origin's)
     not_included: tuple[Left, ...]
@@ -337,6 +389,8 @@ class Slate:
     reference: Reference  # the person's reference level, which places each suggestion
     fewer_reasons: list[FewerReason] = field(default_factory=list)
     notes: list[SlateNote] = field(default_factory=list)
+    # The listed titles chosen into a set, with their place there (Task 6g slice B).
+    titles: tuple[PlacedTitle, ...] = ()
 
     def horizon(self, candidate: Candidate) -> Horizon:
         return place(candidate.occupation.family_code, self.reference)
@@ -348,10 +402,10 @@ _TRANSFER_CHANNELS = frozenset(
 )
 
 
-def _direction(
-    occupation: Occupation, channels: frozenset[SlateChannel], familiar: frozenset[str]
+def _direction_of(
+    family_code: str, channels: frozenset[SlateChannel], familiar: frozenset[str]
 ) -> Direction:
-    if occupation.family_code in familiar or channels & _CLOSE_CHANNELS:
+    if family_code in familiar or channels & _CLOSE_CHANNELS:
         return Direction.CLOSE
     if channels & _TRANSFER_CHANNELS:
         return Direction.TRANSFERABLE
@@ -392,7 +446,7 @@ def _candidate(occupation: Occupation, matches: list[Match], familiar: frozenset
         occupation,
         tuple(matches),
         _relevance(matches),
-        _direction(occupation, channels, familiar),
+        _direction_of(occupation.family_code, channels, familiar),
         channels,
         _reach(occupation, matches),
         _share(occupation, matches),
@@ -588,51 +642,117 @@ def _eligible(
     return _Eligible(eligible, left, excluded)
 
 
+# A listed title's relevance: an exact title match scores 1, weighted as a title idea's hit.
+LISTED_RELEVANCE = CHANNEL_WEIGHT[SlateChannel.HYPOTHESIS]
+# Work found by a title: a title idea code confirmed, the person's own title, or a join to one.
+_TITLE_CHANNELS = frozenset(
+    {SlateChannel.HYPOTHESIS, SlateChannel.CURRENT, SlateChannel.USER_PROPOSED}
+)
+
+
+def found_by_a_title(candidate: Candidate) -> bool:
+    """Whether a title reached this occupation itself: a title idea ESCO holds, the person's
+    own title, or a join to one of theirs by shared essential skills (never a search alone)."""
+    return any(
+        match.query.channel in _TITLE_CHANNELS or match.shared_skills is not None
+        for match in candidate.own_matches
+    )
+
+
+Entry = Candidate | ListedTitle
+
+
+@dataclass(frozen=True)
+class _Option:
+    """An eligible candidate or listed title, as the reranker weighs it."""
+
+    entry: Entry
+    family: str
+    sector: str
+    relevance: float
+    direction: Direction
+    first: bool  # ranks before every option that isn't (Aim higher's rule)
+    order: tuple[float, int, float, str, str]  # `_order`'s key
+
+
+def _option(entry: Entry, *, titles_first: bool) -> _Option:
+    if isinstance(entry, ListedTitle):
+        order = (-LISTED_RELEVANCE, 1, 0.0, entry.title, entry.title)
+        return _Option(
+            entry,
+            entry.family_code,
+            entry.sector_code,
+            LISTED_RELEVANCE,
+            entry.direction,
+            titles_first,
+            order,
+        )
+    occupation = entry.occupation
+    return _Option(
+        entry,
+        occupation.family_code,
+        occupation.sector_code,
+        entry.relevance,
+        entry.direction,
+        titles_first and found_by_a_title(entry),
+        _order(entry),
+    )
+
+
 @dataclass(frozen=True)
 class _Ranked:
-    chosen: list[Candidate]
+    horizon: Horizon | None  # the set (None: the world's first scatter)
+    chosen: list[Entry]
     left: list[Left]
     blocked: int  # left out only because its kind of work was shown as often as allowed
 
 
-def _rerank(eligible: list[Candidate], size: int, family_limit: int, balance: Balance) -> _Ranked:
+def _rerank(
+    eligible: list[_Option],
+    size: int,
+    family_limit: int,
+    balance: Balance,
+    horizon: Horizon | None = None,
+) -> _Ranked:
     """The constrained greedy reranker: up to `size`, each step taking the highest relevance
-    plus the bonuses for what the set has not shown yet, less the same-family penalty."""
-    chosen: list[Candidate] = []
+    plus the bonuses for what the set has not shown yet, less the same-family penalty; an
+    option that ranks first (`_Option.first`) is taken before any that doesn't."""
+    chosen: list[_Option] = []
     families: Counter[str] = Counter()
     sectors: set[str] = set()
     directions: Counter[Direction] = Counter()
-    remaining = sorted(eligible, key=_order)
+    remaining = sorted(eligible, key=lambda option: option.order)
 
-    def gain(candidate: Candidate) -> float:
-        occupation = candidate.occupation
+    def gain(option: _Option) -> tuple[bool, float]:
         return (
-            candidate.relevance
-            + NEW_FAMILY_BONUS * (families[occupation.family_code] == 0)
-            + NEW_SECTOR_BONUS * (occupation.sector_code not in sectors)
-            + DIRECTION_BONUS * (directions[candidate.direction] < balance[candidate.direction])
-            - SAME_FAMILY_PENALTY * families[occupation.family_code]
+            option.first,
+            option.relevance
+            + NEW_FAMILY_BONUS * (families[option.family] == 0)
+            + NEW_SECTOR_BONUS * (option.sector not in sectors)
+            + DIRECTION_BONUS * (directions[option.direction] < balance[option.direction])
+            - SAME_FAMILY_PENALTY * families[option.family],
         )
 
     while len(chosen) < size:
-        options = [c for c in remaining if families[c.occupation.family_code] < family_limit]
+        options = [o for o in remaining if families[o.family] < family_limit]
         if not options:
             break
         best = max(options, key=gain)  # the first of equals, in `_order`
         chosen.append(best)
         remaining.remove(best)
-        families[best.occupation.family_code] += 1
-        sectors.add(best.occupation.sector_code)
+        families[best.family] += 1
+        sectors.add(best.sector)
         directions[best.direction] += 1
 
     left: list[Left] = []
     blocked = 0
-    for candidate in remaining:
-        at_limit = families[candidate.occupation.family_code] >= family_limit
-        blocked += at_limit
-        reason = NotIncluded.FAMILY_LIMIT if at_limit else NotIncluded.LESS_RELEVANT
-        left.append(Left(candidate, reason))
-    return _Ranked(chosen, left, blocked)
+    for option in remaining:  # a listed title not chosen stays in the list beside the slate
+        if isinstance(option.entry, Candidate):
+            at_limit = families[option.family] >= family_limit
+            blocked += at_limit
+            reason = NotIncluded.FAMILY_LIMIT if at_limit else NotIncluded.LESS_RELEVANT
+            left.append(Left(option.entry, reason))
+    return _Ranked(horizon, [o.entry for o in chosen], left, blocked)
 
 
 def _slate(
@@ -646,12 +766,19 @@ def _slate(
     """The chosen sets in order, with why anything is left out and why there are fewer than
     `SLATE_SIZE`: nothing found, a set short of what matched (`short`), kinds of work shown as
     often as allowed, or the person's exclusions."""
-    chosen = [c for r in ranked for c in r.chosen]
+    chosen = [c for r in ranked for c in r.chosen if isinstance(c, Candidate)]
+    titles = tuple(
+        PlacedTitle(entry, r.horizon, position)
+        for r in ranked
+        if r.horizon is not None
+        for position, entry in enumerate(r.chosen)
+        if isinstance(entry, ListedTitle)
+    )
     left = [*eligible.left, *(item for r in ranked for item in r.left)]
     blocked = sum(r.blocked for r in ranked)
     fewer: list[FewerReason] = []
-    if len(chosen) < SLATE_SIZE:
-        fewer += [NothingFound()] if not pool.candidates else short
+    if len(chosen) + len(titles) < SLATE_SIZE:
+        fewer += [NothingFound()] if not pool.candidates and not titles else short
         if blocked:
             fewer.append(KindsOfWorkShown(count=blocked, family_limit=policy.family_limit))
         removed = sum(eligible.excluded.values())
@@ -667,6 +794,7 @@ def _slate(
         reference=reference,
         fewer_reasons=fewer,
         notes=[policy.note] if policy.note else [],
+        titles=titles,
     )
 
 
@@ -676,24 +804,41 @@ def choose_slate(
     left_out: Mapping[uuid.UUID, NotIncluded] | None = None,
     *,
     reference: Reference,
+    listed: Iterable[ListedTitle] = (),
 ) -> Slate:
     """The slate: Next step, then Aim higher, each of up to `HORIZON_SIZE` through the same
     reranker, every eligible candidate placed against the person's `reference` level.
     `left_out`: occupations a hard filter leaves out (the salary floor, the AI Resilience
-    filter), each with its reason; the caller decided, from evidence, that each is below."""
+    filter), each with its reason; the caller decided, from evidence, that each is below.
+    `listed`: the title ideas only the UK job-title index lists that no hard filter leaves out
+    (Task 6g slice B); each is placed by its groups (`place_title`), and excluding its kind of
+    work leaves it out, counted."""
     controls = controls or SlateControls()
     policy = _POLICIES[controls.emphasis]
     eligible = _eligible(pool, controls, left_out or {}, policy.floor)
+    titles: list[ListedTitle] = []
+    for title in listed:
+        if title.family_code in controls.exclude_families:
+            eligible.excluded["families"] += 1
+        else:
+            titles.append(title)
     ranked: list[_Ranked] = []
     short: list[FewMatched] = []
     for horizon in Horizon:
-        placed = [
-            c for c in eligible.candidates if place(c.occupation.family_code, reference) is horizon
+        first = horizon is Horizon.AIM_HIGHER  # work found by a title ranks first there
+        options = [
+            _option(c, titles_first=first)
+            for c in eligible.candidates
+            if place(c.occupation.family_code, reference) is horizon
+        ] + [
+            _option(t, titles_first=first)
+            for t in titles
+            if place_title(t.isco_codes, reference) is horizon
         ]
         balance = policy.balances[horizon]
-        ranked.append(_rerank(placed, HORIZON_SIZE, policy.family_limit, balance))
-        if len(placed) < HORIZON_SIZE:
-            short.append(FewMatched(count=len(placed), horizon=horizon))
+        ranked.append(_rerank(options, HORIZON_SIZE, policy.family_limit, balance, horizon))
+        if len(options) < HORIZON_SIZE:
+            short.append(FewMatched(count=len(options), horizon=horizon))
     return _slate(pool, eligible, ranked, short, policy, reference)
 
 
@@ -706,7 +851,8 @@ def choose_first_scatter(
     destination as a fact only."""
     policy = _POLICIES[Emphasis.BALANCED]
     eligible = _eligible(pool, SlateControls(), left_out or {}, policy.floor)
-    ranked = _rerank(eligible.candidates, SLATE_SIZE, policy.family_limit, _FIRST_SCATTER)
+    options = [_option(c, titles_first=False) for c in eligible.candidates]
+    ranked = _rerank(options, SLATE_SIZE, policy.family_limit, _FIRST_SCATTER)
     count = len(eligible.candidates)
     short = [FewMatched(count=count, horizon=None)] if count < SLATE_SIZE else []
     return _slate(pool, eligible, [ranked], short, policy, reference)

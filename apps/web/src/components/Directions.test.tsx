@@ -138,6 +138,24 @@ const suggestion: SuggestionOut = {
   different_kind_of_work: false,
   shared_skills: [],
 };
+/** A title Careerwright thought of, from the person's enjoyed bicycle repairs. */
+const titleIdea = (
+  title: string,
+  reason: SlateOut["title_ideas"][number]["reason"],
+  more: Partial<SlateOut["title_ideas"][number]> = {},
+): SlateOut["title_ideas"][number] => ({
+  title,
+  based_on: [{ field: "enjoyed_tasks", text: "repairing bicycles" }],
+  reason,
+  outcome: "not_matched",
+  occupations: 0,
+  groups: [],
+  skill_level: null,
+  horizon: null,
+  position: null,
+  left_out: false,
+  ...more,
+});
 const slate = (shown: SuggestionOut[]): SlateOut => ({
   discovery_id: "d1",
   profile_version: 2,
@@ -184,15 +202,7 @@ const slate = (shown: SuggestionOut[]): SlateOut => ({
     },
   ],
   unsearchable_queries: [],
-  title_ideas: [
-    {
-      title: "orbital gardener",
-      based_on: [{ field: "enjoyed_tasks", text: "repairing bicycles" }],
-      reason: "not_yet_found",
-      outcome: "not_matched",
-      occupations: 0,
-    },
-  ],
+  title_ideas: [titleIdea("orbital gardener", "not_yet_found")],
   not_included: [
     {
       concept_id: "o2",
@@ -299,17 +309,106 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
     }
     const aim = screen.getByRole("region", { name: "Aim higher" });
     expect(within(aim).getByRole("article", { name: "Chemist" })).toBeVisible();
-    // The Aim higher card, closed: its usual training in its kind of work's line, and nothing
-    // else added.
+    // Its usual training, once under the heading (Task 6g slice B: never on every card), and
+    // the closed card's line is its kind of work alone.
     expect(
       within(aim).getByText(
-        "Kind of work: Physical and earth science professionals. Most work in this job group usually needs a degree or equivalent training.",
+        "Most work in this job group usually needs a degree or equivalent training.",
       ),
     ).toBeVisible();
-    // The Next step card, open first: its kind of work alone, never its training.
+    expect(within(aim).getAllByText(/usually needs/)).toHaveLength(1);
+    expect(
+      within(aim).getByText("Kind of work: Physical and earth science professionals"),
+    ).toBeVisible();
+    // Next step says nothing of training.
     const next = screen.getByRole("region", { name: "Next step" });
     expect(within(next).getByText("Kind of work: Machinery mechanics and repairers")).toBeVisible();
     expect(within(next).queryByText(/usually needs/)).toBeNull();
+  });
+
+  it("[DIV1-16][DIV1-04] shows a title idea the UK job-title index lists in its set, at its place, and makes it a target through the profile's save", async () => {
+    // Task 6g slice B: Muse's Aim higher idea, confirmed by the UK job-title index and placed
+    // by its job group's level; one whose groups disagree stays in the list beside the slate.
+    const higher: SuggestionOut = {
+      ...suggestion,
+      concept_id: "o3",
+      title: "chemist",
+      family: { code: "211", label: "Physical and earth science professionals" },
+      horizon: "aim_higher",
+      skill_level: 4,
+    };
+    const placed = titleIdea("Customer success manager", "in_uk_title_index", {
+      groups: [{ code: "3339", label: "Business services agents not elsewhere classified" }],
+      skill_level: 3,
+      horizon: "aim_higher",
+      position: 0,
+    });
+    const beside = titleIdea("Account manager", "in_uk_title_index", {
+      groups: [
+        { code: "1330", label: "ICT services managers" },
+        { code: "3313", label: "Accounting associate professionals" },
+      ],
+    });
+    const answer = { ...slate([suggestion, higher]), title_ideas: [placed, beside] };
+    const sent = fakeApi([
+      { method: "GET", path: /\/slate$/, answer },
+      { method: "PUT", path: /\/profile$/, status: 201, answer: profile },
+    ]);
+    const { user } = renderDirections();
+
+    const aim = await screen.findByRole("region", { name: "Aim higher" });
+    expect(within(aim).getAllByRole("article")).toHaveLength(2);
+    const [first, second] = within(aim).getAllByRole("heading", { level: 4 });
+    expect([first?.textContent, second?.textContent]).toEqual([
+      "Customer success manager",
+      "Chemist",
+    ]);
+    // One training sentence for the set, for both its levels.
+    expect(
+      within(aim).getByText(
+        "Most work in these job groups usually needs one to three years of study after A-levels or similar, or a degree or equivalent training.",
+      ),
+    ).toBeVisible();
+    expect(
+      within(aim).getByText("Kind of work: Business services agents not elsewhere classified"),
+    ).toBeVisible();
+    // Beside the slate: only the idea in no set.
+    const list = screen.getByRole("region", { name: UK_TITLE_IDEAS.heading });
+    expect(within(list).getByRole("heading", { name: "Account manager" })).toBeVisible();
+    expect(within(list).queryByText("Customer success manager")).toBeNull();
+    expect(screen.getByText(/and 2 titles found in the UK job-title index\./)).toBeVisible();
+
+    await user.click(within(aim).getByRole("button", { name: /Customer success manager/ }));
+    const card = within(aim).getByRole("article", { name: "Customer success manager" });
+    expect(within(card).getByText(UK_TITLE_IDEAS.found)).toBeVisible();
+    expect(
+      within(card).getByText(
+        "Careerwright thought of it from what you enjoy: “repairing bicycles”",
+      ),
+    ).toBeVisible();
+    const make = within(card).getByRole("button", { name: /Make this a target/ });
+    expect(make).toHaveClass("btn-primary");
+    await user.click(make);
+    const saved = (s: Sent) => s.method === "PUT" && s.path.endsWith("/profile");
+    await waitFor(() => expect(sent.some(saved)).toBe(true));
+    const body = sent.find(saved)?.body as {
+      expected_version: number;
+      profile: ProfileOut["document"];
+    };
+    expect(body.expected_version).toBe(2);
+    expect(body.profile.target_titles).toEqual({
+      state: "provided",
+      value: ["Customer success manager"],
+    });
+  });
+
+  it("[DIV1-16] says how the sets were placed only when a set has something in it", async () => {
+    // Task 6g slice B (slice A's review, Minor 2).
+    fakeApi([{ method: "GET", path: /\/slate$/, answer: slate([]) }]);
+    const { user } = renderDirections();
+
+    await openNotes(user, 2);
+    expect(screen.queryByText(/Careerwright placed each suggestion/)).toBeNull();
   });
 
   it("[PROF-14] with no work known, never says close to what they do now, offers no Closer to what I do, and never tells someone with no job yet that their work isn't known", async () => {
@@ -409,20 +508,10 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
 
   it("[DIV1-04][TEST1-15] lists a title idea the UK job-title index lists beside the slate, with its answers", async () => {
     const ideas: SlateOut["title_ideas"] = [
-      {
-        title: "Prompt engineer",
+      titleIdea("Prompt engineer", "in_uk_title_index", {
         based_on: [{ field: "enjoyed_tasks", text: "writing prompts for AI tools" }],
-        reason: "in_uk_title_index",
-        outcome: "not_matched",
-        occupations: 0,
-      },
-      {
-        title: "orbital gardener",
-        based_on: [{ field: "enjoyed_tasks", text: "repairing bicycles" }],
-        reason: "not_yet_found",
-        outcome: "not_matched",
-        occupations: 0,
-      },
+      }),
+      titleIdea("orbital gardener", "not_yet_found"),
     ];
     fakeApi([
       {

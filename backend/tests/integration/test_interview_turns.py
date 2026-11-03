@@ -839,7 +839,7 @@ def test_the_export_carries_the_conversation_and_its_decisions(scenario: Scenari
         f"/v1/workspaces/{scenario.workspace_id}/export", scenario.token
     ).json()
 
-    assert exported["format_version"] == 4
+    assert exported["format_version"] == 5
     [shown] = exported["interview_turns"]
     assert shown["turn_id"] == turn["turn_id"]
     assert shown["proposal"]["changes"]

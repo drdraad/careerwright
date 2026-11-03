@@ -23,10 +23,10 @@ def test_export_holds_every_version_source_and_event_with_its_synthetic_label(
 
     # Format 2 (Task 5) adds the interview turns and provisional concepts; format 3 (Task 6)
     # the discoveries and the interview preferences; format 4 (Task 6b) each discovery's
-    # written explanation.
+    # written explanation; format 5 (Task 6g slice B) each proposal's aim higher title ideas.
     assert (export["format"], export["format_version"], export["synthetic"]) == (
         "careerwright.workspace-export",
-        4,
+        5,
         True,
     )
     assert [v["version"] for v in export["profile_versions"]] == [1, 2]
