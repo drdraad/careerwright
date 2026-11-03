@@ -14,12 +14,14 @@ a deeper search of its own (`ROLE_SEARCH`); the kind's one reservation is that s
 """
 
 import json
+import re
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlsplit
 
 from pydantic import Field, model_validator
 
@@ -91,6 +93,10 @@ ROLE_SEARCH = SearchBounds(
     max_prompt_bytes=2_500,
     max_output_tokens=4_000,
 )
+# The most pages one role research keeps to try: Muse's picks first, then every other page the
+# search returned (round 2 of the product owner's live try, 3 November 2026: Muse passed on two
+# of the search's pages, both gone). `acquisition_targets.position` holds 0 to 39.
+ROLE_CANDIDATES = 40
 
 
 def refused_hosts() -> list[str]:
@@ -131,17 +137,21 @@ class SearchPurpose(StrEnum):
 
 # Role research (Task 6e; ADR 0015 decision 5): one bounded request of its own (`ROLE_SEARCH`),
 # told only the title and "England". 2: several searches, each page's own address as the
-# search returned it, never a home page, a results page or a list (3 November 2026).
-ROLE_PROMPT_VERSION = "role-search-2"
+# search returned it, never a home page, a results page or a list (3 November 2026). 3: at
+# least four distinct searches before answering, the title alone among them, and the best
+# pages first, since Careerwright also tries the others the search returned (the same day).
+ROLE_PROMPT_VERSION = "role-search-3"
 ROLE_INPUT_FORMAT: Literal["careerwright.role-search-input"] = "careerwright.role-search-input"
 ROLE_COUNTRY = "England"
 
 ROLE_INSTRUCTIONS = f"""You find web pages about one job title for one person's research. Use
-web search, and run several different searches, for example: the exact title in quotes with
-"job" and "England"; the title in quotes with "careers" or "role profile"; the title with
-"professional body" or "gov.uk", for official and professional bodies' pages about it. Return a
-JSON object with "candidates": at most {ROLE_SEARCH.max_candidates} pages, each with its "url"
-and a short "title". Each candidate must be one specific page in England that uses the job title
+web search well: before you answer, run at least four different searches (up to eight). Search
+for the exact title in quotes with "job" and "England"; the title in quotes with "role profile"
+or "careers"; the title with "professional body" or "gov.uk", for an official or professional
+body's page; and the title alone. Searching several ways finds more pages that use the title.
+Return a JSON object with "candidates": at most {ROLE_SEARCH.max_candidates} pages, best first,
+each with its "url" and a short "title". Careerwright also tries the other pages your searches
+return, after yours. Each candidate must be one specific page in England that uses the job title
 in the request and is about that role: an individual job posting for it, a careers or role
 profile, an official page, a professional body's page, or an employer's own page about the role.
 Never return a site's home page, a page of search results or a list of many jobs: none of them
@@ -201,10 +211,12 @@ class ExclusionReason(StrEnum):
     ADDRESS_NOT_ALLOWED = UrlRefusal.ADDRESS_NOT_ALLOWED.value
     SOURCE_NOT_PERMITTED = "source_not_permitted"  # the manifest denies it or allows its API only
     OVER_THE_LIMIT = "over_the_limit"  # past the candidates kept
-    # Role research only: a site's home page can't describe one role, and a page the search
-    # never returned is a guess (the product owner, 3 November 2026).
+    # Role research only: a site's home page can't describe one role, a page the search never
+    # returned is a guess, and a page of search results for the title repeats it whatever it
+    # lists (the product owner, 3 November 2026).
     SITE_ROOT = "site_root"
     NOT_RETURNED_BY_SEARCH = "not_returned_by_search"
+    SEARCH_RESULTS_PAGE = "search_results_page"
 
 
 class SearchExcluded(StrictModel):
@@ -297,25 +309,42 @@ def _grounding_key(url: str) -> str:
     return (checked.url if isinstance(checked, CheckedUrl) else url).strip().rstrip("/").lower()
 
 
-def is_site_root(url: str) -> bool:
-    """A site's home page: its path is empty or "/", whatever its query."""
-    return urlsplit(url).path in ("", "/")
+def _words(text: str) -> str:
+    """Text as its words alone, in one case, one space apart."""
+    return " ".join(re.sub(r"[\W_]+", " ", text.casefold()).split())
+
+
+def role_page_refusal(url: str, title: str) -> ExclusionReason | None:
+    """Why role research never reads a checked page, if it doesn't: a site's home page (its
+    path empty or "/", whatever its query) can't describe one role, and a page of search
+    results for the title (one of its query's values holds the title's words) repeats the
+    search's own words, so the title would be on it whatever it lists."""
+    parts = urlsplit(url)
+    if parts.path in ("", "/"):
+        return ExclusionReason.SITE_ROOT
+    wanted = f" {_words(title)} "
+    if any(wanted in f" {_words(value)} " for _, value in parse_qsl(parts.query)):
+        return ExclusionReason.SEARCH_RESULTS_PAGE
+    return None
 
 
 def check_search(
     output: SearchOutput,
     context: SearchInput | RoleSearchInput,
     *,
-    sources: set[str],
+    sources: Iterable[str],
     queries: list[str],
 ) -> SearchProposal:
     """Deterministic: every candidate kept passes the fetch checks and the manifest, and says
-    whether the search returned it. Role research keeps only pages the search returned, and
-    never a site's home page. Nothing here is repaired at another request's cost."""
+    whether the search returned it. Role research keeps only pages the search returned, never
+    a site's home page or a page of results for the title: Muse's picks first, then every
+    other page the search returned, in its order, up to `ROLE_CANDIDATES`. Nothing here is
+    repaired at another request's cost."""
     kept: list[SearchCandidate] = []
     excluded: list[SearchExcluded] = []
     seen: set[str] = set()
-    grounded_set = {_grounding_key(s) for s in sources}
+    returned = list(dict.fromkeys(s.strip() for s in sources))
+    grounded_set = {_grounding_key(s) for s in returned}
     role = isinstance(context, RoleSearchInput)
     for candidate in output.candidates:
         url = candidate.url.strip()
@@ -332,8 +361,9 @@ def check_search(
                 SearchExcluded(url=checked.url, reason=ExclusionReason.SOURCE_NOT_PERMITTED)
             )
             continue
-        if role and is_site_root(checked.url):
-            excluded.append(SearchExcluded(url=checked.url, reason=ExclusionReason.SITE_ROOT))
+        refusal = role_page_refusal(checked.url, context.target) if role else None
+        if refusal is not None:
+            excluded.append(SearchExcluded(url=checked.url, reason=refusal))
             continue
         if checked.url in seen:
             continue
@@ -354,6 +384,8 @@ def check_search(
                 grounded=grounded,
             )
         )
+    if role:
+        kept += _other_returned_pages(returned, kept, context.target)
     empty_reason = None
     if not kept:
         if output.candidates:
@@ -370,9 +402,33 @@ def check_search(
         excluded=excluded,
         queries=queries,
         sources_seen=len(grounded_set),
-        source_hosts=sorted({h for s in sources if (h := _host_text(s))}),
+        source_hosts=sorted({h for s in returned if (h := _host_text(s))}),
         empty_reason=empty_reason,
     )
+
+
+def _other_returned_pages(
+    returned: list[str], picked: list[SearchCandidate], title: str
+) -> list[SearchCandidate]:
+    """The pages the search returned that Muse didn't pick, in the search's order, each through
+    the same checks as a pick, up to `ROLE_CANDIDATES` in all. Muse's list is a ranking hint,
+    never the limit (round 2 of the product owner's live try, 3 November 2026)."""
+    taken = {_grounding_key(c.url) for c in picked}
+    others: list[SearchCandidate] = []
+    for source in returned:
+        if len(picked) + len(others) == ROLE_CANDIDATES:
+            break
+        checked = check_url(source)
+        if (
+            not isinstance(checked, CheckedUrl)
+            or rule_for(checked.host).access is not Access.PERMITTED
+            or role_page_refusal(checked.url, title) is not None
+            or _grounding_key(checked.url) in taken
+        ):
+            continue
+        taken.add(_grounding_key(checked.url))
+        others.append(SearchCandidate(url=checked.url, title=checked.host, grounded=True))
+    return others
 
 
 def _host_text(url: str) -> str | None:

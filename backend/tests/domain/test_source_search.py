@@ -262,7 +262,7 @@ def test_a_search_is_one_request_with_its_tool_calls_bounded_and_sources_asked_f
         ("https://jobs.board.example/ad/9", False),
     ]
     assert proposal.queries == ["Data quality analyst jobs Manchester"]
-    assert searched(messages)[0] == {SEARCHED}
+    assert searched(messages)[0] == [SEARCHED]  # in the search's own order
 
 
 @pytest.mark.req("MODEL-08")

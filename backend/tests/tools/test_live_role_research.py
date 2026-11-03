@@ -26,7 +26,13 @@ from careerwright.evidence.records import AttemptReason, AttemptStatus, InputRou
 from tests.support.certificates import make_ca
 from tests.support.fake_models import SEARCHED, search_parts
 from tests.support.fake_proxy import fake_proxy
-from tools.live_role_research import PAGES_PRINTED, ROLE_SCOPE, page_notes, research_role
+from tools.live_role_research import (
+    PAGES_PRINTED,
+    ROLE_SCOPE,
+    page_notes,
+    read_until_enough,
+    research_role,
+)
 from tools.live_smoke import SmokeSettings
 from tools.usage_ledger import CallOutcome, Ledger
 
@@ -195,6 +201,30 @@ def test_pages_that_could_not_be_read_are_printed_as_unread_never_not_on_any_pag
         "verdict": None,
         "reason": "no_pages",
         "unread": 0,
+        "read": 0,
+        "gone": 0,
         "sources": 0,
         "official": False,
     }
+
+
+@pytest.mark.req("DIV1-15")
+def test_the_tool_reads_as_the_product_does_past_pages_gone_until_twenty_are_read() -> None:
+    # Round 2 of the product owner's live try (3 November 2026): both pages had expired.
+    urls = [f"https://site{n}.example/role" for n in range(24)]
+    gone = {urls[0]: 404, urls[1]: 410}
+    asked: list[str] = []
+
+    def reader(url: str) -> AcquisitionResult:
+        asked.append(url)
+        if url in gone:
+            return _failed(url).model_copy(
+                update={"reason": AttemptReason.HTTP_ERROR, "http_status": gone[url]}
+            )
+        return _page(url)
+
+    notes = page_notes(TITLE, read_until_enough(urls, reader))
+
+    assert asked == urls[:22]  # two gone, then twenty read; the last two never asked for
+    assert (notes["read"], notes["gone"], notes["unread"]) == (20, 2, 2)
+    assert notes["verdict"] == "found"  # a page no longer there is never one without the title

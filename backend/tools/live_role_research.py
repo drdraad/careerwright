@@ -9,8 +9,9 @@ worst case in all, the test model only) as soon as it returns, before any page i
 what the search proposed in the row's notes; then the requests sent, the result and the row
 are scanned for the key.
 
-Then up to twenty of its candidate pages (`role_research.pages_to_read`: only pages the search
-returned, never a site's home page) are read with the
+Then its candidate pages (`role_research.pages_to_read`: Muse's picks, then the other pages the
+search returned, never a site's home page) are tried in order, past any that can't be read or
+are no longer there, until twenty are read (`read_until_enough`), with the
 restricted acquisition worker's own code (`acquire_page`: the URL checks, the source manifest,
 robots.txt, pacing, redaction; each page's class from the manifest), and the title is checked
 on each by the product's own corroboration code (`check_title`, `corroborate`). No model reads
@@ -46,10 +47,11 @@ from pydantic_ai.models import Model
 
 from careerwright.evidence import search
 from careerwright.evidence.acquire import AcquisitionResult, Pacer, acquire_page
+from careerwright.evidence.acquisition import MAX_ROLE_PAGES
 from careerwright.evidence.corroboration import PageEvidence, check_title, corroborate
 from careerwright.evidence.fetcher import Fetcher
 from careerwright.evidence.records import AttemptStatus
-from careerwright.evidence.role_research import pages_to_read
+from careerwright.evidence.role_research import GONE_STATUSES, pages_to_read
 from careerwright.evidence.search_agent import run_search
 from careerwright.evidence.sources import load_manifest
 from careerwright.identity.activity import PartialWriter, measured_usage
@@ -98,16 +100,30 @@ def _reader(fetcher: Fetcher | None) -> Reader:
     return lambda url: acquire_page(fetcher, pacer, url, now=datetime.now(UTC), read_text=True)
 
 
+def read_until_enough(urls: list[str], read: Reader) -> list[AcquisitionResult]:
+    """The product's reading, in this process: the pages in order, past any it can't read or
+    that is no longer there, until `MAX_ROLE_PAGES` are read (`acquisition.acquire_target`)."""
+    results: list[AcquisitionResult] = []
+    for url in urls:
+        if sum(r.status is AttemptStatus.SUCCEEDED for r in results) == MAX_ROLE_PAGES:
+            break
+        results.append(read(url))
+    return results
+
+
 def page_notes(title: str, results: list[AcquisitionResult]) -> dict[str, Any]:
     """What the row records of the pages read: hosts, classes, outcomes and the verdict; never
     a URL or a page's words. A page not read is counted apart (`pages_unread`), never as a page
-    without the title; with no page to read there is no verdict."""
+    without the title, and a page no longer there (404 or 410) is counted as `gone`; with no
+    page to read there is no verdict."""
     if not results:
         return {
             "pages": [],
             "verdict": None,
             "reason": "no_pages",
             "unread": 0,
+            "read": 0,
+            "gone": 0,
             "sources": 0,
             "official": False,
         }
@@ -139,6 +155,8 @@ def page_notes(title: str, results: list[AcquisitionResult]) -> dict[str, Any]:
         "verdict": result.verdict.value,
         "reason": result.reason.value if result.reason else None,
         "unread": result.unread,
+        "read": len(evidence),
+        "gone": sum(1 for r in results if r.http_status in GONE_STATUSES),
         "sources": result.sources,
         "official": result.official,
     }
@@ -237,7 +255,7 @@ def research_role(
     pages = (
         {"ledger_row": record.seq}
         | route_fields(fetcher)
-        | page_notes(context.title, [reader(url) for url in pages_to_read(proposal)])
+        | page_notes(context.title, read_until_enough(pages_to_read(proposal), reader))
     )
     printed = json.dumps(pages)
     page_findings = scan([("page notes", printed)], [key])

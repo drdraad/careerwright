@@ -207,11 +207,13 @@ function ResearchResult({
                   page.host
                 )}
                 {": "}
-                {page.title_verified === null
-                  ? ROLE_RESEARCH.pageUnread
-                  : page.title_verified
-                    ? ROLE_RESEARCH.pageVerified
-                    : ROLE_RESEARCH.pageNotVerified}
+                {page.gone
+                  ? ROLE_RESEARCH.pageGone
+                  : page.title_verified === null
+                    ? ROLE_RESEARCH.pageUnread
+                    : page.title_verified
+                      ? ROLE_RESEARCH.pageVerified
+                      : ROLE_RESEARCH.pageNotVerified}
                 {page.retrieved_at !== null &&
                   `. ${ROLE_RESEARCH.read(readOn.format(new Date(page.retrieved_at)))}.`}
                 {page.quote !== null && <blockquote className="mt-4">“{page.quote}”</blockquote>}

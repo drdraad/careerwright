@@ -73,6 +73,7 @@ const page = (
   title_verified: verified,
   quote: verified ? `${TITLE} wanted at our Leeds growing hub.` : null,
   source,
+  gone: false,
 });
 const research = (over: Partial<RoleResearchOut>): RoleResearchOut => ({
   research_id: "r1",
@@ -84,6 +85,9 @@ const research = (over: Partial<RoleResearchOut>): RoleResearchOut => ({
   sources: 0,
   official: false,
   candidates: 0,
+  sources_returned: 0,
+  pages_read: 0,
+  pages_gone: 0,
   empty_reason: null,
   search: run("s1", "running"),
   reading: null,
@@ -243,6 +247,30 @@ describe("[DIV1-15][MODEL-08] research this role", () => {
     expect(screen.getByText(ROLE_RESEARCH.notYetFound.pages_unread)).toBeVisible();
     expect(screen.getByText(ROLE_RESEARCH.unread(5))).toBeVisible();
     expect(screen.queryByText(ROLE_RESEARCH.notYetFound.not_on_any_page)).toBeNull();
+  });
+
+  it("says a page is no longer there, never that it lacks the title", async () => {
+    // The product owner's live try (3 November 2026): both pages had expired (404).
+    const expired = { ...page(0, "environmentjob.co.uk", null, null), reason: "http_error" };
+    const gone = research({
+      state: "found",
+      sources: 2,
+      search: run("s1"),
+      reading: run("a1"),
+      pages: [
+        { ...expired, gone: true },
+        page(1, "careers.northwind.example", true, 1),
+        page(2, "growers.guild.example", true, 2),
+      ] as RoleResearchOut["pages"],
+    });
+    shown([gone]);
+    const pages = (await screen.findByText(ROLE_RESEARCH.pages)).closest("details");
+
+    expect(pages).not.toBeNull();
+    const first = within(pages as HTMLElement).getAllByRole("listitem")[0];
+    expect(first).toHaveTextContent(ROLE_RESEARCH.pageGone);
+    expect(first).not.toHaveTextContent(ROLE_RESEARCH.pageNotVerified);
+    expect(first).not.toHaveTextContent(ROLE_RESEARCH.pageUnread);
   });
 
   it("never offers to make the person's own title a target again", async () => {
