@@ -401,11 +401,16 @@ export function Conversation({
   const latest = turns.at(-1);
   const latestFailed = latest !== undefined && turnFailed(latest);
   const answered = [...turns].reverse().find((turn) => turn.proposal !== null);
-  const question =
-    answered?.proposal?.next_question ??
-    (turns.length === 0 && preferences.entry_mode
-      ? OPENING_QUESTION[preferences.entry_mode]
-      : null);
+  // A question is in view only until it is answered (Task W2F slice E: the pay question stayed
+  // while its answer was sent and replied to): while a message is on its way, or its reply is
+  // not yet checked, the newest checked reply's question has been answered, so none shows.
+  const answering = sender.pending || (latest !== undefined && latest !== answered);
+  const question = answering
+    ? null
+    : (answered?.proposal?.next_question ??
+      (turns.length === 0 && preferences.entry_mode
+        ? OPENING_QUESTION[preferences.entry_mode]
+        : null));
   const starting = entryNeeded(preferences, turns);
   const asks = questionAsks(answered, preferences.entry_mode);
   const roleOrExplore = asksRoleOrExplore(asks, demo, preferences.entry_mode, profile.document);
