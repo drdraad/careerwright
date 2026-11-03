@@ -644,11 +644,12 @@
     box-shadow: 0 0 22px -8px var(--glow-action);
   }
 
-  /* Quiet and icon actions take the text colour, marked by an underline or their glyph: teal
-     stays with the one primary action, selection and the chosen path. */
+  /* Quiet and icon actions are teal, the action colour, so an action never reads as information
+     (the product owner, 3 November 2026); the quiet one keeps its underline. The one primary
+     action stays the only teal fill. */
   .btn-quiet {
     background: transparent;
-    color: var(--fg);
+    color: var(--action);
     padding: 0 var(--space-8);
     text-decoration: underline;
     text-underline-offset: 3px;
@@ -658,7 +659,7 @@
     min-width: 40px;
     padding: 0;
     background: transparent;
-    color: var(--fg);
+    color: var(--action);
   }
 
   /* The two decisions on a proposed change, colour coded as well as worded (session 2, C3):
