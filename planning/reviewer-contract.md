@@ -33,6 +33,15 @@ empty-success), security (secrets, ownership, SSRF where relevant), tests that v
 real behaviour (not mocks of own modules, not implementation shape), structure (one
 responsibility per file, module boundaries per plan section 3), dead code.
 
+Part 3 — The journey and its load (any change a person sees; the product owner, 3 November
+2026: "think more carefully about minimising cognitive load and clean user journeys"). Walk
+each step of the changed journey as the person meets it and count, per step: places to type,
+actions, and lines of text. Flag as Important: two inputs or two competing next actions on
+one step; anything shown before it is needed (a reply box beside a choice that must come
+first); a line, label or qualification that doesn't change what the person does next; an
+action that looks like information (actions are teal); an em dash in anything a person
+reads.
+
 Calibration: Critical = wrong/unsafe behaviour or a Global Constraint broken. Important =
 cannot be trusted until fixed (incorrect/fragile behaviour, missed requirement, swallowed
 errors, verbatim logic duplication). Minor = polish, broader coverage. A plan-mandated

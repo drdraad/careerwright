@@ -21,6 +21,10 @@ architectural), and continue. Stop and report BLOCKED only for a genuine blocker
 4. Update `docs/requirements-register.md` rows your work closes (once it exists).
 5. Self-review your own diff (completeness, names, YAGNI, tests that assert real
    behaviour, no secrets, no masked failures) and fix what you find.
+6. For anything a person sees, walk the journey step by step before you report: one place to
+   type and one clear next action per step, nothing shown before it is needed, no line that
+   doesn't change the person's next action, actions teal, no em dash (the product owner, 3
+   November 2026). The reviewer checks this as its Part 3.
 
 ## This machine and parallel work (from 2026-10-31, the product owner: "Where subagent work can be done
 ## cleanly in parallel, do so but coordinate well to avoid them causing conflicts")
