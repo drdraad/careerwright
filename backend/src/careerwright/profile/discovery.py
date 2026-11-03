@@ -51,14 +51,15 @@ MAX_HYPOTHESES = 3
 MAX_AIM_HIGHER = 6
 MAX_BASED_ON = 3
 QUERY_CHARS = (3, 80)
-# Bounds for the spend reservation (bytes bound tokens for byte-level BPE tokenizers).
-# Task 6g slice B: the prompt gained the qualifications (eight of up to 120 characters, with
-# their status) and a paragraph; the output six more title ideas beside the eleven items the
-# earlier bound of 1,500 tokens was set for. 2,000 keeps an attempt on Muse Wonder within
-# $0.20, so the live evaluation's explanation case (two runs) stays inside its $0.40 cap.
+# Bounds for the spend reservation (bytes bound the prompt's tokens for byte-level BPE
+# tokenizers). Task 6g slice B: the prompt gained the qualifications (eight of up to 120
+# characters, with their status) and a paragraph. The output bound holds the largest answer the
+# check accepts (17 items, each quoting three answers of 120 characters: about 8,300 bytes, or
+# 2,800 tokens at 3 bytes a token), the reasoning that shares the bound (800 tokens) and a
+# tenth more, as the contract test measures; a response cut off at its bound ends the run.
 MAX_PROMPT_BYTES = 10_000  # instructions plus the rendered evidence, at every list bound
 SCHEMA_ALLOWANCE_TOKENS = 1_500
-MAX_OUTPUT_TOKENS = 2_000
+MAX_OUTPUT_TOKENS = 4_000
 REPAIR_ALLOWANCE_TOKENS = 1_000
 MAX_REQUESTS = 2  # the first request and at most one repair
 # The answers that describe work, in the order the model reads them.

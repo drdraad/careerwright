@@ -84,8 +84,9 @@ MAX_COST_NANO_USD = 50_000_000  # $0.05 worst case per invocation
 SCOPE_MAX_CALLS = 9
 SCOPE_MAX_COST_NANO_USD = 50_000_000
 # Per invocation with `--wonder` (Muse Wonder, the production model, in the shared scope
-# `wonder-qualification`): two cases, such as an interview ($0.176 worst case on Wonder) and a
-# discovery ($0.196 since Task 6g slice B), or one explanation case ($0.392).
+# `wonder-qualification`): two interview cases ($0.176 worst case each on Wonder), or one
+# discovery case ($0.292 since Task 6g slice B's fix round); an explanation case ($0.584) is
+# refused.
 WONDER_MAX_COST_NANO_USD = 400_000_000
 RESULTS_PATH = REPO_ROOT / "docs" / "evidence" / "live-eval.md"
 EVAL_INTERVIEW = SmokeKind(
