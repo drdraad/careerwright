@@ -1,7 +1,7 @@
 // The You chapter's states (S2.3-S2.5, S2.7, SW.4) on a scripted API at the network edge: the
-// start, a reply streaming and to review (one with a limit to confirm, one changing lists), a
-// failed reply, paused; Send waiting for the start's choice and for the review card (session
-// W2); its other views, what we know and the suggestions; a save with Undo and an undo; the
+// start, a reply streaming and to review (one with a limit to confirm, one changing lists; no
+// reply field while the card waits), a failed reply, paused; its other views, what we know and
+// the suggestions; a save with Undo and an undo; the
 // slate full and thin, with its written note written, pending and unavailable, and with a
 // salary floor applied; key consent, and a stored key as the account menu shows it; and the
 // early sketch with a target. Every value is synthetic.
@@ -490,15 +490,6 @@ const unanswered: ProfileOut = {
 export const Start: Story = {
   render: you(chapterRoutes(prefs(null), []), "conversation", unanswered),
 };
-/** Typed into the reply field (there is none before the start's choice, Task W2F slice E). */
-const typedReply =
-  (words: string): Story["play"] =>
-  async ({ canvasElement }) => {
-    const field = await within(canvasElement).findByRole("textbox", {
-      name: "Reply to Careerwright",
-    });
-    await userEvent.type(field, words);
-  };
 
 // The type-ahead open (Task 6d slice B fix round 1, design review M-3): what the person sees as
 // they type, each from the scripted API's answer for those words.
@@ -599,7 +590,7 @@ export const ReplyToReview: Story = {
  *  two lines, its answer's name with only what it adds and removes against what is saved, in
  *  plain words (a task taken back reads as removed), then its origin as a short tag and its actions;
  *  the task answers' hints one step away; with four changes, Save stays at the foot of the
- *  screen. Typed meanwhile, Send waits for the card, saying so in a few words. */
+ *  screen. While the card waits there is no reply field: its Save or Keep none comes first. */
 const withTasks: ProfileOut = {
   ...profile,
   document: {
@@ -649,7 +640,6 @@ export const ReplyChangesLists: Story = {
     "conversation",
     withTasks,
   ),
-  play: typedReply("Synthetic: and I'd rather not travel far."),
 };
 export const ReplyFailed: Story = { render: you(chapterRoutes(prefs("unsure"), [turn("failed")])) };
 export const Paused: Story = {

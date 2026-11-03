@@ -1141,10 +1141,17 @@ space; this ADR changes as follows.
   what I want' and 'Help me explore' creates unnecessary extra complexity"). The start (the
   first question's job title, then how to start) has no reply field; it comes with the
   conversation's first question. A message can no longer go before the choice, so Send's
-  start reason is gone.
+  start reason is gone. Fix round (the product owner's standing rule, 3 November 2026: one
+  place to type and one clear next action per step): while a review card waits, its Save or
+  Keep none comes first, so the reply field and Send step aside until it is decided, in the
+  demo and live. What was typed is kept and comes back with the field. Focus in the field
+  when the card arrives goes to the card's first choice; after Save or Keep none it lands in
+  the reply field. This replaces session W2's Send that waited beside the card; Try again
+  still says why it waits.
 - **The conversation follows its newest part** (the product owner: "doesn't autoscroll to
   the bottom of the conversation like ChatGPT does"). Once the person sends, the reply field
-  stays in view as the message, the streamed reply and its card arrive, but the person's own
+  (while a card waits, the conversation's own end) stays in view as the message, the
+  streamed reply and its card arrive, but the person's own
   newest message is never scrolled above the top, so the reply reads from its start.
   Scrolling up stops it; coming back to the end resumes it; opening the chapter never
   scrolls. Under reduced motion or calm mode it jumps instead of gliding; focus never moves.

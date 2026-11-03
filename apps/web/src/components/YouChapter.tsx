@@ -14,8 +14,9 @@
 // Resume while the interview is paused, else saving the review tray when it has proposals, else
 // Try again after a failed reply, else Send once the start is done (until then the start's
 // choices are the bright action). What we know has one while its answer form is open (Save
-// changes), and the suggestions while asking for them or choosing one (`Directions`). Send
-// waits, saying why, for the tray's decision (session W2), and the
+// changes), and the suggestions while asking for them or choosing one (`Directions`). While the
+// tray waits for its decision there is no reply field (session W2; the product owner, 3
+// November 2026: one place to type and one clear next action per step), and the
 // stored key's details are a setting in the account menu (`MetaKeySetting`), not under the
 // conversation.
 //
@@ -24,8 +25,9 @@
 // slate's view controls (Task W2C fix round 1).
 //
 // Screen readers hear what changed (UI-06): each new checked reply, a save and an undo, in one
-// live region that stays mounted; after a decision or an undo, focus moves to the notice that
-// says what it did, in the view the person is in. "Add the details yourself" opens the answer
+// live region that stays mounted; after a decision on the tray, focus lands in the reply field,
+// back now, the next step; after an undo, it moves to the notice that says what it did, in the
+// view the person is in. "Add the details yourself" opens the answer
 // form in What we know and moves focus to its heading. Moving between views keeps focus on the
 // view's tab.
 //
@@ -154,9 +156,9 @@ export function YouChapter({
   // triggered the support screen: kept until dismissed or the next decision, never stored.
   const [reviewNote, setReviewNote] = useState<SupportNoteOut | null>(null);
   const [announcement, setAnnouncement] = useState("");
-  // Where focus goes once it is in the page: the notice in the view the person is in, the
-  // answer form's heading, or the suggestions' heading.
-  const [focusTo, setFocusTo] = useState<"notice" | "form" | "directions" | null>(null);
+  // Where focus goes once it is in the page: the notice in the view the person is in, the reply
+  // field, the answer form's heading, or the suggestions' heading.
+  const [focusTo, setFocusTo] = useState<"notice" | "reply" | "form" | "directions" | null>(null);
   // "Name a role": the answer form opens with its target roles ready, focused there. Cleared
   // once the form has applied it, so a later opening of the form changes nothing.
   const [openTarget, setOpenTarget] = useState(false);
@@ -164,6 +166,7 @@ export function YouChapter({
   // Both views that show the save notice have their own copy, each with its own heading.
   const conversationNotice = useRef<HTMLHeadingElement>(null);
   const knownNotice = useRef<HTMLHeadingElement>(null);
+  const replyField = useRef<HTMLTextAreaElement>(null);
   const formTitle = useRef<HTMLHeadingElement>(null);
   const directionsTitle = useRef<HTMLHeadingElement>(null);
   const suggest = useSubmitDiscovery(id);
@@ -174,11 +177,11 @@ export function YouChapter({
   const decided = (next: SaveOutcome) => {
     setOutcome({ value: next, turns: turns.data?.length ?? 0 });
     announce(ANNOUNCED[next.kind]);
-    setFocusTo("notice");
+    setFocusTo(next.kind === "undone" ? "notice" : "reply");
   };
 
-  // The notice mounts with the outcome, the form when it opens, the suggestions when the
-  // person can explore; focus moves once it is there.
+  // The notice mounts with the outcome, the reply field once the tray is decided, the form when
+  // it opens, the suggestions when the person can explore; focus moves once it is there.
   useEffect(() => {
     if (focusTo === null) return;
     const target =
@@ -186,7 +189,9 @@ export function YouChapter({
         ? formTitle.current
         : focusTo === "directions"
           ? directionsTitle.current
-          : (view === "known" ? knownNotice : conversationNotice).current;
+          : focusTo === "reply"
+            ? replyField.current
+            : (view === "known" ? knownNotice : conversationNotice).current;
     if (target !== null) {
       target.focus();
       setFocusTo(null);
@@ -235,9 +240,9 @@ export function YouChapter({
   const latest = turns.data.at(-1);
   const latestFailed = latest !== undefined && turnFailed(latest);
   // Every way of sending a message says why it can't (never disabled silently). It waits for a
-  // review card's decision, so no reply's proposals are lost (session W2); the reply field
-  // keeps what is typed meanwhile. Before the start's choice there is no reply field at all
-  // (Task W2F slice E).
+  // review card's decision, so no reply's proposals are lost (session W2): the reply field
+  // steps aside meanwhile, keeping what is typed, and Try again says why. Before the start's
+  // choice there is no reply field at all (Task W2F slice E).
   const sendBlocked = preferences.data.paused
     ? "Paused: resume to send."
     : (unavailable ??
@@ -368,6 +373,8 @@ export function YouChapter({
             turns={turns.data}
             sender={sender}
             sendBlocked={sendBlocked}
+            reviewing={reviewing}
+            replyField={replyField}
             primary={primary}
             announce={announce}
             onEditAnswers={edit}

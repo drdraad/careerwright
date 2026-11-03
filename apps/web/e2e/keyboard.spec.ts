@@ -103,10 +103,12 @@ test("[UI-06][STATE-06][PROF-04] the You chapter completes from the keyboard, an
   await tabTo(page, page.getByRole("button", { name: "Send" }), 5);
   await page.keyboard.press("Enter");
 
-  // Decide what the reply proposes: accept both, save; focus lands on what the save did.
+  // Decide what the reply proposes: accept both, save. The reply field (and Send, which had
+  // focus) step aside while the card waits, so focus goes to the card's first choice; after the
+  // save it lands in the reply field, back now (the product owner, 3 November 2026).
   const tray = page.getByRole("region", { name: /To review: 2 changes/ });
   await expect(tray).toBeVisible({ timeout: 60_000 });
-  await page.locator("body").focus();
+  await expect(tray.getByRole("button", { name: "Accept current role" })).toBeFocused();
   for (const name of ["Accept current role", "Accept tasks you enjoy"]) {
     const accept = tray.getByRole("button", { name });
     await tabTo(page, accept);
@@ -115,8 +117,10 @@ test("[UI-06][STATE-06][PROF-04] the You chapter completes from the keyboard, an
   }
   await tabTo(page, tray.getByRole("button", { name: /Save 2 to What we know/ }), 10);
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { name: "Saved to What we know" })).toBeFocused();
-  await tabTo(page, page.getByRole("button", { name: "Undo the last save" }), 5);
+  await expect(page.getByRole("textbox", { name: "Reply to Careerwright" })).toBeFocused();
+  // What the save did is right where the decision was made, with Undo.
+  await page.locator("body").focus();
+  await tabTo(page, page.getByRole("button", { name: "Undo the last save" }));
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { name: "Save undone" })).toBeFocused();
 
