@@ -474,3 +474,16 @@ groups the UK job-title index codes its title to, when they are at one level. A 
 person's own words names neither, so their level is unknown and ISCO's bands place the work;
 after "None of these is my job" the title's ONS groups still give it. No title is matched,
 stored or resolved differently.
+
+## Amendment line, Task 6g slice B (2026-11-03): a title idea the index lists takes its place
+
+Decision 2's rule is unchanged and now covers Muse's Aim higher ideas too (ADR 0007's amendment
+of today). A title idea ESCO doesn't hold and the UK job-title index lists is no longer only in
+its own list beside the slate: it is placed in Next step or Aim higher by every ISCO-08 group
+ONS codes it to, when they agree on level, and is never in the slate's pool; one whose groups
+disagree (Maya's "Children's nurse": nurses at level 4, child care workers at level 2) stays in
+the list beside the slate. Made a target by the person's click through the profile's save, its
+record is an ONS title (decision 3), and the slate stays current. Title ideas no list holds are
+still offered for research, Aim higher ones included. What is sent is unchanged in kind: the
+discovery call also reads the qualifications' names and statuses (decision 5's "the person's
+confirmed answers about work", widened by the same call's prompt, `discovery-queries-5`).
