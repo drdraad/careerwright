@@ -32,7 +32,8 @@
   wording (`discovery-queries-3`, untested live).
 - Date: 2026-10-28
 - Amended: 2026-10-31, the product owner's approval of the audit (the last section):
-  decisions 4, 5, 13 and 14 for the role space (ADR 0015).
+  decisions 4, 5, 13 and 14 for the role space (ADR 0015); 2026-11-03, Task W2F slice E (the
+  last section): no em dash in model text, and the review card with half the words.
 - Requirements: REC1-01..11, DIV1-02, DIV1-04..12, STATE-05, STATE-06, STATE-08, PROF-04,
   PROF-07..09, MODEL-03, MODEL-07, TEST1-10; spec sections 3, 4 and 16; ADR 0006; ADR 0008
   decision 4
@@ -1108,3 +1109,42 @@ space; this ADR changes as follows.
   list it as unasked and have the demo interviewer ask again) nor "Skipped". A slate kept
   current after a removal still holds what its searches found from the removed title, and its
   written note may still quote it: both describe the answers it was made from.
+
+## Amendment, 2026-11-03 (the product owner's re-test; Task W2F slice E)
+
+- **No em dash in model text** (the product owner: "Em-dashes are outlawed!"). The written
+  note (`slate-explanation-2`, decision 12) and discovery (`discovery-queries-4`, whose
+  queries and title ideas the person reads in the model's words) carry ADR 0006's one line,
+  "Never write an em dash or a spaced en dash; use a comma, colon or full stop.", and their
+  checks refuse one in a claim, a query or a title idea, so the one repair asks again. A
+  quotation is still kept in its source's own characters, so a dash in the person's answer is
+  theirs and a dash the model typed for their hyphen is never shown; a query that is the
+  person's own title keeps their dash. The overlooked strength's model writes no prose, only
+  a quotation kept the same way, so its prompt is unchanged (`overlooked-strength-1`). No live
+  call was made: the controller runs the capped live checks (R5).
+- **The review card, half the words** (the product owner: "too verbose ... unnecessary
+  qualifications that overload cognitive load"). Each change reads in about two lines: its
+  answer's name with only what changes against what is saved, in plain words ("adds fixing
+  machines, removes helping at Brownies"; no plus or minus signs, which read as dashes; a new
+  answer just its value), then its origin as a short tag ("Your words" or "Careerwright's
+  reading") and its actions. The task answers' hints and the two limits' plain words are one
+  step away, behind a button beside the answer's name; a limit is still confirmed by name.
+  The tray says "To review: 4 changes"; Save's and Send's reasons are a few words, and Send's
+  shows only once something is typed. Whatever focus scrolls into view stops above the card's
+  Save bar by the bar's measured height (three rows at 320 px), not a fixed 96 px.
+- **An answered question leaves** (the product owner: "the question about pay was still
+  showing after I had answered it"). The question in view was the newest checked reply's
+  next question, so it stayed while the answer to it was sent and replied to. Now no question
+  shows while a message is on its way or the newest turn has no checked reply; the next one
+  appears once that reply is checked and its card decided, as before.
+- **One place to type per step** (the product owner: "Having the chat box after the 'I know
+  what I want' and 'Help me explore' creates unnecessary extra complexity"). The start (the
+  first question's job title, then how to start) has no reply field; it comes with the
+  conversation's first question. A message can no longer go before the choice, so Send's
+  start reason is gone.
+- **The conversation follows its newest part** (the product owner: "doesn't autoscroll to
+  the bottom of the conversation like ChatGPT does"). Once the person sends, the reply field
+  stays in view as the message, the streamed reply and its card arrive, but the person's own
+  newest message is never scrolled above the top, so the reply reads from its start.
+  Scrolling up stops it; coming back to the end resumes it; opening the chapter never
+  scrolls. Under reduced motion or calm mode it jumps instead of gliding; focus never moves.
