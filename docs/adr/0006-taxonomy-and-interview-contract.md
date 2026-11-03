@@ -8,7 +8,8 @@
 - Date: 2026-10-28
 - Amended: 2026-10-31, the product owner's approval of the audit: decision 5's provisional
   concepts for the role space (ADR 0015); 2026-11-01, Task 6f; 2026-11-02, Task W2F (the
-  last section): the tasks the person doesn't enjoy and `interview-turn-6`.
+  last section): the tasks the person doesn't enjoy and `interview-turn-6`; 2026-11-03, Task
+  W2F slice E: no em dash, and an answer state is never a value (`interview-turn-7`).
 - Requirements: TAX1-01, TAX1-04, DIV1-01, DIV1-03, REC1-04, BND1-04, PROF-01..07,
   MODEL-01..04, STATE-08, TEST1-10; spec sections 3-5, 16 and 18; ADR 0002, ADR 0004
   decisions 5, 7 and 9
@@ -411,3 +412,29 @@ asks for or infers age.
   demo interviewer applies the same rule before it counts what it noted. "I hate my job and I
   want to kill myself" shows the support panel and proposes nothing. The screen's words,
   lists and policy version are unchanged.
+
+## Amendment, 2026-11-03 (the product owner's re-test; Task W2F slice E)
+
+- **No em dash in anything a model writes for the person** (the product owner: "Em-dashes are
+  outlawed! Muse must never use them in a response"). `interview-turn-7` says "Never write an
+  em dash or a spaced en dash; use a comma, colon or full stop." (`careerwright.profile.dashes`,
+  one line shared with ADR 0007's two prompts), and `check_turn` refuses one in the reply, the
+  next question, a change's reason or its value, so the bounded repair (decision 9) asks
+  again. Code never rewrites the model's words. A dash the person wrote is theirs: a dash
+  that stands between the same words in their messages is not refused. An en dash in a range
+  and a hyphen are not dashes used as punctuation. Known limit: the reply streams before it
+  is checked (decision 13), so a refused reply's dash can show for a moment before the
+  repair's reply replaces it.
+- **An answer state is never a value.** Muse proposed the current role as the text
+  "no_job_yet" (the state it read in the context), the person saved it, and the role became a
+  title of that name with a "Research this role" button (two of the product owner's
+  workspaces, 2 and 3 November, corrected by hand). `check_turn` now refuses a proposed text
+  or list item equal to an answer state's code (`unasked`, `provided`, `unknown`, `skipped`,
+  `prefer_not_to_say`, `no_job_yet`; case and separators aside), and the instructions say
+  "no_job_yet" is "a state, never text". The context still shows each field's state as its
+  code: changing how the context renders states would change what the demo interviewer reads,
+  and the check now refuses the copy. The web shows a state's code saved before this fix in
+  the state's words, and offers it no research.
+- To keep the instructions under half the prompt bound (4,250 bytes), words were cut, never
+  a rule: they stand at 4,238 bytes, as before. No live call was made: the controller runs the
+  capped live check of the new version (R5).
