@@ -1017,4 +1017,4 @@ def test_the_job_list_states_what_an_acquisition_may_spend_before_it_starts(
         "hard_maximum_nano_usd": 200_000_000,
     }
     # No limits stored yet: the default run limit, which storing a key sets, applies.
-    assert before_a_key["acquisition_model_spend"]["hard_maximum_nano_usd"] == 750_000_000
+    assert before_a_key["acquisition_model_spend"]["hard_maximum_nano_usd"] == 2_500_000_000

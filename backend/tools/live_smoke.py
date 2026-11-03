@@ -57,7 +57,7 @@ import time
 import uuid
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Protocol
 from urllib.parse import urlsplit
@@ -173,13 +173,15 @@ SOURCE_SEARCH = SmokeKind(
     "source search via API, outbox and DBOS worker: Meta web search for a synthetic target "
     "and city, candidates checked (key opened just in time)",
 )
-# Fix round 1 (review B I4): whether Meta keeps to `max_tool_calls`, asked for one search.
+# Fix round 1 (review B I4): whether Meta keeps to `max_tool_calls`, asked for one search: a
+# job search's bounds with one tool call.
 BOUND_TOOL_CALLS = 1
+BOUND_SEARCH = replace(search.JOB_SEARCH, max_tool_calls=BOUND_TOOL_CALLS)
 SEARCH_BOUND = SmokeKind(
     "source_search_bound",
     1,
     search.MAX_REQUESTS,
-    lambda model_id: search.worst_case_nano_usd(model_id, max_tool_calls=BOUND_TOOL_CALLS),
+    lambda model_id: search.bounded_worst_case_nano_usd(model_id, BOUND_SEARCH),
     "source search in process with max_tool_calls 1, to qualify that Meta keeps to the bound "
     "(synthetic target and city; the product's own task code and bound check)",
 )
@@ -268,7 +270,7 @@ WONDER_PAIR = SmokeKind(
     2,  # one schema-output call and one streamed search, each a single request
     lambda model_id: (
         connection_check.worst_case_nano_usd(model_id)
-        + search.worst_case_nano_usd(model_id, max_tool_calls=BOUND_TOOL_CALLS)
+        + search.bounded_worst_case_nano_usd(model_id, BOUND_SEARCH)
     ),
     "Muse Wonder qualification, in process",
 )
@@ -940,7 +942,7 @@ def qualify_search_bound(
                 outcome = classify_failure(error).label
         usage, reasoning, response_id = measured_usage(messages)
         # The activity's own check, on every path (`SOURCE_SEARCH_TASK.exceeded_bound`).
-        bound = search.exceeded_bound(usage, BOUND_TOOL_CALLS) if usage else None
+        bound = search.exceeded_bound(usage, BOUND_SEARCH) if usage else None
         if bound is not None:
             outcome = classify_failure(BoundExceededError(bound)).label
         requests = max(1, sum(isinstance(m, ModelRequest) for m in messages))
@@ -975,8 +977,9 @@ def qualify_search_bound(
 
 
 def _search_model(model_id: str, api_key: SecretStr) -> Model:
+    # The default ceiling only: each search sets its own purpose's output bound per run.
     return meta_model(
-        model_id, api_key, max_output_tokens=search.MAX_OUTPUT_TOKENS, effort="minimal"
+        model_id, api_key, max_output_tokens=search.RESERVED.max_output_tokens, effort="minimal"
     )
 
 
@@ -1218,7 +1221,7 @@ def qualify_wonder(
             )
         )
         search_usage = measured_usage(streamed.messages)[0]
-        bound = search.exceeded_bound(search_usage, BOUND_TOOL_CALLS) if search_usage else None
+        bound = search.exceeded_bound(search_usage, BOUND_SEARCH) if search_usage else None
         if bound is not None:  # the activity's own check (`SOURCE_SEARCH_TASK.exceeded_bound`)
             streamed = InProcessCall(
                 streamed.output,
@@ -1241,7 +1244,7 @@ def qualify_wonder(
                 _wonder_entry(
                     model_id,
                     WONDER_STREAM_SEARCH_PURPOSE,
-                    search.worst_case_nano_usd(model_id, max_tool_calls=BOUND_TOOL_CALLS),
+                    search.bounded_worst_case_nano_usd(model_id, BOUND_SEARCH),
                     streamed,
                     {
                         "task": "source_search",

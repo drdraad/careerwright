@@ -22,16 +22,19 @@ from careerwright.evidence.corroboration import (
 from careerwright.evidence.fetcher import Fetcher
 from careerwright.evidence.pages import EXCERPT_CHARS, EXTRACTION_TEXT_BYTES, role_text
 from careerwright.evidence.records import AdvertiserKind, JobCopy, RightsClass
-from careerwright.evidence.role_research import pages_to_read
+from careerwright.evidence.role_research import MAX_PAGES, pages_to_read
 from careerwright.evidence.search import (
     INSTRUCTIONS,
-    MAX_PROMPT_BYTES,
     ROLE_INSTRUCTIONS,
     ROLE_PROMPT_VERSION,
+    ROLE_SEARCH,
     RoleSearchInput,
     SearchCandidate,
+    SearchEmptyReason,
+    SearchOutput,
     SearchProposal,
     SearchPurpose,
+    check_search,
     render_role_prompt,
     role_prompt_bytes,
 )
@@ -79,14 +82,16 @@ def test_the_role_search_is_told_the_title_and_england_and_nothing_else() -> Non
 
     assert sent == {"role": TITLE, "country": "England"}
     assert set(RoleSearchInput.model_fields) == {"input_format", "prompt_version", "title"}
-    assert ROLE.prompt_version == ROLE_PROMPT_VERSION
-    assert role_prompt_bytes(ROLE) <= MAX_PROMPT_BYTES
+    assert ROLE.prompt_version == ROLE_PROMPT_VERSION == "role-search-2"
+    assert role_prompt_bytes(ROLE) <= ROLE_SEARCH.max_prompt_bytes
     assert ROLE_INSTRUCTIONS != INSTRUCTIONS
     assert "untrusted" in ROLE_INSTRUCTIONS
 
 
 @pytest.mark.req("DIV1-15", "MODEL-08")
-def test_a_role_search_is_one_bounded_request_whose_candidates_are_checked_by_code() -> None:
+def test_a_role_search_is_one_deeper_request_whose_candidates_are_checked_by_code() -> None:
+    # The product owner, 3 November 2026: "Widen it. Deeper search": search context medium
+    # and up to eight tool calls, in the one request; room in its answer for 30 pages.
     request: dict[str, object] = {"role": TITLE, "city": "England"}
     provider = Provider(search_parts(request, ""))
 
@@ -96,14 +101,119 @@ def test_a_role_search_is_one_bounded_request_whose_candidates_are_checked_by_co
 
     assert provider.requests == 1
     [settings] = provider.settings
-    assert settings["extra_body"] == {"max_tool_calls": 2}
+    assert settings["extra_body"] == {"max_tool_calls": 8}
+    assert settings["max_tokens"] == 4_000
+    assert settings["openai_include_web_search_sources"] is True
+    [tool] = provider.native_tools
+    assert (tool.kind, tool.search_context_size) == ("web_search", "medium")
     assert proposal.purpose is SearchPurpose.ROLE_RESEARCH
     assert (proposal.target, proposal.city) == (TITLE, "England")
-    assert [(c.url, c.grounded) for c in proposal.candidates] == [
-        (SEARCHED, True),
-        ("https://jobs.board.example/ad/9", False),
+    # Only the page the search really returned: a page it never returned is not a guess
+    # Careerwright reads.
+    assert [(c.url, c.grounded) for c in proposal.candidates] == [(SEARCHED, True)]
+    assert [(e.url, e.reason) for e in proposal.excluded] == [
+        ("https://jobs.board.example/ad/9", "not_returned_by_search"),
+        ("https://www.linkedin.com/jobs/view/1", "source_not_permitted"),
     ]
-    assert [e.reason for e in proposal.excluded] == ["source_not_permitted"]
+
+
+# --- never a home page; only pages the search returned; up to 20 read (3 November 2026) ----
+
+HOME_PAGES = (  # the product owner's run read these five and nothing else
+    "https://studentjob.co.uk/",
+    "https://jobs24.co.uk",
+    "https://environmentjob.co.uk/?utm_source=search",
+    "https://sercanto.co.uk/#vacancies",
+    "https://recruitmenthub.solutions/",
+)
+
+
+def role_output(*urls: str) -> SearchOutput:
+    return SearchOutput.model_validate({"candidates": [{"url": u, "title": "T"} for u in urls]})
+
+
+def sealed(*urls: str, grounded: bool = True) -> SearchProposal:
+    """A role proposal as sealed before these rules (`role-search-1`)."""
+    return SearchProposal(
+        purpose=SearchPurpose.ROLE_RESEARCH,
+        target=TITLE,
+        city="England",
+        candidates=[SearchCandidate(url=u, title="T", grounded=grounded) for u in urls],
+        excluded=[],
+        queries=[f"{TITLE} England"],
+        sources_seen=len(urls),
+    )
+
+
+@pytest.mark.req("DIV1-15")
+def test_a_site_s_home_page_is_never_a_page_to_read() -> None:
+    page = "https://careers.northwind.example/roles/orbital-hydroponics-technician"
+    proposed = (*HOME_PAGES, page)
+
+    proposal = check_search(role_output(*proposed), ROLE, sources=set(proposed), queries=["q"])
+
+    assert [c.url for c in proposal.candidates] == [page]
+    assert [(e.url, e.reason) for e in proposal.excluded] == [
+        ("https://studentjob.co.uk/", "site_root"),
+        ("https://jobs24.co.uk/", "site_root"),
+        ("https://environmentjob.co.uk/?utm_source=search", "site_root"),
+        ("https://sercanto.co.uk/", "site_root"),
+        ("https://recruitmenthub.solutions/", "site_root"),
+    ]
+    assert pages_to_read(proposal) == [page]
+    # A proposal sealed before the rule still never has a home page read.
+    assert pages_to_read(sealed(*proposed)) == [page]
+
+
+@pytest.mark.req("DIV1-15", "STATE-02")
+def test_when_every_candidate_is_a_home_page_no_page_is_read() -> None:
+    proposal = check_search(role_output(*HOME_PAGES), ROLE, sources=set(HOME_PAGES), queries=["q"])
+
+    assert proposal.candidates == []
+    # "The search found no page Careerwright could read", never "not yet found".
+    assert proposal.empty_reason is SearchEmptyReason.ALL_EXCLUDED
+    assert pages_to_read(proposal) == []
+    assert pages_to_read(sealed(*HOME_PAGES)) == []
+
+
+@pytest.mark.req("DIV1-15")
+def test_only_pages_the_search_really_returned_are_read() -> None:
+    returned = "https://careers.northwind.example/roles/1"
+    edited = "https://careers.northwind.example/roles"  # not as the search returned it
+
+    proposal = check_search(role_output(returned, edited), ROLE, sources={returned}, queries=[])
+    unsourced = check_search(role_output(returned, edited), ROLE, sources=set(), queries=[])
+
+    assert pages_to_read(proposal) == [returned]
+    assert [(e.url, e.reason) for e in proposal.excluded] == [(edited, "not_returned_by_search")]
+    # A search that returned no address grounds nothing, so nothing is read: never a "not yet
+    # found" from guesses.
+    assert unsourced.candidates == []
+    assert unsourced.empty_reason is SearchEmptyReason.ALL_EXCLUDED
+    assert pages_to_read(sealed(returned, edited, grounded=False)) == []
+
+
+@pytest.mark.req("DIV1-15")
+def test_twenty_pages_are_read_after_home_pages_and_refused_hosts_are_dropped() -> None:
+    pages = [f"https://site{n}.example/roles/{n}" for n in range(ROLE_SEARCH.max_candidates)]
+    proposed = (*HOME_PAGES, "https://www.linkedin.com/jobs/view/1", *pages)
+
+    proposal = check_search(role_output(*proposed), ROLE, sources=set(proposed), queries=["q"])
+
+    assert MAX_PAGES == 20  # `acquisition_targets.position` holds 0 to 19
+    assert ROLE_SEARCH.max_candidates == 30
+    assert [c.url for c in proposal.candidates] == pages
+    assert pages_to_read(proposal) == pages[:MAX_PAGES]
+
+
+@pytest.mark.req("DIV1-15")
+def test_the_role_search_is_told_how_to_search_and_what_never_to_return() -> None:
+    assert f"at most {ROLE_SEARCH.max_candidates} pages" in ROLE_INSTRUCTIONS
+    for asked in ("several", "in quotes", "careers", "role profile", "professional bod"):
+        assert asked in ROLE_INSTRUCTIONS, asked
+    for never in ("home page", "search results", "list of many jobs"):
+        assert never in ROLE_INSTRUCTIONS, never
+    assert "exactly as your search returned it" in ROLE_INSTRUCTIONS
 
 
 @pytest.mark.req("DIV1-15", "ACQ-06")

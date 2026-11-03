@@ -1357,7 +1357,9 @@ def test_a_source_search_proposes_candidates_for_a_confirmed_target_and_city(
         None,
     )
     [attempt] = scenario.attempts(search_id)
-    assert attempt["reserved_nano_usd"] == 8_000_000  # its one request at its bounds
+    # The run kind's one reservation, at role research's deeper search (a job search asks for
+    # less, `search.JOB_SEARCH`), test model.
+    assert attempt["reserved_nano_usd"] == 30_700_000
     # The model saw a role and a city only: the profile's private text reached no journal or
     # log, and the model's output is sealed.
     assert scenario.leaks() == []
@@ -1379,7 +1381,7 @@ def test_a_search_past_its_reserved_bounds_is_booked_at_cost_and_its_output_neve
     assert saved.status_code == 201, saved.text
     body = {"expected_profile_version": 2, "target": "Data quality analyst", "city": "Manchester"}
     search_id = api.write("POST", f"{base}/research/searches", ada, body).json()["search_id"]
-    worker = scenario.worker("search", fake_failure=failure)  # 3 searches reported
+    worker = scenario.worker("search", fake_failure=failure)  # 9 searches reported
     try:
         run = scenario.wait_terminal(search_id)
     finally:
@@ -1389,7 +1391,7 @@ def test_a_search_past_its_reserved_bounds_is_booked_at_cost_and_its_output_neve
 
     assert (run["status"], run["failure_class"]) == ("failed", "bound_exceeded")
     assert attempt["outcome"] == "bound_exceeded:web_searches"
-    assert (attempt["spend_state"], attempt["web_search_queries"]) == ("reconciled", 3)
+    assert (attempt["spend_state"], attempt["web_search_queries"]) == ("reconciled", 9)
     assert attempt["cost_nano_usd"] > 0  # the actual cost, booked
     assert shown["proposal"] is None
     assert scenario.outputs(search_id) == []

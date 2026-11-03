@@ -15,15 +15,15 @@ from pydantic_ai.usage import RequestUsage
 
 from careerwright.evidence.search import (
     INSTRUCTIONS,
-    MAX_CANDIDATES,
-    MAX_PROMPT_BYTES,
+    JOB_SEARCH,
+    ROLE_SEARCH,
     SearchEmptyReason,
     SearchInput,
     SearchOutput,
     SearchProposal,
+    bounded_worst_case_nano_usd,
     check_search,
     exceeded_bound,
-    max_input_tokens,
     prompt_bytes,
     refused_hosts,
     render_prompt,
@@ -51,7 +51,7 @@ def test_the_model_is_told_the_target_and_city_and_nothing_else() -> None:
     sent = json.loads(render_prompt(CONTEXT).partition("\n")[2])
 
     assert sent == {"role": "Data quality analyst", "city": "Manchester", "country": "England"}
-    assert prompt_bytes(CONTEXT) <= MAX_PROMPT_BYTES
+    assert prompt_bytes(CONTEXT) <= JOB_SEARCH.max_prompt_bytes
 
 
 @pytest.mark.req("ACQ-06", "ACQ-01")
@@ -93,11 +93,11 @@ def test_only_fetchable_permitted_candidates_are_kept_and_grounding_is_recorded(
 
 
 def test_candidates_past_the_limit_are_excluded_not_kept() -> None:
-    urls = [f"https://jobs.board.example/ad/{n}" for n in range(MAX_CANDIDATES + 2)]
+    urls = [f"https://jobs.board.example/ad/{n}" for n in range(JOB_SEARCH.max_candidates + 2)]
 
     proposal = check_search(output(*urls), CONTEXT, sources=set(), queries=[])
 
-    assert len(proposal.candidates) == MAX_CANDIDATES
+    assert len(proposal.candidates) == JOB_SEARCH.max_candidates == 8
     assert [e.reason for e in proposal.excluded] == ["over_the_limit"] * 2
 
 
@@ -162,12 +162,14 @@ class Provider:
         self.parts = parts
         self.usage = usage
         self.settings: list[Any] = []
+        self.native_tools: list[Any] = []
         self.requests = 0
 
     def model(self) -> FunctionModel:
         def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
             self.requests += 1
             self.settings.append(info.model_settings)
+            self.native_tools.extend(info.model_request_parameters.native_tools)
             if self.usage is None:
                 return ModelResponse(parts=self.parts)
             return ModelResponse(parts=self.parts, usage=self.usage)
@@ -181,26 +183,28 @@ class Provider:
     [
         (
             RequestUsage(
-                input_tokens=20_000, output_tokens=300, details={"web_search_requests": 3}
+                input_tokens=20_000, output_tokens=300, details={"web_search_requests": 9}
             ),
             "web_searches",
         ),
         (
             RequestUsage(
-                input_tokens=max_input_tokens() + 1,
+                input_tokens=ROLE_SEARCH.max_input_tokens() + 1,
                 output_tokens=300,
                 details={"web_search_requests": 2},
             ),
             "input_tokens",
         ),
     ],
-    ids=["a third search", "more input than reserved"],
+    ids=["a ninth search", "more input than reserved"],
 )
 def test_a_search_past_its_reserved_bounds_is_named_for_the_activity_to_refuse(
     usage: RequestUsage, bound: str
 ) -> None:
     # Review B I4, N4: Meta runs the searches inside the one request, so its own measured
     # usage is the check, applied by the activity on every path (`RunTask.exceeded_bound`).
+    # The bound is the run kind's one reservation, role research's deeper search (eight
+    # tool calls), whichever purpose the search had.
     provider = Provider(search_parts(request(), "SENTINEL"), usage)
 
     with capture_run_messages() as messages:
@@ -248,7 +252,11 @@ def test_a_search_is_one_request_with_its_tool_calls_bounded_and_sources_asked_f
     assert provider.requests == 1
     [settings] = provider.settings
     assert settings["extra_body"] == {"max_tool_calls": 2}
+    assert settings["max_tokens"] == 1_500
     assert settings["openai_include_web_search_sources"] is True
+    # A job search keeps its own settings (role research's deeper search is its own).
+    [tool] = provider.native_tools
+    assert (tool.kind, tool.search_context_size) == ("web_search", "low")
     assert [(c.url, c.grounded) for c in proposal.candidates] == [
         (SEARCHED, True),
         ("https://jobs.board.example/ad/9", False),
@@ -273,10 +281,22 @@ def test_an_unusable_answer_ends_the_run_without_a_repair_request() -> None:
 
 @pytest.mark.req("MODEL-08")
 def test_an_attempt_reserves_its_one_request_with_every_tool_call_at_its_bounds() -> None:
-    # Input 2,500 + 500 + 2 x 12,000 = 27,000 tokens; output 1,500; 2 searches at $2.50/1,000.
-    # Contributor: 27,000 x 100 + 1,500 x 200 + 2 x 2,500,000 = 8,000,000 nano-USD ($0.008).
-    # Standard: 27,000 x 1,250 + 1,500 x 4,250 + 5,000,000 = 45,125,000 ($0.045): three DBOS
-    # attempts fit the default $0.15 run limit.
-    assert worst_case_nano_usd("muse-spark-1.3-contributor") == 8_000_000
-    assert worst_case_nano_usd("muse-spark-1.3") == 45_125_000
-    assert 3 * worst_case_nano_usd("muse-spark-1.3") <= 150_000_000
+    # One run kind, one reservation (no new run kind): role research's search is the larger in
+    # every bound, so it is the kind's worst case, priced from the registry.
+    # Role research: input 2,500 + 500 + 8 x 12,000 = 99,000 tokens; output 4,000; 8 searches
+    # at $2.50/1,000 (one price whatever the search context).
+    # Contributor: 99,000 x 100 + 4,000 x 200 + 8 x 2,500,000 = 30,700,000 nano-USD ($0.031).
+    # Standard: 99,000 x 1,250 + 4,000 x 4,250 + 20,000,000 = 160,750,000 ($0.161): three
+    # DBOS attempts fit the default $0.50 run limit.
+    # Muse Wonder: 99,000 x 4,000 + 4,000 x 20,000 + 20,000,000 = 496,000,000 ($0.496):
+    # three fit the session's $1.60 run cap.
+    for bound in ("max_tool_calls", "max_candidates", "max_prompt_bytes", "max_output_tokens"):
+        assert getattr(ROLE_SEARCH, bound) >= getattr(JOB_SEARCH, bound), bound
+    assert worst_case_nano_usd("muse-spark-1.3-contributor") == 30_700_000
+    assert worst_case_nano_usd("muse-spark-1.3") == 160_750_000
+    assert worst_case_nano_usd("muse-wonder-1.0") == 496_000_000
+    assert 3 * worst_case_nano_usd("muse-spark-1.3") <= 500_000_000
+    # A job search alone, at its own bounds: 2,500 + 500 + 2 x 12,000 = 27,000 in, 1,500 out,
+    # 2 searches: $0.008 on the test model, $0.045 on Standard.
+    assert bounded_worst_case_nano_usd("muse-spark-1.3-contributor", JOB_SEARCH) == 8_000_000
+    assert bounded_worst_case_nano_usd("muse-spark-1.3", JOB_SEARCH) == 45_125_000

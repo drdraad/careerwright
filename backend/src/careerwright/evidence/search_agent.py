@@ -3,11 +3,12 @@
 reach another provider).
 
 One request on whatever model the worker built for the run: strict JSON output
-(`NativeOutput`), search context `low`, at most `MAX_TOOL_CALLS` tool calls asked of the
-Responses API (`max_tool_calls`), the search's sources included so each candidate's
-grounding can be checked, and no repair (`search.MAX_REQUESTS`). A response cut off at its
-token limit ends the run (`TruncationGuard`). Demo workspaces never search (a database
-CHECK), so there is no fixture model for this kind.
+(`NativeOutput`), the purpose's search context and tool calls asked of the Responses API
+(`search.SearchBounds`: a job search `low` and two, role research `medium` and eight), the
+search's sources included so each candidate's grounding can be checked, and no repair
+(`search.MAX_REQUESTS`). A response cut off at its token limit ends the run
+(`TruncationGuard`). Demo workspaces never search (a database CHECK), so there is no fixture
+model for this kind.
 """
 
 import asyncio
@@ -30,13 +31,12 @@ from pydantic_ai.usage import UsageLimits
 from careerwright.evidence import search
 from careerwright.evidence.search import (
     INSTRUCTIONS,
-    MAX_OUTPUT_TOKENS,
     MAX_REQUESTS,
-    MAX_TOOL_CALLS,
     ROLE_INSTRUCTIONS,
     RoleSearchInput,
     SearchOutput,
     SearchProposal,
+    bounds_for,
     render_prompt,
     render_role_prompt,
 )
@@ -73,22 +73,23 @@ def run_search(
     raw_input: bytes | None,
     _sink: PartialSink,
     *,
-    max_tool_calls: int = MAX_TOOL_CALLS,
+    max_tool_calls: int | None = None,
     observe: Sequence[AbstractCapability[Any]] = (),
 ) -> SearchProposal:
-    """`max_tool_calls` is the product's two; only the live qualification of the bound
-    (`tools.live_smoke --search-bound`) asks for one. `observe` is empty in the product; a
-    model's live qualification (`tools.live_smoke --wonder`) passes a stream probe, which
-    makes the one request stream."""
+    """`max_tool_calls` is None in the product (the purpose's own); only the live
+    qualification of the bound (`tools.live_smoke --search-bound`) asks for one. `observe` is
+    empty in the product; a model's live qualification (`tools.live_smoke --wonder`) passes a
+    stream probe, which makes the one request stream."""
     if raw_input is None:
         raise ValueError("a source search has a sealed input")
     context = search.sealed_search_input(raw_input)
-    # Role research (Task 6e) is the same bounded request with its own instructions, told
-    # only the title and England.
+    # Role research (Task 6e) is one bounded request with its own instructions and its own
+    # deeper search, told only the title and England.
     if isinstance(context, RoleSearchInput):
         instructions, prompt = ROLE_INSTRUCTIONS, render_role_prompt(context)
     else:
         instructions, prompt = INSTRUCTIONS, render_prompt(context)
+    bounds = bounds_for(context)
     agent = Agent(
         model,
         output_type=NativeOutput(SearchOutput),
@@ -98,7 +99,7 @@ def run_search(
             TruncationGuard(),
             NativeTool(
                 WebSearchTool(
-                    search_context_size="low",
+                    search_context_size=bounds.context_size,
                     user_location=WebSearchUserLocation(country="GB"),
                 )
             ),
@@ -114,9 +115,11 @@ def run_search(
         return output
 
     settings = OpenAIResponsesModelSettings(
-        max_tokens=MAX_OUTPUT_TOKENS,
+        max_tokens=bounds.max_output_tokens,
         openai_include_web_search_sources=True,
-        extra_body={"max_tool_calls": max_tool_calls},
+        extra_body={
+            "max_tool_calls": bounds.max_tool_calls if max_tool_calls is None else max_tool_calls
+        },
     )
     asyncio.run(
         agent.run(

@@ -4500,7 +4500,7 @@
           "research"
         ],
         "summary": "Read Role Pages",
-        "description": "Read the search's pages, up to five, through the restricted acquisition worker (202);\n200 with the same research when its reading has started already. It calls no model. A\nrepeat with the same Idempotency-Key answers with the research as it is now.",
+        "description": "Read the search's pages, up to twenty, through the restricted acquisition worker (202);\n200 with the same research when its reading has started already. It calls no model. A\nrepeat with the same Idempotency-Key answers with the research as it is now.",
         "operationId": "read_role_pages",
         "security": [
           {
@@ -11525,7 +11525,9 @@
           "host_not_allowed",
           "address_not_allowed",
           "source_not_permitted",
-          "over_the_limit"
+          "over_the_limit",
+          "site_root",
+          "not_returned_by_search"
         ],
         "title": "ExclusionReason",
         "description": "Why a proposed page is not a candidate: the URL checks' refusals, or these."

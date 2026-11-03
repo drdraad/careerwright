@@ -5,8 +5,9 @@ amendment): for a title no list holds, the person's own words or a title idea no
    request on the one bounded activity, told only the title and "England" (SEC-05), its
    candidates checked by code against the fetch checks and the source manifest. Its estimated
    cost is the source search's (`GET .../spend/estimate?kind=source_search`).
-2. **The reading** is an acquisition of up to `MAX_PAGES` of those candidates (the ones the
-   search really returned first) through the restricted acquisition worker and the guarded
+2. **The reading** is an acquisition of up to `MAX_PAGES` of those candidates (only pages the
+   search really returned, never a site's home page; with none, the search found no page
+   Careerwright could read) through the restricted acquisition worker and the guarded
    fetcher; each page's class comes from the manifest. Each target carries the title, so the
    worker checks it as a span of the page's visible text and records that check, never a
    posting, and never hands the page to a model. It calls no model and costs nothing.
@@ -51,11 +52,12 @@ from careerwright.evidence.records import (
     StrictModel,
 )
 from careerwright.evidence.search import (
-    MAX_PROMPT_BYTES,
+    ROLE_SEARCH,
     RoleSearchInput,
     SearchEmptyReason,
     SearchProposal,
     SearchPurpose,
+    is_site_root,
     role_prompt_bytes,
     worst_case_nano_usd,
 )
@@ -77,7 +79,9 @@ from careerwright.profile.commands import current_profile
 from careerwright.profile.store import stale_version
 from careerwright.vocabulary import WorkState
 
-MAX_PAGES = 5  # the candidate pages one reading fetches (ADR 0009 decision 12, amendment)
+# The candidate pages one reading fetches (ADR 0009 decision 12, amendments; the product owner,
+# 3 November 2026: "Up to 20 pages"); `acquisition_targets.position` holds 0 to 19.
+MAX_PAGES = 20
 LIST_LIMIT = 20
 _SETTLED = frozenset({WorkState.COMPLETE, WorkState.FAILED, WorkState.CANCELLED})
 
@@ -130,7 +134,7 @@ def start_research(
         )
     no_list_holds(tx, title)
     context = RoleSearchInput(title=title)
-    if role_prompt_bytes(context) > MAX_PROMPT_BYTES:
+    if role_prompt_bytes(context) > ROLE_SEARCH.max_prompt_bytes:
         raise CareerwrightError(
             ErrorCode.LIMIT_EXCEEDED,
             "That title is too long to search for.",
@@ -191,16 +195,22 @@ def _proposal(tx: Tx, keyring: Keyring, run: Run) -> SearchProposal | None:
 
 
 def pages_to_read(proposal: SearchProposal) -> list[str]:
-    """Up to `MAX_PAGES` candidates, the pages the search really returned first, each still
-    passing the fetch checks but the port's. The port is left, as a job acquisition's
+    """Up to `MAX_PAGES` candidates: only pages the search really returned, never a site's
+    home page (held here too for proposals sealed before the search excluded them), each
+    still passing the fetch checks but the port's. The port is left, as a job acquisition's
     targets leave it (`acquisition.RECORDABLE_PORTS`), to the restricted worker's own fetch
     check: it refuses a port other than 80 or 443 as a blocked attempt, on record, and it
     alone knows a controlled test server's port. The search already excludes other ports."""
-    ordered = sorted(proposal.candidates, key=lambda c: not c.grounded)
     urls: list[str] = []
-    for candidate in ordered:
+    for candidate in proposal.candidates:
+        if not candidate.grounded:
+            continue
         checked = check_url(candidate.url, allowed_ports=RECORDABLE_PORTS)
-        if isinstance(checked, CheckedUrl) and checked.url not in urls:
+        if (
+            isinstance(checked, CheckedUrl)
+            and not is_site_root(checked.url)
+            and checked.url not in urls
+        ):
             urls.append(checked.url)
     return urls[:MAX_PAGES]
 

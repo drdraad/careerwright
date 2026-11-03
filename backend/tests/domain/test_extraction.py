@@ -736,12 +736,12 @@ def test_an_attempt_reserves_both_requests_at_their_bounds() -> None:
     # Input 10,000 + 1,500 + 1,500 + 1,000 = 14,000 tokens; output 1,500; two requests.
     # Contributor: (14,000 x 100 + 1,500 x 200) x 2 = 3,400,000 nano-USD ($0.0034).
     # Standard: (14,000 x 1,250 + 1,500 x 4,250) x 2 = 47,750,000 ($0.048): three DBOS
-    # attempts fit the default $0.15 run limit.
+    # attempts fit the default $0.50 run limit.
     longest = ExtractionInput(text="a" * EXTRACTION_TEXT_BYTES)
     assert prompt_bytes(longest) <= MAX_PROMPT_BYTES
     assert worst_case_nano_usd("muse-spark-1.3-contributor") == 3_400_000
     assert worst_case_nano_usd("muse-spark-1.3") == 47_750_000
-    assert 3 * worst_case_nano_usd("muse-spark-1.3") <= 150_000_000
+    assert 3 * worst_case_nano_usd("muse-spark-1.3") <= 500_000_000
 
 
 @pytest.mark.req("MODEL-08")
@@ -787,7 +787,7 @@ def test_an_acquisition_s_model_spend_states_its_ceiling_without_a_crash_and_its
     assert estimate.per_run_nano_usd == ACTIVITY_MAX_ATTEMPTS * reservation
     assert estimate.per_run_nano_usd <= default_run_limit  # the run limit never cuts it short
     assert estimate.worst_case_nano_usd == worst_case  # without a worker crash
-    assert estimate.hard_maximum_nano_usd == 750_000_000  # 5 runs x the $0.15 run limit
+    assert estimate.hard_maximum_nano_usd == 2_500_000_000  # 5 runs x the $0.50 run limit
     assert lower.hard_maximum_nano_usd == 100_000_000  # it follows the workspace's own limit
     assert lower.worst_case_nano_usd == worst_case
     assert (
