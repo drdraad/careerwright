@@ -573,7 +573,9 @@ for (const viewport of VIEWPORTS) {
         await page.context().close();
       }
       const moving = seen.get("moving");
-      expect(moving?.[0]).toContain("Reply to Careerwright");
+      // The conversation's own heading: there whether or not the start's choice is made (the
+      // reply field comes only once it is, Task W2F slice E).
+      expect(moving?.[0]).toContain("Conversation with Careerwright");
       for (const mode of MODES) {
         expect(seen.get(mode), `${workspace ?? "fixture"}: ${mode} against moving`).toEqual(moving);
       }

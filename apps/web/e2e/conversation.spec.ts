@@ -198,16 +198,20 @@ test("[STATE-09][STATE-08][BND1-02] the demo takes a target in the person's word
   await signIn(page, "ada", chapterUrl("you", workspace));
   // Before the first answer: what Careerwright is for (session 2: "not sure" what the start
   // page was for) and covers, and the entry choice as the bright action, never Send on an
-  // empty field (F17).
+  // empty field (F17). One place to type per step (Task W2F slice E): no reply field beside the
+  // first question or the choice; it comes with the conversation's first question.
   await expect(
     page.getByText(
       "Careerwright helps you find work that could suit you, see what it would take, and plan a route you can afford.",
     ),
   ).toBeVisible();
   await expect(page.getByText("Careerwright covers England for now.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Send" })).not.toHaveClass(/btn-primary/);
+  await expect(page.getByRole("textbox", { name: "Reply to Careerwright" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Send" })).toHaveCount(0);
   await skipFirstQuestion(page);
+  await expect(page.getByRole("textbox", { name: "Reply to Careerwright" })).toHaveCount(0);
   await page.getByRole("button", { name: "I know my direction" }).click();
+  await expect(page.getByRole("textbox", { name: "Reply to Careerwright" })).toBeVisible();
   const opening = "Which role are you aiming for, and at what level?";
   await expect(page.getByRole("heading", { name: opening })).toBeVisible();
   const asked = [await questionShown(page)];

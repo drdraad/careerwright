@@ -1637,9 +1637,9 @@
      view, so Save is in the first screen however many changes there are (session W2). On a
      card's own surface, as the reply field's Send is: no new colour pairing. Why Save waits
      comes after both buttons, beside them where there is room (one row on a wide screen,
-     since slice E made it a few words) and under them on a phone, so the bar is two rows at
-     most. Whatever focus scrolls into view stops above it (WCAG 2.4.11; 96 px holds its two
-     rows with room to spare), and on a phone it rises above an open sheet. */
+     since slice E made it a few words) and under them on a phone. Whatever focus scrolls into
+     view stops above it, however many rows it takes (WCAG 2.4.11; its measured height, below),
+     and on a phone it rises above an open sheet. */
   .tray-actions {
     position: sticky;
     bottom: 0;
@@ -1658,8 +1658,10 @@
     order: 1;
   }
 
+  /* The bar's own height, measured by the card (`--tray-actions-height`; two rows until
+     measured), and room beside it: three rows at 320 px (Task W2F slice E). */
   html:has(.you-view:not([hidden]) .tray-actions) {
-    scroll-padding-bottom: 96px;
+    scroll-padding-bottom: calc(var(--tray-actions-height, 80px) + var(--space-16));
   }
 
   @media (max-width: 760px) {
@@ -1668,7 +1670,9 @@
     }
 
     html:has(.app[data-drawer="open"] .you-view:not([hidden]) .tray-actions) {
-      scroll-padding-bottom: calc(var(--sheet-peek) + 96px);
+      scroll-padding-bottom: calc(
+        var(--sheet-peek) + var(--tray-actions-height, 80px) + var(--space-16)
+      );
     }
   }
 

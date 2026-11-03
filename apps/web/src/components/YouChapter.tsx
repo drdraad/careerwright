@@ -3,8 +3,9 @@
 // console, a glass panel beside the person's light, with session 2's findings applied as the
 // product owner recorded them. One idea per view ("need minimum ideas per page"): the
 // conversation first, then what we know and the suggestions, each a view of its own ("The
-// suggested jobs should ... be on a separate tab"). Chat is immediate: the reply field is
-// there from the first screen. How Careerwright talks with you is a preference in the account
+// suggested jobs should ... be on a separate tab"). One place to type per step (the product
+// owner's re-test, 3 November 2026): the start has the job title, then its choice; the reply
+// field comes once the choice is made. How Careerwright talks with you is a preference in the account
 // menu ("this should be in preferences"). Each view has one bright primary action ("Needs to be
 // a bright colour"); accept and undo are colour coded ("could be easier with colour coded
 // buttons"); the limits say what they mean ("what do these mean??").
@@ -14,7 +15,7 @@
 // Try again after a failed reply, else Send once the start is done (until then the start's
 // choices are the bright action). What we know has one while its answer form is open (Save
 // changes), and the suggestions while asking for them or choosing one (`Directions`). Send
-// waits, saying why, for the start's choice and for the tray's decision (session W2), and the
+// waits, saying why, for the tray's decision (session W2), and the
 // stored key's details are a setting in the account menu (`MetaKeySetting`), not under the
 // conversation.
 //
@@ -233,21 +234,20 @@ export function YouChapter({
   const starting = entryNeeded(preferences.data, turns.data);
   const latest = turns.data.at(-1);
   const latestFailed = latest !== undefined && turnFailed(latest);
-  // Every way of sending a message says why it can't (never disabled silently). It waits for
-  // the start's choice and for a review card's decision, so no reply's proposals are lost
-  // (session W2); the reply field keeps what is typed meanwhile.
+  // Every way of sending a message says why it can't (never disabled silently). It waits for a
+  // review card's decision, so no reply's proposals are lost (session W2); the reply field
+  // keeps what is typed meanwhile. Before the start's choice there is no reply field at all
+  // (Task W2F slice E).
   const sendBlocked = preferences.data.paused
     ? "Paused: resume to send."
     : (unavailable ??
-      (starting
-        ? SEND_WAITS.start
-        : latest !== undefined && turnRunning(latest)
-          ? "Careerwright is still replying."
-          : reviewing
-            ? SEND_WAITS.review
-            : sender.pending
-              ? "Sending…"
-              : undefined));
+      (latest !== undefined && turnRunning(latest)
+        ? "Careerwright is still replying."
+        : reviewing
+          ? SEND_WAITS.review
+          : sender.pending
+            ? "Sending…"
+            : undefined));
   // A card waiting comes before Try again, which waits for it too (a message sent before
   // session W2's fix may have failed after a card it left waiting).
   const primary = !keyStored

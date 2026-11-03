@@ -145,3 +145,38 @@ test("[UI-06] tabbing through the open answer form, the Save bar never covers th
     await page.close();
   }
 });
+
+test("[UI-06][STATE-06] tabbing through a waiting review card, its Save bar never covers the focused control, at 320 px too (WCAG 2.2 2.4.11; Task W2F slice E)", async ({
+  browser,
+}) => {
+  // The bar wraps to three rows at 320 px (135 px), taller than the fixed 96 px of room the
+  // window kept for it: Source, Edit and Skip went under it. The room is now its own height.
+  for (const viewport of [{ width: 320, height: 844 }, ...WIDTHS]) {
+    const page = await browser.newPage({ viewport });
+    await page.goto(`${origin}/iframe.html?id=you--reply-changes-lists&viewMode=story`);
+    await expect(page.getByRole("button", { name: "Keep none" })).toBeVisible();
+    await page.evaluate(() => document.fonts.ready);
+    await page.locator(".proposal button").first().focus();
+    const covered: string[] = [];
+    let stops = 0;
+    for (; stops < 60; stops += 1) {
+      const focused = await page.evaluate(() => {
+        const element = document.activeElement;
+        const bar = document.querySelector(".tray-actions");
+        if (element === null || bar === null || element.closest(".proposal") === null) return null;
+        const box = element.getBoundingClientRect();
+        const under = bar.getBoundingClientRect();
+        return {
+          name: element.getAttribute("aria-label") ?? element.textContent ?? element.tagName,
+          covered: box.bottom > under.top && box.top < under.bottom,
+        };
+      });
+      if (focused === null) break;
+      if (focused.covered) covered.push(focused.name.trim());
+      await page.keyboard.press("Tab");
+    }
+    expect(stops, `${viewport.width} px: stops tabbed`).toBeGreaterThan(15);
+    expect(covered, `${viewport.width} px: focused controls under the Save bar`).toEqual([]);
+    await page.close();
+  }
+});

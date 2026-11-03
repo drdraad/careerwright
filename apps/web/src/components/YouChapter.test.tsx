@@ -5,7 +5,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type {
   DiscoveryOut,
   OriginOut,
@@ -413,11 +413,13 @@ describe("[PROF-08][REC1-10] the chapter leads with how to start", () => {
     expect(screen.queryByText(/Careerwright helps you find work/)).toBeNull();
   });
 
-  it("[PROF-08] has the reply field from the first screen, and no tone setting in the chapter", async () => {
-    // Session 2: "Chat should be immediate"; "ditch the tone selection - this should be in
-    // preferences" (it is in the account menu, `ConversationTone`). Session W2: a message sent
-    // before the choice went out with none, and the choice was gone for good, so Send waits for
-    // it, saying so, and keeps what was typed.
+  it("[PROF-08] shows the reply field once the start is chosen, never beside the start, and no tone setting", async () => {
+    // Session 2: "ditch the tone selection - this should be in preferences" (it is in the
+    // account menu, `ConversationTone`). Session W2: a message sent before the choice went out
+    // with none. The product owner's re-test (Task W2F slice E): "Having the chat box after the
+    // 'I know what I want' and 'Help me explore' creates unnecessary extra complexity", and the
+    // first question had two places to type. One place to type per step: no reply field at the
+    // first question or the choice; it appears with the first question of the conversation.
     const state = { preferences: prefs(null), turns: [] as TurnOut[] };
     const sent = fakeApi(
       routes(state, [
@@ -438,33 +440,24 @@ describe("[PROF-08][REC1-10] the chapter leads with how to start", () => {
       ]),
     );
     const user = renderYou();
-    const waits = "Choose how to start, then send.";
 
-    // At the first question, then at the choice: typed, Send waits and says why. With nothing
-    // typed, the line isn't needed, so it isn't shown (slice E).
-    const field = await screen.findByLabelText("Reply to Careerwright");
-    expect(screen.queryByText(waits)).toBeNull();
-    await user.type(field, "I fix bikes.");
-    await user.click(screen.getByRole("button", { name: "Send" }));
-    expect(screen.getByRole("button", { name: "Send" })).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByText(waits)).toBeVisible();
+    await screen.findByRole("combobox", { name: "Your job title" });
+    expect(screen.queryByLabelText("Reply to Careerwright")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
     await skipFirstQuestion(user);
     expect(
       await screen.findByRole("heading", { name: "How would you like to start?" }),
     ).toBeVisible();
+    expect(screen.queryByLabelText("Reply to Careerwright")).toBeNull();
     expect(screen.queryByLabelText("How Careerwright talks with you")).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Send" }));
-    expect(screen.getByText(waits)).toBeVisible();
-    expect(sent.some((s) => s.method === "POST")).toBe(false);
-    expect(field).toHaveValue("I fix bikes."); // never wiped
 
-    // Once the choice is made, the same words go.
+    // Once the choice is made, the field is there for the first question's answer.
     await user.click(screen.getByRole("button", { name: "Help me explore" }));
     await screen.findByRole("heading", {
       name: "What would you like your working life to be like?",
     });
-    expect(screen.queryByText(waits)).toBeNull();
-    expect(field).toHaveValue("I fix bikes.");
+    const field = screen.getByLabelText("Reply to Careerwright");
+    await user.type(field, "I fix bikes.");
     await user.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(sent.some((s) => s.method === "POST")).toBe(true));
     expect(sent.find((s) => s.method === "POST")?.body).toEqual({
@@ -898,6 +891,121 @@ describe("[MODEL-03] the reply streams as provisional and the checked reply repl
   });
 });
 
+describe("[UI-06] the conversation follows its newest part, as a chat does", () => {
+  // Task W2F slice E (the product owner's re-test): "The conversation doesn't autoscroll to the
+  // bottom of the conversation like ChatGPT does." jsdom lays nothing out, so the browser's
+  // layout is stubbed at its edge: where the reply field and the newest message sit, the
+  // window's scroll position, and its notices that the conversation changed size.
+  it("follows once the person sends, stops when they scroll up, resumes at the end, and never moves focus", async () => {
+    const layout = { fieldBottom: 1400, newestTop: 500, scrollY: 0, reduced: false };
+    const grown: Array<() => void> = [];
+    const rect = (top: number, bottom: number) =>
+      ({ top, bottom, left: 0, right: 0, width: 0, height: bottom - top, x: 0, y: top }) as DOMRect;
+    const original = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class {
+      constructor(callback: ResizeObserverCallback) {
+        grown.push(() => callback([], this as unknown as ResizeObserver));
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
+    const boxes = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.matches("form.composer")) return rect(layout.fieldBottom - 90, layout.fieldBottom);
+        if (this.matches(".turn-you")) return rect(layout.newestTop, layout.newestTop + 60);
+        return rect(0, 0);
+      });
+    const scrollBy = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
+    Object.defineProperty(window, "scrollY", { configurable: true, get: () => layout.scrollY });
+    Object.defineProperty(document.documentElement, "scrollHeight", {
+      configurable: true,
+      value: 3000,
+    });
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("reduce") && layout.reduced,
+    })) as unknown as typeof window.matchMedia;
+    const scrolledTo = (y: number) => {
+      layout.scrollY = y;
+      window.dispatchEvent(new Event("scroll"));
+    };
+    const grow = () =>
+      act(() => {
+        for (const notice of grown) notice();
+      });
+    try {
+      const decided = { ...turn("complete", proposal), decision: {} as TurnOut["decision"] };
+      const state = { preferences: prefs("unsure"), turns: [decided] as TurnOut[] };
+      fakeApi(
+        routes(state, [
+          {
+            method: "POST",
+            path: /\/interview\/turns$/,
+            status: 202,
+            answer: () => {
+              const sent = {
+                ...turn("running"),
+                turn_id: "t2",
+                message_id: "m2",
+                message: "Synthetic: about 6 hours.",
+                run: { ...turn("running").run, run_id: "t2" },
+              };
+              state.turns = [decided, sent];
+              return { ...sent, support_note: null };
+            },
+          },
+        ]),
+      );
+      const user = renderYou();
+      const field = await screen.findByLabelText("Reply to Careerwright");
+
+      // Opening the chapter never scrolls it: the person hasn't sent or come to the end.
+      grow();
+      expect(scrollBy).not.toHaveBeenCalled();
+
+      // Once they send, the newest part stays in view as it grows, never past the top of their
+      // own newest message (the reply reads from its start), and focus stays where it was.
+      await user.type(field, "Synthetic: about 6 hours.");
+      await user.click(screen.getByRole("button", { name: "Send" }));
+      await screen.findByText("Synthetic: about 6 hours.");
+      const focused = document.activeElement;
+      grow();
+      expect(scrollBy).toHaveBeenLastCalledWith({ top: 484, behavior: "smooth" });
+      expect(document.activeElement).toBe(focused);
+
+      // Scrolling up to read stops it following.
+      scrolledTo(484);
+      scrolledTo(200);
+      scrollBy.mockClear();
+      grow();
+      expect(scrollBy).not.toHaveBeenCalled();
+
+      // Back at the end, it follows again; with reduced motion, at once.
+      layout.fieldBottom = 700;
+      scrolledTo(900);
+      layout.fieldBottom = 1000;
+      layout.reduced = true;
+      grow();
+      expect(scrollBy).toHaveBeenLastCalledWith({ top: 232, behavior: "instant" });
+
+      // Calm mode is as still as reduced motion.
+      layout.reduced = false;
+      document.documentElement.dataset.calm = "true";
+      grow();
+      expect(scrollBy).toHaveBeenLastCalledWith({ top: 232, behavior: "instant" });
+    } finally {
+      globalThis.ResizeObserver = original;
+      boxes.mockRestore();
+      scrollBy.mockRestore();
+      Reflect.deleteProperty(window, "scrollY");
+      Reflect.deleteProperty(document.documentElement, "scrollHeight");
+      Reflect.deleteProperty(window, "matchMedia");
+      delete document.documentElement.dataset.calm;
+    }
+  });
+});
+
 describe("[STATE-06][PROF-04] the review tray saves only what the person chose and confirmed", () => {
   it("applies a limit only once confirmed by name, and styles a reading apart from a fact", async () => {
     const sent = fakeApi(
@@ -988,8 +1096,9 @@ describe("[STATE-06] the card says what a list change does, and what each task a
       return within(found);
     };
 
-    // Against what is saved: what it adds, and what it removes (taken back).
-    const enjoyed = card("Tasks you enjoy: + fixing machines, − working outdoors");
+    // Against what is saved: what it adds, and what it removes (taken back), in plain words on
+    // one line: no plus or minus signs, which read as dashes (the product owner's re-test).
+    const enjoyed = card("Tasks you enjoy: adds fixing machines, removes working outdoors");
     expect(enjoyed.getByText("Your words")).toBeVisible();
     expect(enjoyed.queryByText(/^(Adds|Removes) /)).toBeNull();
     const hint = enjoyed.getByText(
@@ -1995,14 +2104,10 @@ describe("[UI-04][S0-V08] one filled primary action in each state of the chapter
     await screen.findByRole("button", { name: "Help me explore" });
     // Until the first answer the bright action is the entry choice, never Send on an empty
     // field (the audit's F17): the two equal choices together, edged in the action colour,
-    // neither filled over the other.
+    // neither filled over the other. No reply field competes with them (Task W2F slice E).
     expect(screen.getByRole("button", { name: "Help me explore" })).toHaveClass("btn-choice");
     expect(screen.getByRole("button", { name: "I know my direction" })).toHaveClass("btn-choice");
-    expect(screen.getByRole("button", { name: "Send" })).toHaveClass("btn-secondary");
-    expect(count()).toBe(0);
-    // Typed first, Send still waits for the choice (session W2), so it never turns bright.
-    await start.type(screen.getByRole("textbox", { name: "Reply to Careerwright" }), "Hello");
-    expect(screen.getByRole("button", { name: "Send" })).toHaveClass("btn-secondary");
+    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
     expect(count()).toBe(0);
 
     cleanup();
