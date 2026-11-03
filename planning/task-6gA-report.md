@@ -134,3 +134,162 @@ None. Cost $0.
 ## Paths a reviewer can skip
 
 `apps/web/src/generated/**` (generated client and openapi.json).
+
+## Review
+
+Independent review of ec059b3..fd864f0 (worktree `/Users/darianraad/Code/careerwright-wt/6ga`,
+head fd864f0), 2026-11-03. Read the card, the dispatch, the design note, this report and the
+3,265-line package in passes (backend, tests, web, docs), then the worktree code around each
+named risk below. One read-only check ran with the backend venv (risk 4); no suite re-run, no
+Docker, no web requests, no live calls.
+
+### Spec Compliance
+- ✅ Spec compliant with the card's slice A and dispatch items 1 to 6:
+  1. The table (43 sub-major groups), an offline shape test, and an integration test against
+     the pinned, hash-checked release's own group descriptions.
+  2. The reference comes from the role alone. Unknown is `level: null`, never a number: no job
+     yet, skipped, own words, several occupations with none chosen, or groups at different
+     levels. ISCO's bands then decide. Targets never set it.
+  3. Two sets through the one `_rerank`, three each, Next step first; Next step's balance is
+     2/1/0. No direction heading anywhere in the web (grep of `src` and `e2e`). Facts and codes
+     in the API, the client regenerated, words in `vocabulary.ts`.
+  4. An Aim higher card carries the training sentence; a Next step card says nothing of
+     training; no new word says suits, ready, pay or status (and a test checks it).
+  5. Sam (DSC-22) and Maya (DSC-21) carry `reference_is`, `horizons_by_level` (an oracle that
+     shares no code with the product's table) and `both_horizons`, so neither can pass on an
+     empty or one-set slate.
+  6. Spec section 22, ADR 0007, ADR 0015 and the register, in the last commit.
+- ⚠️ Cannot verify from diff: `make check` and the focused integration runs (the report's
+  claims, not re-run); `make acceptance` (the Playwright journeys with the changed
+  `e2e/api.ts`, and the Storybook build; the controller runs it); the 1280 and 390 walk
+  (agent observation only); the product owner's live look at Maya and Sam (not run, requires
+  human).
+
+### Checks by named risk
+1. **Deterministic slate; a target only by choice.** `place` is pure over the job group's code
+   and the reference; each set is sorted by `_order` and chosen by the same `_rerank`; sets
+   come in the enum's order. A family (ISCO minor group) sits in one sub-major group, so it has
+   one level and one major group and always lands in one set: the family limit still holds over
+   the whole slate. Making a target is unchanged (the person's click posts the concept). OK.
+2. **A job group's level, never the person's, pay or status.** The table is keyed by sub-major
+   group only; nothing reads pay, popularity or status; the web never shows a level number or
+   the reference level, and its words say "your role's job group". OK.
+3. **Unknown is unknown.** `reference_level` returns `UNKNOWN_REFERENCE` (level `None`) on
+   every path but one occupation or one agreeing level; `ReferenceOut.level` is null; the web
+   words the basis only. The full-release test covers ESCO, ONS, own words, no job yet and
+   skipped. OK.
+4. **A lookup that could fail the slate read.** `skill_level` raises for a code with no
+   sub-major group and now runs on every ONS-coded role. Checked with the product's own parser
+   over the pinned `ons-soc2020-volume2-coding-index-v14.xlsx`: 32,435 entries, 425 distinct
+   ISCO codes, none without a level. `_reference` (`exploration.py:949`) indexes `facts` by the
+   role's occupations without the guard `familiar_families` keeps (`exploration.py:896`), but
+   those occupations come from held URIs and are pooled as "r1", so they are always in `facts`.
+   No finding.
+5. **Words.** No em dash in any added line (grep of the package); no internal codes; Next step
+   is never worded by level.
+6. **Evaluation.** The unit test shows each new check failing on a wrong set, a wrong order, a
+   wrong level and an unknown served as 2. DSC-21's scripted searches are offline only
+   (`_offline_slate`); live still lets the model propose. The report is open that DSC-21 had
+   passed on an empty slate, and a full-release test records it.
+7. **Spec section 22 and ADR 0007 against line 283.** Reads true: line 283 forbids optimising
+   for prestige and treating common work as bad work. The change splits by a stated, computed
+   training level, ranks within each set by the same relevance reranker and never words Next
+   step's level, and the row says so. See the questions below on the level-4 rule.
+
+### Journey and load (Part 3)
+Walked in code (`Directions.tsx`, `vocabulary.ts`), before (ec059b3) and after:
+
+| Step | Before | After |
+|---|---|---|
+| View buttons and count line | 4 or 5 buttons, 1 line, nothing to type | Unchanged |
+| "How Careerwright searched" (closed, one step away) | Its lines | One more line for everyone (how the sets were placed); a short slate can give two "found only" lines (one per set) instead of one; "doesn't know your current work" is gone |
+| Set headings | Up to 3, by direction ("Directions to consider" for unknown work) | Up to 2: "Next step", "Aim higher" |
+| Closed card | Title and one line (kind of work) | Title and one line; on Aim higher the line adds the training sentence, growing from about 55 to 130 to 150 characters |
+| Open card | Choice first, one bright action, quiet teal actions | Unchanged; the kind-of-work line gains the training sentence on Aim higher |
+
+No new place to type, no new or competing action, nothing shown before a choice that must
+come first, no em dash. Net: one fewer heading, one more note line, longer Aim higher lines in
+the scan list (Minor 1).
+
+### Strengths
+- Small, deep, pure modules: `skill_levels.py` (one table, one lookup) and `horizons.py`
+  (reference and placing). The reranker is extracted (`_eligible`, `_rerank`, `_slate`) and
+  shared by both sets and the first scatter, not copied.
+- The table is checked against the pinned release's own statements, independently of the
+  product's import.
+- Unknown stays unknown at every boundary: domain, API null, web words by basis only.
+- An honest report: the DSC-21 empty-slate finding, the uncaptured RED run, the odd Aim higher
+  pick and the words still needing the product owner.
+
+### Issues
+#### Critical
+None.
+
+#### Important
+None.
+
+#### Minor
+1. **Load in the Aim higher scan list** (`apps/web/src/components/Directions.tsx:455`,
+   `apps/web/src/lib/vocabulary.ts:773`). The training sentence is on every closed Aim higher
+   card. For a known level-4 role all three say the same sentence, so it can't help choose
+   which to open, and at 390 wide each closed card wraps to several lines. Fix: show it only in
+   the open card's "What the work is" (still "an Aim higher card says"), or once under the Aim
+   higher heading when the set shares one level. For the product owner's session sheet.
+2. **The placement note shows with nothing placed** (`Directions.tsx:793`). "Careerwright
+   placed each suggestion..." appears when the slate is empty (nothing found, or all filtered).
+   Fix: only when `data.suggestions.length > 0`.
+3. **The level-4 note is incomplete** (`vocabulary.ts:785`). For a level-4 role, Aim higher's
+   level-4 work is placed by its major group, not its training, while the note says each was
+   placed by training and the cards then name the same degree-level training as the person's
+   own role. It says less, not something false. See the questions below.
+4. **"Found no work ... closely enough" when a filter or exclusion emptied a set**
+   (`vocabulary.ts:973`, `backend/src/careerwright/profile/slate.py:696`). The count is taken
+   after hard filters and exclusions, so with "hide unscored" on the person reads "Careerwright
+   found no work for Next step that matches your answers closely enough" although work matched
+   and their filter left it out; `backend/tests/integration/test_discovery.py:281` pins it, now
+   once per set. Existing behaviour (the old "Only 0 occupations matched" had the same fault),
+   and the filter's line beside it gives the count. Fix later: count from the floor alone, or
+   say "after your filters".
+5. **The "More depth" note overstates** (`slate.py:546`, `vocabulary.ts:965`). A set holds three
+   and a family lives in one set, so at most three from one kind of work can show, while the
+   note says "Showing up to 4". DIV1-11's relaxation is now two to three. Fix: word the cap the
+   slate can reach, or record the limit.
+6. **A narrowed regression test keeps its old name**
+   (`backend/tests/integration/test_evaluation.py:134`): it now compares only what the searches
+   found (`pool_shape`), not the slate. Name kept for citations, and its comment says so. At the
+   final review, rename it, or record the two-set slates so a later unintended reranker change
+   is caught on the full release.
+7. **A known limit asserted as expected** (`test_evaluation.py:499`): Maya's as-written answers
+   finding no work. Useful as a record, but a better search would fail it; say in its comment
+   that it is a known-limit record to update, not to "fix".
+8. **Register and ADR words** (batch for the final review). `docs/requirements-register.md:171`
+   (DIV1-12) still says "with no familiarity known the slate says so" (that line was removed)
+   and "no rarity, prestige or popularity input exists" (true, but a skill level is now an
+   input); `docs/adr/0007-conversation-discovery-and-support.md:1121` says the controls are
+   unchanged, then lists their new per-set balances.
+9. **Sentence rule, wording from the card** (`vocabulary.ts:764`). "Most work in this job group
+   usually needs a degree or equivalent training." is the card's own example and is hedged, but
+   it states what ISCO holds rather than what Careerwright checked. For the product owner's
+   session, with the level-2 and level-3 words the report already flags.
+10. `familiarity_known` is now read by no web code (`Directions.tsx` dropped its only use); the
+    API still serves it. Keep or retire at the final review.
+11. The `few_matched` words sit in `FEWER_REASON` (`vocabulary.ts:973`), outside the
+    suggestions section the dispatch named; the report already flags the merge with slice E.
+
+### Questions for the product owner's session (suggestion quality, not findings)
+- Sam's Aim higher holds an equine dental technician (reached through "assist customers") and
+  Maya's Next step a pulp grader. Sensible?
+- With a degree-level role, Aim higher is degree-level work in another major group (a
+  warehouse manager sees engineering professionals; a teacher would see managers). Is that
+  "aim higher"?
+- With the level unknown, someone whose real role needs a degree still sees levels 1 and 2 as
+  their "Next step". And with a known role, Next step holds everything at or below it, so a
+  degree-level role's Next step can hold elementary work. Acceptable for L0?
+- The level-2 and level-3 training words.
+
+### Assessment
+**Task quality:** Approved
+**Reasoning:** Slice A is built as the card asks: a pinned table checked against the release,
+unknown kept unknown, both sets from the one deterministic reranker, no direction heading left,
+and Sam's and Maya's cases can't pass on an empty or one-set slate. The Minors are load, wording
+and record tidiness for the list; none changes a decision, hides a failure or loses input.
