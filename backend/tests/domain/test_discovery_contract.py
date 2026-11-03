@@ -366,6 +366,17 @@ def test_aim_higher_ideas_are_checked_as_title_ideas_are() -> None:
     assert problems(twice, ctx) == ["title ideas: each title once"]
 
 
+@pytest.mark.req("DIV1-16")
+def test_the_prompt_says_each_title_once_as_the_check_refuses_a_repeat() -> None:
+    # Task 6g slice B, fix round: a repeat costs the repair request, and a second one ends the
+    # discovery, so the model is told before it answers.
+    said = " ".join(INSTRUCTIONS.split())
+
+    assert "Name each title only once, in hypotheses or aim_higher." in said
+    assert PROMPT_VERSION == "discovery-queries-5"  # nothing has run on version 5 yet
+    assert DASH_RULE in INSTRUCTIONS
+
+
 @pytest.mark.req("DIV1-16", "PROF-13")
 def test_the_prompt_reads_qualifications_with_their_status_an_expected_one_never_held() -> None:
     answers = json.loads(render_prompt(context(MAYA)).partition("\n")[2])["answers"]

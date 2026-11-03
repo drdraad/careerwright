@@ -43,7 +43,8 @@ from careerwright.profile.safety import inferred_sensitive_terms
 # examples. 4 (Task W2F slice E, the product owner: "Em-dashes are outlawed!"): queries and
 # title ideas are shown in the model's words, so never an em dash or a spaced en dash.
 # 5 (Task 6g slice B, the product owner's two horizons): up to six "aim higher" title ideas,
-# and the person's qualifications, an expected one never read as achieved.
+# each title once across both lists, and the person's qualifications, an expected one never
+# read as achieved.
 PROMPT_VERSION = "discovery-queries-5"
 INPUT_FORMAT: Literal["careerwright.discovery-input"] = "careerwright.discovery-input"
 MAX_QUERIES = 8
@@ -356,7 +357,7 @@ years: work that usually needs more training, study or experience than what they
 have done, even by a long path. Choose each for how well it follows from their answers, never
 for its pay or status, and name it as employers in England do. Careerwright checks every title
 against ESCO and the UK job-title index, suggests only those it finds, and decides itself how
-much training each usually needs.
+much training each usually needs. Name each title only once, in hypotheses or aim_higher.
 
 Qualifications come with their status: "achieved" is held; "expected" is being taken now or
 still to be awarded, so never treat an expected one as achieved.
