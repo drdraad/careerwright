@@ -99,6 +99,15 @@ one coherent, consistent design system across every chapter. It MUST come after 
 module in the current plan is built (10B, 12bB, 14B, 15, 7e and 8), and before Task M, whose
 moments build on it. Not before.
 
+**V1, the product owner's yes (3 November 2026):** "Make V1 the five screens the demo shows
+(You, Skills, Options, Routes, Plan), and build the Roles map, option research for any role,
+and the moments animation straight after V1 instead of before it?" Yes. The order from here:
+10B and 12bB (in parallel) → 14B (after 12bB's shared parts) → 15 (Plan) → the end-to-end
+session → the design system pass (on the five V1 screens) → Task 16's release qualification
+for V1 (five chapters; Roles is after V1, so rule 13's "all six chapters" reads as the five V1
+chapters for V1) → 17 (the manual) → V1. Then, after V1: 7e → 8 (Roles) → M → Task 16 again
+for the full L0 → the final review. Nothing is dropped, only moved later.
+
 History: the v1.5 order was, in the main tree, Task A1's documents and the W2C part 1
 re-review → W2E → 6d and 3b → 6e → session W2 → 10 → 12b → 14 → 15 → the end-to-end session
 → 7e → 8 → M → 16 → 17 → the final review, and in the worktree 13a → 12a → 13b (all three
