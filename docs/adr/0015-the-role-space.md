@@ -453,3 +453,11 @@ Decisions 1 to 3's fourth layer is built (S2.9; `careerwright.evidence.role_rese
   title). A title Careerwright thought of stays its idea once made a target.
 - **A role page is no job source:** the Jobs chapter's coverage, its empty reason, a job
   request's join and its back-off leave out every attempt whose target carries a role title.
+
+## Amendment line, Task W2F slice D (2026-11-03): a wider search, no home pages, 20 pages
+
+The Task 6e line's search and reading change (the product owner's yes, 3 November 2026; ADR
+0009's line of today has the detail): the search is `role-search-2`, search context `medium`
+and at most eight tool calls, its own bounds and no longer the job search's; the reading takes
+up to 20 of its candidates, only pages the search really returned and never a site's home page.
+With none, the search found no page Careerwright could read. Decision 2's rule is unchanged.

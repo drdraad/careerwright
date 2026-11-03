@@ -707,3 +707,41 @@ example's text in Skills and to check the spans they choose in it (ADR 0012, Tas
 line). A fetched page's body stays the worker's alone; the text was redacted before it was
 sealed, as before. Written, not run (the controller runs integration):
 `test_skills.py::test_the_api_opens_only_a_pasted_body_and_only_in_its_owner_s_workspace`.
+
+## Amendment line, Task W2F slice D (2026-11-03): role research searches wider and never reads a home page
+
+The product owner's live run of "Biodiversity net gain officer" read five pages, every one a
+site's home page, so no page could show the title. Their answers, 3 November 2026: "Widen it.
+Deeper search, up to 8 pages, no home pages. Still needs the exact title on 2 independent
+sites before saying found", then "Up to 20 pages. We need to do this properly."
+- **The search** (`role-search-2`, `search.ROLE_SEARCH`): one request, search context
+  `medium`, at most eight tool calls, room for 30 pages in the answer. Its instructions say
+  how to search (several searches: the exact title in quotes with "job" and "England", with
+  "careers" or "role profile", and official and professional bodies' pages) and what never to
+  return (a site's home page, a page of search results, a list of many jobs), and ask for
+  each page's own address exactly as the search returned it. The job search is unchanged
+  (`source-search-3`, `low`, two tool calls, eight pages).
+- **Only pages the search returned.** Meta's search returns its sources as page addresses,
+  not only sites (`web_search_call.action.sources`, asked for with
+  `openai_include_web_search_sources`): rows 44-46 saw 21 or 22 distinct sources over 9 to 18
+  hosts, so one site came back under several addresses. The addresses themselves were never
+  recorded (hosts only). Yet none of the 13 role candidates in those rows was one of them. So role research keeps a candidate only when
+  the search returned or opened that address (`not_returned_by_search` otherwise). A search
+  that returned no address grounds nothing, so nothing is read: "the search found no page
+  Careerwright could read", never "not yet found" from a guess.
+- **Never a home page.** A role candidate whose path is empty or "/", whatever its query, is
+  excluded (`site_root`), and the reading never fetches one, even from a proposal sealed
+  before this rule. If every candidate is one, it is the same "no page" state.
+- **Up to 20 pages read** (from five; `role_research.MAX_PAGES`, the most
+  `acquisition_targets.position` holds). Reading calls no model, so it costs nothing; each
+  page keeps the fetcher's checks, robots.txt and per-host pacing. Its time is bounded: one
+  try of a page is at most 20 seconds after its host's pacing slot (at most 5 seconds for one
+  reading), and a transient failure is tried at most three times, 2 and 4 seconds apart. So 20
+  pages take at most about 27 minutes, and never more than 92 minutes (the DBOS worker's 90
+  seconds a try). Most pages take a second or two, and the person can stop the reading.
+- **The found rule is unchanged:** the exact title on pages from two independent sources, or
+  one official page.
+- **One reservation for the run kind** (ADR 0003's line of today): the source search kind
+  reserves role research's larger search, $0.031 on the test model and $0.161 on Spark an
+  attempt. No run kind, workflow or step changed, so the DBOS `application_version` stays
+  `careerwright-l0-1`.
