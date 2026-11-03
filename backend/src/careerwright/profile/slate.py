@@ -650,7 +650,7 @@ _TITLE_CHANNELS = frozenset(
 )
 
 
-def found_by_a_title(candidate: Candidate) -> bool:
+def _found_by_a_title(candidate: Candidate) -> bool:
     """Whether a title reached this occupation itself: a title idea ESCO holds, the person's
     own title, or a join to one of theirs by shared essential skills (never a search alone)."""
     return any(
@@ -695,7 +695,7 @@ def _option(entry: Entry, *, titles_first: bool) -> _Option:
         occupation.sector_code,
         entry.relevance,
         entry.direction,
-        titles_first and found_by_a_title(entry),
+        titles_first and _found_by_a_title(entry),
         _order(entry),
     )
 
