@@ -215,3 +215,152 @@ robots.txt and per-host pacing.
 `apps/web/src/generated/api/{schemas.gen.ts, sdk.gen.ts, types.gen.ts}` and
 `apps/web/src/generated/openapi.json`. They hold the two new exclusion reasons and the reading
 route's docstring.
+
+## Review
+
+Independent reviewer, 3 November 2026. Read the dispatch, the ledger from "PO answer (3
+November 2026): widen role research" on, the brief's Global Constraints, this report, then the
+whole diff in five passes (2,068 lines; generated client skipped as listed). Read-only; no
+suites re-run. Three focused in-process checks, named below where used.
+
+### Spec Compliance
+- ✅ Spec compliant, with the product owner's later changes (20 pages, 30 candidates, eight
+  tool calls, directed queries, grounding, $0.50 and $1.60 caps, migration 0047).
+  - Never a home page: `check_search` excludes a root as `site_root` for role research
+    (`backend/src/careerwright/evidence/search.py:295`, `:330`), and `pages_to_read` drops
+    roots and ungrounded candidates even from proposals sealed before the rule
+    (`backend/src/careerwright/evidence/role_research.py:197-213`). Only home pages, or nothing
+    grounded, gives `no_pages`: the web says "The search found no page Careerwright could
+    read." with "Every page the search suggested is one Careerwright can't use." and "This
+    isn't a sign the role doesn't exist." (`apps/web/src/lib/vocabulary.ts:714`, `:687`,
+    `:721`). Never "not yet found". The integration test proves it at the API (409,
+    `no_pages`) with grounded home pages, so the root rule itself is what is exercised.
+  - The found rule is unchanged: `corroboration.py` and `check_title` are not in the diff.
+  - Every page still goes through the restricted worker and the guarded fetcher (robots,
+    pacing, 20 s page deadline): the reading path is unchanged; it only gets up to 20 targets,
+    which `acquisition_targets.position` (0 to 19) holds. Role pages still never reach a model
+    (`acquisition.py:1010-1012`).
+  - Reservation from the registry: one price per query ($2.50 per 1,000,
+    `model_registry.py:20`); the arithmetic in the tests is right ($0.031, $0.161, $0.496 an
+    attempt; 3 x $0.161 <= $0.50; 3 x $0.496 <= $1.60). The estimate route and the worker
+    share `search.worst_case_nano_usd`, so the cost line before "Research this role" covers
+    the deeper search.
+  - A breach is observable and booked at actual cost: the activity holds measured usage to
+    `exceeded_bound` on every path and reconciles at `estimate_cost_nano_usd(usage)`
+    (`identity/activity.py:576`, `_spend`).
+  - The job search's request is unchanged. Checked by importing the old `search.py` from
+    `834b1b1` beside the new one: `INSTRUCTIONS` byte-identical, still `source-search-3`;
+    the tests pin `low`, two tool calls and 1,500 tokens.
+  - Migration 0047 mirrors 0009: only `version = 1 AND run_limit_nano_usd = 150000000`,
+    `downgrade` raises. Rows are created only from the defaults (`credential_store.py:161`), so
+    version 1 is "never changed by the person". Its test covers untouched, chosen $0.15,
+    session $0.75 and lower rows.
+- ⚠️ Cannot verify from diff: how often the live search returns addresses the model copies
+  exactly (rows 44-46: 0 of 13 grounded); `medium`'s tokens and the request's duration; the
+  implementer's `make check` and integration runs (not re-run). No human-only gate is claimed.
+
+### Strengths
+- One `SearchBounds` per purpose replaces loose constants; the request, the reservation and
+  the bound check read from it, so they cannot drift apart.
+- Strict grounding is the honest choice: a guessed address is never read, and nothing read is
+  never "not yet found".
+- Legacy sealed proposals are filtered at read time too, so the product owner's old research
+  cannot read a home page after the upgrade.
+- The shared reservation is disclosed in ADR 0003, the register and the report, with its cost
+  to the job search stated.
+
+### Issues
+#### Critical
+None.
+
+#### Important
+None.
+
+#### Minor
+1. **Grounding compares Meta's source addresses raw.** `search.py:313` normalises sources
+   with `_normal` only, while candidates pass `check_url`, which drops the fragment. Probed:
+   source `https://a.example/p#:~:text=...`, candidate `https://a.example/p` -> excluded
+   `not_returned_by_search`. Grounding is now a gate on what is read, and rows 44-46 grounded
+   0 of 13, so a mismatch here means role research reads nothing. Fix: put each source through
+   `check_url` (same normal form) before comparing; it widens nothing, the page is the same.
+   Worth doing before, or as soon as, the live check shows a mismatch.
+2. **Results and listing pages are kept out by the prompt only** (`search.py:147`). Code drops
+   only an empty or "/" path; `/index.html` and `/en-gb/` pass (probed), and a board's own
+   results page (`?q=`, `?keywords=`, `/search`) is read if the search returned it. Such a page
+   often repeats the title in its heading, and two boards meet the found rule. This is ADR
+   0015's recorded known limit (a title in a list still counts), but the new query "the exact
+   title in quotes with job" makes such pages likelier. Question for the live check: are the
+   found pages postings or lists? A cheap partial fix, if wanted: exclude addresses with a
+   search parameter or a `/search` path. (A WordPress page at `/?page_id=12` is excluded as a
+   root, as the dispatch asked.)
+3. **The deeper request is unmeasured on three axes; list them for the live check.** (a)
+   Input per call at `medium` is held to `low`'s 12,000 (`search.py:53`); an overrun fails
+   `bound_exceeded`, booked at cost (fine). (b) 30 candidates plus eight searches' reasoning
+   within 4,000 output tokens (`search.py:92`); a cut-off fails `output_truncated`, booked
+   (fine). (c) Eight searches in one request against the 120 s client timeout
+   (`identity/meta.py:21`), not raised in the report: a timeout is transient
+   (`failures.py:114-119`), so DBOS tries three times, each with unknown cost and the whole
+   reservation committed: up to $1.49 on Wonder with only "The search stopped before it
+   found any pages." shown. Record duration, input and output tokens in the live check.
+4. **The shared reservation is acceptable, but it is a change to the job search** the
+   dispatch called unchanged. It is forced by the frozen infrastructure (the activity reserves
+   at `activity.py:472`, before the sealed input is opened at `:539`; no new run kind). Money
+   stays bounded: measured usage is still held to what was reserved. Two effects: a job search
+   reserves $0.161 on Spark (was $0.045), and its bound check now lets up to eight searches
+   through, not two, if Meta ignores `max_tool_calls` (unproven, ADR 0003 row 37). No person
+   sees it: the web never starts a job search (only the API and `make live-smoke`), and the
+   `live-search` scope still fits (9 x $0.031 <= $0.30). For the controller to acknowledge.
+5. **The reading can take minutes and the person isn't told.** They can stop it (Stop is
+   shown; DBOS cancels before the next page), but the line stays "Reading the pages the search
+   found…" (`vocabulary.ts:716`) with no count, and pages not yet tried say "Not read"
+   (`vocabulary.ts:742`) while reading. Typical about a minute; 27 minutes worst case by the
+   report's arithmetic (20 s page deadline, 5 s pacing, three tries; checked against
+   `FetchLimits` and `workflow.py`). For the final list: "Read 3 of 20 pages".
+6. **Two edits outside Edit/Write** (process). Checked the results: the ADR 0003 append is
+   intact (every `$` amount present, no shell expansion, no em dash), and the eight test
+   replacements read correctly in the diff.
+7. **Pre-existing, not from this slice:** in role research's `no_pages` state with
+   `no_candidate_proposed`, the web says "The search returned pages, but none was a single job
+   posting" (`vocabulary.ts:681-683`): a job-search sentence, and a claim about what pages
+   contain rather than what Careerwright checked. For the final list.
+
+### Assessment
+**Task quality:** Approved
+**Reasoning:** Every asked-for rule holds in code with tests at the boundary: no home page
+read, only grounded pages read, "no page Careerwright could read" never "not yet found", the
+found rule and the guarded fetch unchanged, the reservation priced from the registry with
+overruns visible and booked, and the migration limited to untouched rows. What remains is live
+behaviour, so the live check should record grounding, duration and tokens, and finding 1 is
+the cheapest way to keep strict grounding from reading nothing.
+
+## Fix report (implementer, 3 November 2026): grounding compares canonical addresses
+
+Commit `a63c812` (pathspec, main tree).
+- **What was wrong:** grounding compared the search's own addresses only trimmed, without a
+  trailing "/" and lower-cased. A candidate went through `check_url` first. So a returned
+  address with a fragment ("#apply") or a default port (":443") never matched its own page,
+  and role research rejected it as `not_returned_by_search`.
+- **Change** (`backend/src/careerwright/evidence/search.py`): `_normal` became
+  `_grounding_key`.
+  - Every returned address goes through `check_url`'s canonical form first: scheme and host
+    case, the default port, the fragment dropped. Then the trailing "/" and case are folded,
+    as before.
+  - A candidate is compared by its checked address's key.
+  - A returned address the checks refuse keeps its own text, and no checked candidate can
+    match it.
+  - Side effect: `sources_seen` now counts canonical addresses, so one page returned with two
+    fragments counts once.
+- **Test, failing first**
+  (`tests/domain/test_role_research.py::test_a_page_the_search_returned_is_grounded_however_its_address_is_written`):
+  - Cases: "a fragment", "a trailing slash", "the host's case", and "scheme, port and
+    fragment".
+  - RED: `uv run --locked pytest tests/domain/test_role_research.py -k however_its_address`
+    gave 2 failed (the fragment, and scheme/port/fragment), 2 passed. The trailing-slash and
+    host-case cases already passed and are kept as guards.
+  - GREEN: the role research, source search, live role research and live smoke tests,
+    115 passed.
+- **`make check`:** exit 0 (pytest 2148 passed, 123 skipped; Vitest 494 passed; ruff, mypy,
+  client drift, Biome and tsc clean).
+- **Integration:** not re-run. The change is pure code inside `check_search`, covered by the
+  domain test. The controller's acceptance covers the rest.
+- **Not changed:** everything else in the slice, including the shared reservation.
