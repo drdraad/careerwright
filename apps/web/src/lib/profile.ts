@@ -46,19 +46,37 @@ export function describeQualification(qualification: QualificationAnswer): strin
   return `${qualification.name} (${QUALIFICATION_STATUS[qualification.status]})`;
 }
 
+const stateKey = (text: string) => text.toLowerCase().replace(/[\W_]+/g, "");
+const STATE_CODES = new Map(
+  (Object.keys(FIELD_STATE) as FieldState[]).map((state) => [stateKey(state), state]),
+);
+
+/** Whether a text is an answer state's code, case and separators aside ("no_job_yet", "No job
+ *  yet"). The API refuses one as a proposed value now (Task W2F slice E); an answer saved
+ *  before that may still hold one. */
+export function isStateCode(text: string): boolean {
+  return STATE_CODES.has(stateKey(text));
+}
+
+/** A text as an answer shows it: a state's code in the state's words, never the code. */
+function shownText(text: string): string {
+  const state = STATE_CODES.get(stateKey(text));
+  return state === undefined ? text : FIELD_STATE[state];
+}
+
 /** An answer's value as text (a proposal's value reads the same way). `name`: the field it
  *  answers, so what the person is doing now reads in words, never as its code. */
 export function describeValue(value: AnswerValue, name?: ProfileFieldName): string {
   if (Array.isArray(value)) {
     return value
-      .map((item) => (typeof item === "string" ? item : describeQualification(item)))
+      .map((item) => (typeof item === "string" ? shownText(item) : describeQualification(item)))
       .join(", ");
   }
   if (isSalary(value)) return describeSalary(value);
   if (typeof value === "object") return formatMoney(value as Money);
   if (typeof value === "number") return `${value} hours a week`;
   if (name === "work_status" && isWorkStatus(value)) return WORK_STATUS[value];
-  return value;
+  return shownText(value);
 }
 
 /** The field as text: its value when answered, otherwise what its state means. */

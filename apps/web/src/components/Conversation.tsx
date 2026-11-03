@@ -17,7 +17,8 @@
 // first answer, one says Careerwright covers England for now (BND1-02); and the entry choice
 // is the bright action, never Send on an empty field (F17). Session W2: Send waits, saying
 // why, until the person has chosen how to start and until a waiting review card is saved or
-// kept none of (`sendBlocked`), and the field keeps what is typed meanwhile.
+// kept none of (`sendBlocked`), and the field keeps what is typed meanwhile. Task W2F slice E:
+// Send says why it waits only once there is something to send.
 // Each demo question offers one-tap example replies the demo interviewer reads (STATE-09), and
 // the role-or-explore question offers two ways on that open existing views.
 import { type ReactNode, type Ref, useEffect, useId, useRef, useState } from "react";
@@ -657,12 +658,13 @@ export function Conversation({
           onChange={(event) => setMessage(event.target.value)}
         />
         {/* Bright only with something to send: never Send on an empty field (F17). Why it
-            waits takes a line of its own under the field, so the field keeps its width. */}
+            waits takes a line of its own under the field, so the field keeps its width, and
+            only once there is something to send (slice E: an empty field sends nothing). */}
         <div className="composer-send">
           <Button
             type="submit"
             variant={primary === "send" && message.trim() !== "" ? "primary" : "secondary"}
-            disabledReason={sendBlocked}
+            disabledReason={message.trim() === "" ? undefined : sendBlocked}
           >
             Send
           </Button>

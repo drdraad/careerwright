@@ -37,6 +37,7 @@ import type {
 import { ApiError } from "@/lib/api";
 import { listLimit } from "@/lib/bounds";
 import { stillRunning } from "@/lib/conversation";
+import { isStateCode } from "@/lib/profile";
 import {
   type SlateControls,
   useChooseTarget,
@@ -911,7 +912,10 @@ export function researchable(
       titles.push({ title, why });
     }
   };
-  if (role?.kind === "own_words" && !role.on_a_list && role.text !== null) add(role.text, "role");
+  // A role saved as a state's code ("no_job_yet", before slice E) is no title to research.
+  if (role?.kind === "own_words" && !role.on_a_list && role.text !== null) {
+    if (!isStateCode(role.text)) add(role.text, "role");
+  }
   for (const idea of ideas) {
     if (TITLE_IDEA_SHOWN[idea.reason] === "not_yet_found") add(idea.title, "idea");
   }
