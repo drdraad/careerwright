@@ -1343,6 +1343,44 @@ we know in the visual checks; one capped live check of the new prompt version on
 model (the controller's); `make check` and `make acceptance` pass. The visual part is an agent
 pre-review only (R2); the product owner's short re-test of Maya and Sam follows.
 
+## Task 6g: two horizons, "Next step" and "Aim higher" (the product owner, 3 November 2026)
+
+**Preconditions:** session W2's re-test (3 November 2026): the product owner judged the slate
+"quite basic ... not very aspirational or inspirational" and asked to "distinguish between
+immediate next job (which may have a very short career path from current position) and ideal
+job (which may have a long, involved career path)". Their yes the same day: design now, build
+after Task W2F and before 10B, 12bB and 14B; Muse also proposes "Aim higher" ideas, each shown
+only once code confirms the title. The design: `planning/two-horizons-design.md` (approach C).
+**Parallel:** slice A may overlap Task W2F's remaining slices on disjoint files; slice B follows
+slice A.
+
+Deliver, each as something the person sees:
+- **Slice A (code places by level):** a pinned skill-level table by ISCO sub-major group,
+  checked against the pinned ESCO release (a job group's level, never the person's, never pay
+  or prestige); the person's reference level from their role's occupation or agreeing ONS
+  groups, else unknown (never a number), with ISCO's bands then; the slate in two sets, "Next
+  step" (at or below the reference level) and "Aim higher" (above it), each through the same
+  deterministic reranker; Next step drops the forced "less familiar" slot and the "Directions
+  to consider" heading; an Aim higher card says what Careerwright checked about its job group's
+  usual training, in plain words, and never that the person suits it or is ready.
+- **Slice B (Muse widens the horizon):** the one discovery call also proposes up to six "Aim
+  higher" title ideas, each quoting the answers it came from (checked), with the person's
+  qualifications among what Muse reads (an expected one never counted as met); code confirms
+  each by the existing rule (an ESCO label, the ONS UK job-title index, or Research this role)
+  and places it by level; within Aim higher, confirmed ideas and joins rank before a single
+  search's hit (a rule, evaluated); a title whose ONS groups disagree on level goes in neither
+  set. The demo proposer proposes none. A new discovery prompt version, qualified on the test
+  model by the controller.
+- The world: Next step rings on a nearer line, Aim higher on the horizon (ADR 0014 decision 4
+  amendment: depth means which set, a computed fact, never how likely or how good), with the
+  suggestion rings, after the working view.
+
+Spec and ADRs: spec section 22 (the first slate's 2/2/2 balance and line 283's "prestige" rule:
+Aim higher is placed by a job group's usual training level, never pay or status), ADR 0007,
+ADR 0015, ADR 0014 for the world. Acceptance: Sam's and Maya's evaluation cases show Next step
+and Aim higher sets as the rules say; no "Directions to consider" for a person whose work isn't
+known; `make check` and `make acceptance` pass; the PO's live look at Maya and Sam.
+
 ## Task 8: Sprint 3 — living opportunity map and the job corpus (S3.5) + Sprint 3 review
 
 **Preconditions:** Task 7c complete (the reviewed job values this task scores against;
