@@ -34,7 +34,8 @@
 - Amended: 2026-10-31, the product owner's approval of the audit (the last section):
   decisions 4, 5, 13 and 14 for the role space (ADR 0015); 2026-11-03, Task W2F slice E (its
   section): no em dash in model text, and the review card with half the words; 2026-11-03,
-  decision 5 for the two horizons, Next step and Aim higher (Task 6g).
+  decision 5 for the two horizons, Next step and Aim higher (Task 6g); 2026-11-03, decisions
+  4 and 5 for Muse's Aim higher ideas (Task 6g slice B, the last section).
 - Requirements: REC1-01..11, DIV1-02, DIV1-04..12, STATE-05, STATE-06, STATE-08, PROF-04,
   PROF-07..09, MODEL-03, MODEL-07, TEST1-10; spec sections 3, 4 and 16; ADR 0006; ADR 0008
   decision 4
@@ -1210,3 +1211,66 @@ pool, retrieval, relevance, directions, floor, family limit and controls are unc
   words. Approach A re-sorts the same pool, so Sam's Aim higher can still hold odd work (an
   equine dental technician, reached through "assist customers"); slice B (Muse's own Aim
   higher ideas, each checked by code) is the design's answer.
+
+## Amendment, 2026-11-03 (Muse widens the horizon; Task 6g slice B)
+
+The product owner's yes (3 November 2026): "Should Muse add Aim higher job ideas from your
+answers, each shown only once Careerwright finds that title on an official job list?" This is
+the design's second slice (`planning/two-horizons-design.md`, approach C). The model proposes;
+code confirms, places and ranks; the person chooses. Decisions 4 and 5 change as follows.
+
+- **Decision 4: the one discovery call also proposes Aim higher ideas** (`discovery-queries-5`;
+  it keeps version 4's dash rule). Up to six titles of work that usually needs more training,
+  study or experience than the person's, chosen for how well they follow from the answers,
+  never for pay or status. Each quotes 1 to 3 answers and is checked as a title idea is
+  (bounded, no dash of the model's, no inferred characteristic, each title once across both
+  lists). The model now reads the person's qualifications with their status, and the prompt
+  says an expected one is never achieved; a title idea or query may quote one by its name.
+  Qualifications alone never start a discovery. The output bound is 2,000 tokens and the prompt
+  bound 10,000 bytes, so an attempt reserves $0.0037 on the test model, $0.053 on Spark and
+  $0.196 on Muse Wonder (two requests, priced from the registry); three attempts fit the default
+  run limit and the session's. The demo proposer proposes none. Inputs and proposals sealed
+  before carry no qualifications and no Aim higher ideas; the export (format 5) carries them.
+- **Decision 5: code confirms and places every title idea by one rule** (hypotheses `h1`...,
+  then Aim higher ideas `a1`...). An ESCO label joins the pool, as before, and its occupation is
+  placed by level like any. A title only the UK job-title index lists becomes an entry of the
+  slate (`ListedTitle`), never in the pool: it is placed by every ISCO-08 group ONS codes it to,
+  only when they agree on level and set (`horizons.place_title`); one whose groups disagree goes
+  in neither set and stays in the list beside the slate. One no list holds is not yet found,
+  with Research this role in a live workspace. A listed title is weighed by the same reranker
+  as an idea ESCO holds (its title match scores 1, weighted 0.9), counts against its kind of
+  work's limit and its set's three, honours the person's kind-of-work exclusions (counted), is
+  counted by the salary floor (pay unknown: kept) and the AI filter (unscored: kept, or left out
+  when unscored work is), and when a filter or exclusion leaves it out it is shown nowhere.
+  One placed but beaten to its set's three stays in the list beside the slate.
+- **The rule within Aim higher** (product policy, evaluated on Sam's and Maya's cases): work
+  found by a title (a title idea code confirmed, the person's own title, or a join to one by
+  shared skills) ranks before work only searches found, however well those matched; the
+  reranker weighs each group as before. Next step keeps relevance order. The slate stays
+  deterministic given its inputs.
+- **Facts and words** (ruling R11). Each title idea carries `groups`, `skill_level`, `horizon`
+  (the set it is shown in), `position` (its place there among the suggestions) and `left_out`;
+  the proposal carries `aim_higher`. The web shows a listed idea's card in its set at its place:
+  closed, its title and kind of work; open, Make this a target first (the view's one bright
+  action when open), then "Found in the UK job-title index (ONS). Not compared with your
+  experience yet." and the answers it came from. It is made a target through the profile's own
+  save, and one of the discovery's own ideas made a target so keeps the slate current
+  (`exploration.stays_current`, STATE-10), as a choice from it does. Slice A's review Minors,
+  fixed here by the product owner's load rule: Aim higher's training sentence is said once,
+  under its heading, for its entries' levels ("Most work in these job groups usually needs one
+  to three years of study after A-levels or similar, or a degree or equivalent training."),
+  never on every card; the placement note shows only when a set holds something; "More depth"
+  relaxes the kind-of-work limit to 3, what a set can show, and its note says so.
+- **Evaluation.** Sam (DSC-22) and Maya (DSC-21) give a fixed model output with six ideas each;
+  on the full release each Aim higher holds three confirmed ideas (Sam: careers adviser,
+  customer success manager, training and development officer; Maya: biomedical scientist,
+  genetic counsellor, clinical scientist), never the equine dental technician, with the rule
+  checked (`titles_first_in_aim_higher`) and each listed title placed by an independent level
+  oracle. DSC-23 and DSC-24 are live only, run when the controller names them.
+- **Known limits (L0, recorded):** a listed title has no "Not for me" (only its kind of work
+  can be excluded) and is not listed under "Show why something wasn't included"; a placed one
+  lists after or among ESCO's by its place, with nothing numbered; any of the discovery's own
+  ideas typed exactly as a target keeps it current, whether or not it was clicked.
+- **Provisional (R6), for the product owner's live look at Maya and Sam:** six ideas, the rule
+  within Aim higher, a listed title's weight (0.9), and the prompt's words. `discovery-queries-5`
+  is not yet run live: the controller's capped check (DSC-23, DSC-24).
