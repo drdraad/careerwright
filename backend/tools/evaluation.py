@@ -532,6 +532,19 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
         searched = [q["text"] for q in observed["queries"] if q["text"] in e.words and q["hits"]]
         bad = missing or searched
         return Failure(FailureType.GROUNDING, f"{missing} {searched}") if bad else None
+    if e.check == "reference_is":
+        # Task 6g: the person's reference level, read from their role alone; unknown is never
+        # a number.
+        found = observed["reference"]
+        return None if found == e.value else Failure(FailureType.GROUNDING, f"{found}")
+    if e.check == "horizons_by_level":
+        # Task 6g: each suggestion's job group level is ISCO's, and its set follows from it
+        # and the reference level; Next step is listed first, each set holds at most three.
+        return _horizons_by_level(observed)
+    if e.check == "both_horizons":
+        sets = {s["horizon"] for s in suggestions}
+        both = sets == {"next_step", "aim_higher"}
+        return None if both else Failure(FailureType.DIVERSITY, f"sets shown: {sorted(sets)}")
     if e.check == "limit_reported":
         # The floor is applied with its counts, and pay it cannot compare is never below it
         # (Task 7 slice B). The evaluation holds no reviewed UK SOC mapping, so every pooled
@@ -543,6 +556,42 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
             return Failure(FailureType.LIMIT, f"{floor['left_out']} left out with pay unknown")
         return None
     raise ValueError(f"unknown discovery check {e.check!r}")
+
+
+def isco_skill_level(unit_code: str) -> int:
+    """ISCO-08's usual skill level for a unit group, from its major group's statement, with
+    the exceptions ISCO states: sub-major group 14 at 3, and the armed forces' sub-major
+    groups at 4, 2 and 1. Independent of the product's pinned table."""
+    if unit_code.startswith("14"):
+        return 3
+    if unit_code.startswith("0"):
+        return {"01": 4, "02": 2, "03": 1}[unit_code[:2]]
+    return {"1": 4, "2": 4, "3": 3, "9": 1}.get(unit_code[0], 2)
+
+
+def _horizons_by_level(observed: Json) -> Failure | None:
+    """Next step holds work at or below the reference level, Aim higher work above it; with the
+    reference unknown, ISCO's bands (1 and 2, 3 and 4). For a level-4 reference, level-4 work
+    may be in either set: which depends on the role's major group, which the slate doesn't
+    serve."""
+    reference = observed["reference"]["level"]
+    wrong: list[str] = []
+    for s in observed["suggestions"]:
+        level = isco_skill_level(s["isco_group"]["code"])
+        if s["skill_level"] != level:
+            wrong.append(f"{s['title']}: level {s['skill_level']}, ISCO {level}")
+            continue
+        if reference == 4 and level == 4:
+            continue
+        top = 2 if reference is None else reference
+        want = "aim_higher" if level > top else "next_step"
+        if s["horizon"] != want:
+            wrong.append(f"{s['title']}: {s['horizon']}, level {level}")
+    order = [s["horizon"] for s in observed["suggestions"]]
+    if order != sorted(order, key=["next_step", "aim_higher"].index):
+        wrong.append(f"listed {order}")
+    wrong += [f"{h}: {order.count(h)}" for h in ("next_step", "aim_higher") if order.count(h) > 3]
+    return Failure(FailureType.GROUNDING, f"{wrong}") if wrong else None
 
 
 # Explanation checks: `observed` holds the first view's slate (`SlateOut`), the explanation

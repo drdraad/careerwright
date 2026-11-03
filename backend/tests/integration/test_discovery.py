@@ -276,8 +276,10 @@ def test_the_ai_resilience_filter_keeps_unscored_roles_by_default_and_counts_its
     assert {n["reason"] for n in hidden["not_included"]} >= {"ai_resilience_unscored_excluded"}
     # The role is kept in the person's words: nothing offers it a closest occupation after the
     # start, so its fact never asks for one (Task 6d slice B fix round 1, design review I-2).
+    # Each of the two sets says it has nothing (Task 6g).
     assert hidden["fewer_reasons"] == [
-        {"reason": "few_matched", "count": 0},
+        {"reason": "few_matched", "count": 0, "horizon": "next_step"},
+        {"reason": "few_matched", "count": 0, "horizon": "aim_higher"},
         {
             "reason": "role_not_matched",
             "outcome": "not_matched",
@@ -307,7 +309,8 @@ def test_after_none_of_these_the_slate_keeps_the_role_in_the_person_s_words_and_
     hidden = slate(scenario, discovery_id, min_ai_resilience="3", include_unscored="false")
 
     assert hidden["fewer_reasons"] == [
-        {"reason": "few_matched", "count": 0},
+        {"reason": "few_matched", "count": 0, "horizon": "next_step"},
+        {"reason": "few_matched", "count": 0, "horizon": "aim_higher"},
         {
             "reason": "title_kept_as_own",
             "outcome": "not_matched",

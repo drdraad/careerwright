@@ -20,6 +20,10 @@ import {
   FIRST_QUESTION,
   fewerReason,
   floorWords,
+  HORIZON,
+  HORIZON_ORDER,
+  kindOfWorkLine,
+  REFERENCE_BASIS,
   RESEARCH_STATUS,
   RESOLUTION,
   ROLE_KEPT,
@@ -186,14 +190,30 @@ describe("[DIV1-06][DIV1-03] why there are fewer than six, in words", () => {
       "None of your answers found work to suggest yet.",
     ],
     [
-      "one matched",
-      { reason: "few_matched", count: 1 },
+      "one matched, in the world's first scatter",
+      { reason: "few_matched", count: 1, horizon: null },
       "Only 1 occupation matched your answers closely enough to suggest. Careerwright doesn't fill the rest with weaker matches.",
     ],
     [
-      "three matched",
-      { reason: "few_matched", count: 3 },
+      "three matched, in the world's first scatter",
+      { reason: "few_matched", count: 3, horizon: null },
       "Only 3 occupations matched your answers closely enough to suggest. Careerwright doesn't fill the rest with weaker matches.",
+    ],
+    // Task 6g: each of the slate's two sets says why it is short of three.
+    [
+      "one matched for Aim higher",
+      { reason: "few_matched", count: 1, horizon: "aim_higher" },
+      "Careerwright found only 1 occupation for Aim higher that matches your answers closely enough, and doesn't fill the rest with weaker matches.",
+    ],
+    [
+      "two matched for Next step",
+      { reason: "few_matched", count: 2, horizon: "next_step" },
+      "Careerwright found only 2 occupations for Next step that match your answers closely enough, and doesn't fill the rest with weaker matches.",
+    ],
+    [
+      "none matched for Aim higher",
+      { reason: "few_matched", count: 0, horizon: "aim_higher" },
+      "Careerwright found no work for Aim higher that matches your answers closely enough.",
     ],
     [
       "kinds of work already shown",
@@ -330,6 +350,55 @@ describe("[REC1-05][DIV1-06] why a suggestion could suit you, in words", () => {
     expect(regulated.entryGate).toBe("Registration may be required. Not checked yet.");
     expect(facts({ regulated: null }).entryGate).toBe("Entry requirements aren't researched yet.");
     expect(facts({ essential_skills: [], essential_skill_count: 0 }).tryIt).toHaveLength(1);
+  });
+});
+
+describe("[DIV1-16][DIV1-12] the two sets, Next step and Aim higher, in words (Task 6g)", () => {
+  const card = (horizon: SuggestionOut["horizon"], level: SuggestionOut["skill_level"]) =>
+    kindOfWorkLine({
+      horizon,
+      skill_level: level,
+      family: { code: "221", label: "Medical doctors" },
+    } as SuggestionOut);
+
+  it("heads the sets in the order they are listed", () => {
+    expect(HORIZON_ORDER.map((horizon) => HORIZON[horizon])).toEqual(["Next step", "Aim higher"]);
+  });
+
+  it("says what Careerwright checked about an Aim higher job group's usual training, in the kind of work's line", () => {
+    expect(card("aim_higher", 4)).toBe(
+      "Kind of work: Medical doctors. Most work in this job group usually needs a degree or equivalent training.",
+    );
+    expect(card("aim_higher", 3)).toBe(
+      "Kind of work: Medical doctors. Most work in this job group usually needs one to three years of study after A-levels or similar.",
+    );
+    expect(card("aim_higher", 2)).toBe(
+      "Kind of work: Medical doctors. Most work in this job group usually needs GCSEs or similar, sometimes A-levels or a vocational course.",
+    );
+  });
+
+  it("says nothing of a Next step card's training, so no work is called basic", () => {
+    for (const level of [1, 2, 3, 4] as const) {
+      expect(card("next_step", level)).toBe("Kind of work: Medical doctors");
+    }
+    const every = [
+      ...Object.values(HORIZON),
+      ...Object.values(REFERENCE_BASIS),
+      ...([1, 2, 3, 4] as const).map((level) => card("aim_higher", level)),
+    ].join(" ");
+    // Never basic, never a judgement of the person, never pay or status.
+    expect(every).not.toMatch(/basic|simple|low-skill|suit|ready|pays?\b|salary|prestig|status/i);
+  });
+
+  it("says how the sets were placed, naming no work for someone whose work isn't known", () => {
+    expect(REFERENCE_BASIS).toEqual({
+      role_occupation:
+        "Careerwright placed each suggestion by the training its job group usually needs, compared with your role's job group in ESCO.",
+      uk_title_groups:
+        "Careerwright placed each suggestion by the training its job group usually needs, compared with the job group the UK job-title index gives your job title.",
+      unknown:
+        "Careerwright placed each suggestion by the training its job group usually needs: Aim higher is work that usually needs study after A-levels or similar.",
+    });
   });
 });
 

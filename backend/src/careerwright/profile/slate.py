@@ -27,15 +27,21 @@ family is one of their current role's or targets', or their role or a target fou
 building on skills they could carry over (a transferable or cross-industry query, or a skill
 join, found it), or something different (anything else).
 
-**Slate.** A constrained greedy reranker, with no claim of optimality: each step takes the
-eligible candidate with the highest relevance plus bonuses for a family, an ISCO major group
-and a direction not yet shown (aiming at two of each direction), less a penalty per
-candidate already shown from its family; at most `FAMILY_LIMIT` per family, relaxed visibly
-when the person asks for depth. A relevance floor applies: a slot is never filled with a
-weak match, so a thin pool returns fewer suggestions with the reason (DIV1-06). The person's
-own exclusions come first and are counted (DIV1-07); excluding one title never excludes
-its family (REC1-08). The weights are product policy subject to evaluation, not estimates of
-fit (spec section 4).
+**Slate.** Two sets of up to `HORIZON_SIZE`, Next step and Aim higher, each candidate placed
+by its job group's usual ISCO skill level against the person's reference level
+(`careerwright.profile.horizons`; Task 6g), and each set chosen by the same constrained greedy
+reranker, with no claim of optimality: each step takes the eligible candidate with the highest
+relevance plus bonuses for a family, an ISCO major group and a direction its set has not yet
+shown as often as the set's balance asks (Next step: two close and one transferable, with no
+slot kept for something different; Aim higher: one of each), less a penalty per candidate
+already shown from its family; at most `FAMILY_LIMIT` per family, relaxed visibly when the
+person asks for depth. The world's first scatter (the origin's destinations) is one set of
+`SLATE_SIZE`, two of each direction: its near and far lines are a later slice. A relevance
+floor applies: a slot is never filled with a weak match, so a thin pool returns fewer
+suggestions with the reason, for each set short of its size (DIV1-06). The person's own
+exclusions come first and are counted (DIV1-07); excluding one title never excludes its
+family (REC1-08). The weights and balances are product policy subject to evaluation, not
+estimates of fit (spec section 4).
 """
 
 import uuid
@@ -46,6 +52,7 @@ from enum import StrEnum
 
 from careerwright.catalogue.records import SkillNeighbour
 from careerwright.profile.discovery import EvidenceItem, QueryChannel
+from careerwright.profile.horizons import Horizon, Reference, place
 from careerwright.profile.slate_facts import (
     CastingWider,
     ExclusionsRemoved,
@@ -58,6 +65,7 @@ from careerwright.profile.slate_facts import (
 )
 
 SLATE_SIZE = 6
+HORIZON_SIZE = 3  # each of the slate's two sets, Next step and Aim higher
 FAMILY_LIMIT = 2
 DEEPER_FAMILY_LIMIT = 4
 POOL_LIMIT = 120
@@ -320,14 +328,18 @@ class Left:
 
 @dataclass(frozen=True)
 class Slate:
-    suggestions: tuple[Candidate, ...]
+    suggestions: tuple[Candidate, ...]  # Next step's, then Aim higher's (one set: the origin's)
     not_included: tuple[Left, ...]
     pool_size: int  # distinct occupations after de-duplication
     beyond_limit: int
     excluded: dict[str, int]
     family_limit: int
+    reference: Reference  # the person's reference level, which places each suggestion
     fewer_reasons: list[FewerReason] = field(default_factory=list)
     notes: list[SlateNote] = field(default_factory=list)
+
+    def horizon(self, candidate: Candidate) -> Horizon:
+        return place(candidate.occupation.family_code, self.reference)
 
 
 _CLOSE_CHANNELS = frozenset({SlateChannel.CURRENT, SlateChannel.USER_PROPOSED})
@@ -495,26 +507,40 @@ def build_pool(
     return Pool(pool, len(reached - {c.occupation.concept_id for c in pool}))
 
 
+Balance = Mapping[Direction, int]
+
+
+def _balance(close: int, transferable: int, less_familiar: int) -> Balance:
+    return {
+        Direction.CLOSE: close,
+        Direction.TRANSFERABLE: transferable,
+        Direction.LESS_FAMILIAR: less_familiar,
+    }
+
+
 @dataclass(frozen=True)
 class _Policy:
     floor: float
     family_limit: int
-    quotas: Mapping[Direction, int]
+    balances: Mapping[Horizon, Balance]  # how many of each direction each set aims at
     note: SlateNote | None = None
 
 
-_BALANCED = {Direction.CLOSE: 2, Direction.TRANSFERABLE: 2, Direction.LESS_FAMILIAR: 2}
+# Next step keeps no slot for something different (the product owner's re-test, 3 November
+# 2026: a forced "less familiar" slot brought odd work in); Aim higher keeps one of each
+# direction. Provisional product policy, for evaluation (R6).
+_BALANCED = {Horizon.NEXT_STEP: _balance(2, 1, 0), Horizon.AIM_HIGHER: _balance(1, 1, 1)}
 _POLICIES: Mapping[Emphasis, _Policy] = {
     Emphasis.BALANCED: _Policy(RELEVANCE_FLOOR, FAMILY_LIMIT, _BALANCED),
     Emphasis.PRACTICAL: _Policy(
         RELEVANCE_FLOOR,
         FAMILY_LIMIT,
-        {Direction.CLOSE: 3, Direction.TRANSFERABLE: 2, Direction.LESS_FAMILIAR: 1},
+        {Horizon.NEXT_STEP: _balance(3, 0, 0), Horizon.AIM_HIGHER: _balance(2, 1, 0)},
     ),
     Emphasis.UNFAMILIAR: _Policy(
         RELEVANCE_FLOOR,
         FAMILY_LIMIT,
-        {Direction.CLOSE: 1, Direction.TRANSFERABLE: 1, Direction.LESS_FAMILIAR: 4},
+        {Horizon.NEXT_STEP: _balance(1, 1, 1), Horizon.AIM_HIGHER: _balance(0, 1, 2)},
     ),
     Emphasis.BROAD: _Policy(BROAD_RELEVANCE_FLOOR, 1, _BALANCED, CastingWider()),
     Emphasis.DEEPER: _Policy(
@@ -524,18 +550,22 @@ _POLICIES: Mapping[Emphasis, _Policy] = {
         MoreDepth(family_limit=DEEPER_FAMILY_LIMIT),
     ),
 }
+# The world's first scatter: one set, two of each direction (spec section 4's first slate).
+_FIRST_SCATTER = _balance(2, 2, 2)
 
 
-def choose_slate(
-    pool: Pool,
-    controls: SlateControls | None = None,
-    left_out: Mapping[uuid.UUID, NotIncluded] | None = None,
-) -> Slate:
-    """`left_out`: occupations a hard filter leaves out (the salary floor, the AI Resilience
-    filter), each with its reason; the caller decided, from evidence, that each is below."""
-    controls = controls or SlateControls()
-    hard = left_out or {}
-    policy = _POLICIES[controls.emphasis]
+@dataclass(frozen=True)
+class _Eligible:
+    candidates: list[Candidate]
+    left: list[Left]
+    excluded: dict[str, int]
+
+
+def _eligible(
+    pool: Pool, controls: SlateControls, hard: Mapping[uuid.UUID, NotIncluded], floor: float
+) -> _Eligible:
+    """What may be suggested: neither a duplicate, nor excluded by the person, nor left out by
+    a hard filter, nor below the relevance floor. The rest say why they are not."""
     left: list[Left] = []
     eligible: list[Candidate] = []
     excluded = {"occupations": 0, "families": 0}
@@ -551,11 +581,23 @@ def choose_slate(
             left.append(Left(candidate, NotIncluded.EXCLUDED_FAMILY))
         elif occupation.concept_id in hard:
             left.append(Left(candidate, hard[occupation.concept_id]))
-        elif candidate.best_score < policy.floor:
+        elif candidate.best_score < floor:
             left.append(Left(candidate, NotIncluded.BELOW_RELEVANCE_FLOOR))
         else:
             eligible.append(candidate)
+    return _Eligible(eligible, left, excluded)
 
+
+@dataclass(frozen=True)
+class _Ranked:
+    chosen: list[Candidate]
+    left: list[Left]
+    blocked: int  # left out only because its kind of work was shown as often as allowed
+
+
+def _rerank(eligible: list[Candidate], size: int, family_limit: int, balance: Balance) -> _Ranked:
+    """The constrained greedy reranker: up to `size`, each step taking the highest relevance
+    plus the bonuses for what the set has not shown yet, less the same-family penalty."""
     chosen: list[Candidate] = []
     families: Counter[str] = Counter()
     sectors: set[str] = set()
@@ -568,13 +610,12 @@ def choose_slate(
             candidate.relevance
             + NEW_FAMILY_BONUS * (families[occupation.family_code] == 0)
             + NEW_SECTOR_BONUS * (occupation.sector_code not in sectors)
-            + DIRECTION_BONUS
-            * (directions[candidate.direction] < policy.quotas[candidate.direction])
+            + DIRECTION_BONUS * (directions[candidate.direction] < balance[candidate.direction])
             - SAME_FAMILY_PENALTY * families[occupation.family_code]
         )
 
-    while len(chosen) < SLATE_SIZE:
-        options = [c for c in remaining if families[c.occupation.family_code] < policy.family_limit]
+    while len(chosen) < size:
+        options = [c for c in remaining if families[c.occupation.family_code] < family_limit]
         if not options:
             break
         best = max(options, key=gain)  # the first of equals, in `_order`
@@ -584,22 +625,36 @@ def choose_slate(
         sectors.add(best.occupation.sector_code)
         directions[best.direction] += 1
 
+    left: list[Left] = []
     blocked = 0
     for candidate in remaining:
-        at_limit = families[candidate.occupation.family_code] >= policy.family_limit
+        at_limit = families[candidate.occupation.family_code] >= family_limit
         blocked += at_limit
         reason = NotIncluded.FAMILY_LIMIT if at_limit else NotIncluded.LESS_RELEVANT
         left.append(Left(candidate, reason))
+    return _Ranked(chosen, left, blocked)
 
+
+def _slate(
+    pool: Pool,
+    eligible: _Eligible,
+    ranked: list[_Ranked],
+    short: list[FewMatched],
+    policy: _Policy,
+    reference: Reference,
+) -> Slate:
+    """The chosen sets in order, with why anything is left out and why there are fewer than
+    `SLATE_SIZE`: nothing found, a set short of what matched (`short`), kinds of work shown as
+    often as allowed, or the person's exclusions."""
+    chosen = [c for r in ranked for c in r.chosen]
+    left = [*eligible.left, *(item for r in ranked for item in r.left)]
+    blocked = sum(r.blocked for r in ranked)
     fewer: list[FewerReason] = []
     if len(chosen) < SLATE_SIZE:
-        if not pool.candidates:
-            fewer.append(NothingFound())
-        elif len(eligible) < SLATE_SIZE:
-            fewer.append(FewMatched(count=len(eligible)))
+        fewer += [NothingFound()] if not pool.candidates else short
         if blocked:
             fewer.append(KindsOfWorkShown(count=blocked, family_limit=policy.family_limit))
-        removed = sum(excluded.values())
+        removed = sum(eligible.excluded.values())
         if removed:
             fewer.append(ExclusionsRemoved(count=removed))
     return Slate(
@@ -607,8 +662,51 @@ def choose_slate(
         not_included=tuple(sorted(left, key=lambda item: _order(item.candidate))),
         pool_size=sum(c.duplicate_of is None for c in pool),
         beyond_limit=pool.beyond_limit,
-        excluded=excluded,
+        excluded=eligible.excluded,
         family_limit=policy.family_limit,
+        reference=reference,
         fewer_reasons=fewer,
         notes=[policy.note] if policy.note else [],
     )
+
+
+def choose_slate(
+    pool: Pool,
+    controls: SlateControls | None = None,
+    left_out: Mapping[uuid.UUID, NotIncluded] | None = None,
+    *,
+    reference: Reference,
+) -> Slate:
+    """The slate: Next step, then Aim higher, each of up to `HORIZON_SIZE` through the same
+    reranker, every eligible candidate placed against the person's `reference` level.
+    `left_out`: occupations a hard filter leaves out (the salary floor, the AI Resilience
+    filter), each with its reason; the caller decided, from evidence, that each is below."""
+    controls = controls or SlateControls()
+    policy = _POLICIES[controls.emphasis]
+    eligible = _eligible(pool, controls, left_out or {}, policy.floor)
+    ranked: list[_Ranked] = []
+    short: list[FewMatched] = []
+    for horizon in Horizon:
+        placed = [
+            c for c in eligible.candidates if place(c.occupation.family_code, reference) is horizon
+        ]
+        balance = policy.balances[horizon]
+        ranked.append(_rerank(placed, HORIZON_SIZE, policy.family_limit, balance))
+        if len(placed) < HORIZON_SIZE:
+            short.append(FewMatched(count=len(placed), horizon=horizon))
+    return _slate(pool, eligible, ranked, short, policy, reference)
+
+
+def choose_first_scatter(
+    pool: Pool, left_out: Mapping[uuid.UUID, NotIncluded] | None = None, *, reference: Reference
+) -> Slate:
+    """The world's first scatter of destinations (the origin): one set of up to `SLATE_SIZE`,
+    balanced across the three directions, by the same reranker. Its near and far lines are a
+    later slice than the two horizons, so it is not split; `reference` places each
+    destination as a fact only."""
+    policy = _POLICIES[Emphasis.BALANCED]
+    eligible = _eligible(pool, SlateControls(), left_out or {}, policy.floor)
+    ranked = _rerank(eligible.candidates, SLATE_SIZE, policy.family_limit, _FIRST_SCATTER)
+    count = len(eligible.candidates)
+    short = [FewMatched(count=count, horizon=None)] if count < SLATE_SIZE else []
+    return _slate(pool, eligible, [ranked], short, policy, reference)

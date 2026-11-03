@@ -158,6 +158,7 @@ const suggestion = (
   title: string,
   family: string,
   direction: SuggestionOut["direction"],
+  level: SuggestionOut["skill_level"],
 ): SuggestionOut => ({
   concept_id: title,
   concept_kind: "esco",
@@ -166,6 +167,9 @@ const suggestion = (
   isco_group: { code: `${family}1`, label: `Group ${family}` },
   family: { code: family, label: `Kind of work ${family}` },
   sector: { code: family[0] ?? "9", label: "Sector" },
+  // The stories' role is at level 2 (Task 6g): work above it is Aim higher.
+  horizon: level > 2 ? "aim_higher" : "next_step",
+  skill_level: level,
   direction,
   channels: ["tasks"],
   linked_evidence: [{ field: "enjoyed_tasks", text: "repairing physical objects" }],
@@ -207,8 +211,16 @@ const slate = (suggestions: SuggestionOut[]): SlateOut => ({
   emphasis: "balanced",
   target_size: 6,
   family_limit: 2,
+  reference: { basis: "role_occupation", level: 2 },
   suggestions,
-  fewer_reasons: suggestions.length < 6 ? [{ reason: "few_matched", count: 2 }] : [],
+  // The thin slate: two next steps, and nothing for Aim higher.
+  fewer_reasons:
+    suggestions.length < 6
+      ? [
+          { reason: "few_matched", count: 2, horizon: "next_step" },
+          { reason: "few_matched", count: 0, horizon: "aim_higher" },
+        ]
+      : [],
   notes: [],
   salary_floor: null,
   ai_resilience_filter: {
@@ -245,13 +257,14 @@ const slate = (suggestions: SuggestionOut[]): SlateOut => ({
   // The stories' role joins work by shared skills, so its kind of work is known.
   familiarity_known: true,
 });
+// Next step's three, then Aim higher's, as the API lists them.
 const full = [
-  suggestion("agricultural machinery technician", "723", "close_to_current"),
-  suggestion("warehouse manager", "432", "close_to_current"),
-  suggestion("facilities technician", "311", "transferable"),
-  suggestion("training coordinator", "242", "transferable"),
-  suggestion("tree surgeon", "621", "less_familiar"),
-  suggestion("wind turbine technician", "311", "less_familiar"),
+  suggestion("agricultural machinery technician", "723", "close_to_current", 2),
+  suggestion("warehouse manager", "432", "close_to_current", 2),
+  suggestion("tree surgeon", "621", "less_familiar", 2),
+  suggestion("facilities technician", "311", "transferable", 3),
+  suggestion("training coordinator", "242", "transferable", 4),
+  suggestion("wind turbine technician", "311", "less_familiar", 3),
 ];
 // The written note (S2.7): synthetic claims quoting the story's answers and ESCO's words
 // the cards show (the skill "use hand tools" and each title).

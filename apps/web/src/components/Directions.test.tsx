@@ -114,6 +114,8 @@ const suggestion: SuggestionOut = {
   isco_group: { code: "7231", label: "Motor vehicle mechanics and repairers" },
   family: { code: "723", label: "Machinery mechanics and repairers" },
   sector: { code: "7", label: "Craft and related trades workers" },
+  horizon: "next_step",
+  skill_level: 2,
   direction: "less_familiar",
   channels: ["tasks"],
   linked_evidence: [{ field: "enjoyed_tasks", text: "repairing bicycles" }],
@@ -149,8 +151,10 @@ const slate = (shown: SuggestionOut[]): SlateOut => ({
   emphasis: "balanced",
   target_size: 6,
   family_limit: 2,
+  reference: { basis: "unknown", level: null },
   suggestions: shown,
-  fewer_reasons: shown.length < 6 ? [{ reason: "few_matched", count: 1 }] : [],
+  fewer_reasons:
+    shown.length < 6 ? [{ reason: "few_matched", count: 1, horizon: "next_step" }] : [],
   notes: [],
   salary_floor: null,
   ai_resilience_filter: {
@@ -250,13 +254,14 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
     expect(screen.getByText("Why this could suit you")).toBeVisible();
     expect(screen.getByText("Try it before committing")).toBeVisible();
     // Never overwhelming: the notes are one step away, and each keeps its words there.
-    expect(screen.getByText(/Only 1 occupation matched/)).not.toBeVisible();
+    const few = /Careerwright found only 1 occupation for Next step/;
+    expect(screen.getByText(few)).not.toBeVisible();
     await openNotes(user, 3);
-    expect(screen.getByText(/Only 1 occupation matched/)).toBeVisible();
-    // Task 6f: the note loses its "yet" (the school-leaver walk's word pass).
+    expect(screen.getByText(few)).toBeVisible();
+    // How the two sets were placed (Task 6g), naming no work it doesn't know.
     expect(
       screen.getByText(
-        "Careerwright doesn't know your current work, so it can't say which directions are close to it.",
+        "Careerwright placed each suggestion by the training its job group usually needs: Aim higher is work that usually needs study after A-levels or similar.",
       ),
     ).toBeVisible();
     // Never shown as a suggestion, and named for what Careerwright did (W2B re-review 5; Task
@@ -267,41 +272,44 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
       ),
     ).toBeVisible();
     expect(screen.queryByRole("heading", { name: UK_TITLE_IDEAS.heading })).toBeNull();
-    // Familiarity unknown: the group heading claims no relation to their current work.
-    expect(screen.getByRole("heading", { name: "Directions to consider" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Next step" })).toBeVisible();
     expect(document.body.textContent).not.toMatch(/\d\s?(%|per ?cent)/i); // a number as a percentage
   });
 
-  it("[DIV1-03][DIV1-10] says Something different only when the API knows the role's kind of work", async () => {
-    // Design review M-2: a role kept in the person's words (or after "None of these is my
-    // job") names no ESCO occupation, so nothing knows what is different from it: say less.
-    const kept: ProfileOut = {
-      ...profile,
-      document: {
-        ...profile.document,
-        current_role: { state: "provided", value: "Bookkeeping assistant", source_ref_id: "s2" },
-      },
+  it("[DIV1-16][DIV1-12] lists Next step then Aim higher, never by direction, and says an Aim higher job group's usual training", async () => {
+    // The product owner's re-test (3 November 2026): "Directions to consider" was very odd,
+    // and the suggestions too basic. The API places each in a set; the web heads the two.
+    const higher: SuggestionOut = {
+      ...suggestion,
+      concept_id: "o3",
+      title: "chemist",
+      family: { code: "211", label: "Physical and earth science professionals" },
+      horizon: "aim_higher",
+      skill_level: 4,
+      direction: "less_familiar",
     };
-    let known = false;
-    fakeApi([
-      {
-        method: "GET",
-        path: /\/slate$/,
-        answer: () => ({ ...slate([suggestion]), familiarity_known: known }),
-      },
-    ]);
-    const { user } = renderDirections(discovery, undefined, kept);
+    const close: SuggestionOut = { ...suggestion, direction: "close_to_current" };
+    fakeApi([{ method: "GET", path: /\/slate$/, answer: () => slate([close, higher]) }]);
+    renderDirections();
 
-    expect(await screen.findByRole("heading", { name: "Directions to consider" })).toBeVisible();
-    expect(screen.queryByRole("heading", { name: "Something different" })).toBeNull();
-    await openNotes(user, 2);
-    // The role was given, so it never says Careerwright doesn't know the person's work.
-    expect(screen.queryByText(/doesn't know your current work/)).toBeNull();
-    cleanup();
-
-    known = true;
-    renderDirections(discovery, undefined, kept);
-    expect(await screen.findByRole("heading", { name: "Something different" })).toBeVisible();
+    const sets = await screen.findAllByRole("heading", { level: 3 });
+    expect(sets.map((heading) => heading.textContent)).toEqual(["Next step", "Aim higher"]);
+    for (const direction of ["Directions to consider", "Close to what you do now"]) {
+      expect(screen.queryByText(direction)).toBeNull();
+    }
+    const aim = screen.getByRole("region", { name: "Aim higher" });
+    expect(within(aim).getByRole("article", { name: "Chemist" })).toBeVisible();
+    // The Aim higher card, closed: its usual training in its kind of work's line, and nothing
+    // else added.
+    expect(
+      within(aim).getByText(
+        "Kind of work: Physical and earth science professionals. Most work in this job group usually needs a degree or equivalent training.",
+      ),
+    ).toBeVisible();
+    // The Next step card, open first: its kind of work alone, never its training.
+    const next = screen.getByRole("region", { name: "Next step" });
+    expect(within(next).getByText("Kind of work: Machinery mechanics and repairers")).toBeVisible();
+    expect(within(next).queryByText(/usually needs/)).toBeNull();
   });
 
   it("[PROF-14] with no work known, never says close to what they do now, offers no Closer to what I do, and never tells someone with no job yet that their work isn't known", async () => {
@@ -319,10 +327,9 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
     fakeApi([{ method: "GET", path: /\/slate$/, answer: () => answer() }]);
     renderDirections(discovery, undefined, withTarget);
 
-    // Close only to the role they named: never "Close to what you do now".
-    expect(
-      await screen.findByRole("heading", { name: "Close to the roles you named" }),
-    ).toBeVisible();
+    // Close only to the role they named: never "Close to what you do now" (Task 6g: no set is
+    // headed by direction at all).
+    expect(await screen.findByRole("heading", { name: "Next step" })).toBeVisible();
     expect(screen.queryByText("Close to what you do now")).toBeNull();
     expect(screen.queryByRole("button", { name: "Closer to what I do" })).toBeNull();
     expect(screen.getByRole("button", { name: "Balanced" })).toBeVisible();
@@ -336,9 +343,9 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
       document: { ...profile.document, current_role: noJob },
     };
     const { user } = renderDirections(discovery, undefined, nothingNamed);
-    expect(await screen.findByRole("heading", { name: "Directions to consider" })).toBeVisible();
-    await openNotes(user, 2);
-    expect(screen.queryByText(/doesn't know your current work/)).toBeNull();
+    expect(await screen.findByRole("heading", { name: "Next step" })).toBeVisible();
+    await openNotes(user, 3);
+    expect(screen.queryByText(/doesn't know your (current )?work/)).toBeNull();
     expect(screen.queryByRole("button", { name: "Closer to what I do" })).toBeNull();
     cleanup();
 

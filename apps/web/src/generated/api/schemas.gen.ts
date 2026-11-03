@@ -4701,16 +4701,28 @@ export const FewMatchedSchema = {
         count: {
             type: 'integer',
             title: 'Count'
+        },
+        horizon: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Horizon'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            description: 'The set it is about (each holds up to three); null: the world\'s first scatter, one set of up to six.'
         }
     },
     additionalProperties: false,
     type: 'object',
     required: [
         'reason',
-        'count'
+        'count',
+        'horizon'
     ],
     title: 'FewMatched',
-    description: 'Only these matched closely enough to suggest; weaker matches don\'t fill the rest.'
+    description: 'Only these matched closely enough to suggest in a set; weaker matches don\'t fill the\nrest.'
 } as const;
 
 export const FieldEditSchema = {
@@ -5395,6 +5407,15 @@ export const HoldingSchema = {
         'unknown'
     ],
     title: 'Holding'
+} as const;
+
+export const HorizonSchema = {
+    type: 'string',
+    enum: [
+        'next_step',
+        'aim_higher'
+    ],
+    title: 'Horizon'
 } as const;
 
 export const HoursFieldSchema = {
@@ -12491,6 +12512,17 @@ export const RecurringSchema = {
     description: 'Payments stated as "from £X a month" with or without their number: a total is known\nonly with the count and an exact amount.'
 } as const;
 
+export const ReferenceBasisSchema = {
+    type: 'string',
+    enum: [
+        'role_occupation',
+        'uk_title_groups',
+        'unknown'
+    ],
+    title: 'ReferenceBasis',
+    description: 'What the person\'s reference level was read from.'
+} as const;
+
 export const ReferenceLabelSchema = {
     properties: {
         reference_version: {
@@ -12520,6 +12552,41 @@ export const ReferenceLabelSchema = {
     ],
     title: 'ReferenceLabel',
     description: 'The rubrics, crosswalks and gate types\' version and review state.'
+} as const;
+
+export const ReferenceOutSchema = {
+    properties: {
+        basis: {
+            $ref: '#/components/schemas/ReferenceBasis',
+            description: 'role_occupation: the ESCO occupation their role names; uk_title_groups: the ISCO-08 groups the UK job-title index codes its title to, all at one level; unknown: neither, so ISCO\'s bands placed each (levels 1 and 2 Next step, 3 and 4 Aim higher).'
+        },
+        level: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    enum: [
+                        1,
+                        2,
+                        3,
+                        4
+                    ]
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Level',
+            description: 'Null when unknown: never a number.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'basis',
+        'level'
+    ],
+    title: 'ReferenceOut',
+    description: 'The person\'s reference level, which placed each suggestion: Next step is work whose job\ngroup\'s usual skill level is at or below it, Aim higher work above it (for level 4,\nlevel-4 work in another ISCO-08 major group). Read from their role alone.'
 } as const;
 
 export const ReferenceReleaseOutSchema = {
@@ -16475,12 +16542,16 @@ export const SlateOutSchema = {
             title: 'Family Limit',
             description: 'At most this many from one kind of work.'
         },
+        reference: {
+            $ref: '#/components/schemas/ReferenceOut'
+        },
         suggestions: {
             items: {
                 $ref: '#/components/schemas/SuggestionOut'
             },
             type: 'array',
-            title: 'Suggestions'
+            title: 'Suggestions',
+            description: 'Next step\'s, then Aim higher\'s (each suggestion\'s `horizon`).'
         },
         fewer_reasons: {
             items: {
@@ -16685,6 +16756,7 @@ export const SlateOutSchema = {
         'release',
         'emphasis',
         'family_limit',
+        'reference',
         'suggestions',
         'fewer_reasons',
         'notes',
@@ -16702,7 +16774,7 @@ export const SlateOutSchema = {
         'familiarity_known'
     ],
     title: 'SlateOut',
-    description: 'A varied slate of up to six career hypotheses from the discovery\'s searches, computed\ndeterministically each time it is read, with every count that explains it. A title of\nthe person\'s own (their role, a target, or a search naming one) joins other work only by\nshared essential skills, never by its words, and only once it names one occupation.'
+    description: 'A varied slate of career hypotheses from the discovery\'s searches, in two sets of up to\nthree, Next step then Aim higher, computed deterministically each time it is read, with\nevery count that explains it. A title of the person\'s own (their role, a target, or a\nsearch naming one) joins other work only by shared essential skills, never by its words,\nand only once it names one occupation.'
 } as const;
 
 export const SmallPoolSchema = {
@@ -18394,6 +18466,21 @@ export const SuggestionOutSchema = {
             $ref: '#/components/schemas/IscoGroupOut',
             description: 'Its ISCO-08 major group.'
         },
+        horizon: {
+            $ref: '#/components/schemas/Horizon',
+            description: 'The set the slate placed it in, by its job group\'s usual skill level against the person\'s reference level (`SlateOut.reference`): never whether it suits them, whether they are ready, or what it pays.'
+        },
+        skill_level: {
+            type: 'integer',
+            enum: [
+                1,
+                2,
+                3,
+                4
+            ],
+            title: 'Skill Level',
+            description: 'Its job group\'s usual ISCO-08 skill level, by its sub-major group: the training most work there usually needs, from 1 to 4 (a degree or equivalent). A job group\'s level, never the person\'s, never pay or status.'
+        },
         direction: {
             $ref: '#/components/schemas/Direction'
         },
@@ -18510,6 +18597,8 @@ export const SuggestionOutSchema = {
         'isco_group',
         'family',
         'sector',
+        'horizon',
+        'skill_level',
         'direction',
         'channels',
         'linked_evidence',

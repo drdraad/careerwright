@@ -72,9 +72,9 @@ def test_every_discovery_case_passes_on_the_full_release(full_release: sa.Engine
     }
 
     print(f"discovery cases: {len(cases)}, failures by type: {failures_by_type(results)}")
-    for case_id in ("DSC-01", "DSC-03"):
+    for case_id in ("DSC-01", "DSC-03", "DSC-21", "DSC-22"):
         shown = [
-            (s["title"], s["family"]["code"], s["direction"])
+            (s["title"], s["isco_group"]["code"], s["horizon"], s["direction"])
             for s in observed[case_id]["suggestions"]
         ]
         print(f"{case_id}: pool {observed[case_id]['pool_size']}, slate {shown}")
@@ -84,16 +84,24 @@ def test_every_discovery_case_passes_on_the_full_release(full_release: sa.Engine
     # (DIV1-02): since Task W2B fix round 2 a search reaches work only through a skill whose
     # label holds all its words, and work style isn't searched, so only "working outdoors"
     # reaches work (12 occupations). Below the target, the slate says why (DSC-01's
-    # `small_pool_has_reason`). The bound itself is exercised on the full release by
-    # `test_the_working_pool_keeps_its_bound_and_counts_the_work_beyond_it`.
+    # `small_pool_has_reason`): a full slate in a note, a short one in why it is short (since
+    # Task 6g, Aim higher has two of the twelve to choose from). The bound itself is exercised
+    # on the full release by `test_the_working_pool_keeps_its_bound_and_counts_the_work_beyond_it`.
     assert p02["pool_size"] <= POOL_LIMIT
-    if p02["pool_size"] < POOL_TARGET:
+    if p02["pool_size"] < POOL_TARGET and len(p02["suggestions"]) == p02["target_size"]:
         assert {
             "reason": "small_pool",
             "outcome": "found_work",
             "pool_size": p02["pool_size"],
             "pool_target": POOL_TARGET,
         } in p02["notes"]
+    elif p02["pool_size"] < POOL_TARGET:
+        aim_higher = [s for s in p02["suggestions"] if s["horizon"] == "aim_higher"]
+        assert {
+            "reason": "few_matched",
+            "count": len(aim_higher),
+            "horizon": "aim_higher",
+        } in p02["fewer_reasons"]
     assert p02["release"]["sample"] is False  # the real catalogue, not the test subset
 
 
@@ -131,21 +139,31 @@ def test_every_evaluation_case_s_slate_is_the_one_before_targets_were_stored_onc
     # case (DSC-20, title ideas beside the slate); every case recorded before is compared.
     # Slice C: the slate no longer singles out a connection (the product owner's "Always a
     # plain line"), so the recording's `connection` is not compared; the file is unchanged.
+    # Task 6g: the slate is now two sets, Next step and Aim higher, placed by each job group's
+    # usual training, so which occupations it chooses, in what order, and why each other one
+    # is left out change by design (the evaluation cases check the new rule). What the
+    # searches found is unchanged and still compared: the pool and every occupation in it,
+    # what was found past its bound, every search, and the person's titles that joined
+    # nothing. The file is unchanged.
     recorded = json.loads(SLATES_BEFORE.read_text(encoding="utf-8"))
-    before = {
-        case: {key: value for key, value in shape.items() if key != "connection"}
-        for case, shape in recorded.items()
-    }
+    before = {case: pool_shape(shape) for case, shape in recorded.items()}
     cases = [case for case in load_cases() if case.kind is CaseKind.DISCOVERY]
     assert set(before) <= {case.id for case in cases}
     with system_transaction(full_release) as tx:
         now = {
-            case.id: slate_shape(observe_discovery_offline(tx, case))
+            case.id: pool_shape(slate_shape(observe_discovery_offline(tx, case)))
             for case in cases
             if case.id in before
         }
 
     assert now == before
+
+
+def pool_shape(shape: dict[str, Any]) -> dict[str, Any]:
+    """What a slate's searches found, apart from what it chose from it (Task 6g)."""
+    found = ("pool_size", "beyond_pool_limit", "unmatched_titles", "ambiguous_titles", "queries")
+    pooled = {s[0] for s in shape["suggestions"]} | {n[0] for n in shape["not_included"]}
+    return {**{key: shape[key] for key in found}, "pooled": sorted(pooled)}
 
 
 @pytest.mark.req("PROF-10")
@@ -384,11 +402,12 @@ def test_a_general_answer_adds_weight_to_all_the_work_another_answer_found(
     # occupations and kept its best 127, which leave out the nursery school head teacher
     # ("write work-related reports"), so the one occupation both answers reach lost the
     # general answer's weight. It now adds to every occupation another search found.
+    # Since Task 6g it heads Aim higher: an education manager's job group usually needs a degree.
     with system_transaction(full_release) as tx:
         slate = observed_for(tx, {"enjoyed_tasks": ["caring for children", "writing reports"]})
 
-    first = slate["suggestions"][0]
-    assert first["title"] == "nursery school head teacher"
+    first = next(s for s in slate["suggestions"] if s["horizon"] == "aim_higher")
+    assert (first["title"], first["skill_level"]) == ("nursery school head teacher", 4)
     assert {e["text"] for e in first["linked_evidence"]} == {
         "caring for children",
         "writing reports",
@@ -442,6 +461,57 @@ def test_the_demo_s_scripted_strengths_are_essential_esco_skills_named_as_esco_n
         found = {row["esco_uri"]: row["preferred_label"] for row in rows}
 
     assert found == {s.skill_uri: s.skill_label for s in SCRIPTED_STRENGTHS}
+
+
+@pytest.mark.req("DIV1-16")
+@pytest.mark.parametrize(
+    ("role", "reference"),
+    [
+        # ESCO's title of the warehouse manager (unit group 1324, managers: level 4).
+        ("warehouse supervisor", {"basis": "role_occupation", "level": 4}),
+        # No ESCO title; the UK job-title index codes it to 2512 (professionals: level 4).
+        ("Prompt engineer", {"basis": "uk_title_groups", "level": 4}),
+        # Sam's, on no list: unknown, never a number.
+        ("Client onboarding assistant", {"basis": "unknown", "level": None}),
+        ({"state": "no_job_yet"}, {"basis": "unknown", "level": None}),
+        ({"state": "skipped"}, {"basis": "unknown", "level": None}),
+    ],
+)
+def test_the_reference_level_is_read_from_the_role_alone_on_the_full_release(
+    full_release: sa.Engine, role: Any, reference: dict[str, Any]
+) -> None:
+    # Task 6g: from the role's ESCO occupation, else the ISCO-08 groups the UK job-title index
+    # codes its title to when they agree; otherwise unknown, and ISCO's bands place the work.
+    # A target never sets it.
+    profile = {"current_role": role, "target_titles": ["nurse"], "enjoyed_tasks": ["stock shelves"]}
+    with system_transaction(full_release) as tx:
+        slate = observed_for(tx, profile)
+
+    assert slate["reference"] == reference
+    assert slate["suggestions"]
+    top = 2 if reference["level"] is None else reference["level"]
+    for s in slate["suggestions"]:
+        if not s["skill_level"] == top == 4:  # level 4 for a level-4 role: by major group
+            assert s["horizon"] == ("aim_higher" if s["skill_level"] > top else "next_step")
+
+
+@pytest.mark.req("TEST1-16", "DIV1-16")
+def test_the_school_leaver_s_answers_as_searches_find_no_work_so_her_case_gives_a_model_s(
+    full_release: sa.Engine,
+) -> None:
+    # Task 6g: the demo proposer searches each answer as written, and no essential skill's
+    # main name holds all the words of hers, so DSC-21's checks held on an empty slate. Her
+    # case now gives the searches a model might propose (its note says so).
+    [maya] = [case for case in load_cases() if case.id == "DSC-21"]
+    with system_transaction(full_release) as tx:
+        as_written = observed_for(tx, maya.profile)
+
+    assert as_written["suggestions"] == []
+    assert {q["text"]: q["reach"] for q in as_written["queries"]} == {
+        "doing practicals in the chemistry lab": 0,
+        "helping the younger girls with crafts": 0,
+        "help run a Brownies group": 0,
+    }
 
 
 @pytest.mark.req("DIV1-15", "TEST1-16")

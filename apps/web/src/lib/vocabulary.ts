@@ -9,7 +9,6 @@ import type {
   BudgetScope,
   ConversationMode,
   DataMode,
-  Direction,
   Emphasis,
   EmptyReason,
   EntryMode,
@@ -758,22 +757,48 @@ export const ROLE_RESEARCH = {
   targetSaved: "Saved as one of your targets.",
 } as const;
 
-/** The slate's three directions (relative to what the person has told Careerwright). */
-export const DIRECTION: Record<Direction, string> = {
-  close_to_current: "Close to what you do now",
-  transferable: "Builds on skills you could carry over",
-  less_familiar: "Something different",
+type Horizon = SuggestionOut["horizon"];
+
+/** The slate's two sets (Task 6g; the product owner, 3 November 2026), placed by code by each
+ *  job group's usual training: their headings, in the order they are listed. They replace the
+ *  direction headings, so nothing is headed "Directions to consider" or "Close to what you do
+ *  now" for someone whose work Careerwright doesn't know. */
+export const HORIZON: Record<Horizon, string> = {
+  next_step: "Next step",
+  aim_higher: "Aim higher",
+};
+export const HORIZON_ORDER: readonly Horizon[] = ["next_step", "aim_higher"];
+
+/** What Careerwright checked about an Aim higher suggestion's job group (its ISCO skill level):
+ *  the training most work there usually needs. Never that the work suits the person, that they
+ *  are ready, or that it pays more. Level 1 is above no other level, so it is never said. */
+const USUAL_TRAINING: Record<SuggestionOut["skill_level"], string | null> = {
+  1: null,
+  2: "Most work in this job group usually needs GCSEs or similar, sometimes A-levels or a vocational course.",
+  3: "Most work in this job group usually needs one to three years of study after A-levels or similar.",
+  4: "Most work in this job group usually needs a degree or equivalent training.",
 };
 
-/** The close group's heading when Careerwright knows no current work (Task 6f): with no role,
- *  only the roles the person named make a suggestion close, so nothing is called close to
- *  what they do now. */
-export const CLOSE_WITHOUT_WORK = "Close to the roles you named";
+/** A suggestion's kind of work, with an Aim higher suggestion's usual training after it in the
+ *  same line: a Next step card says nothing of its training, so no work is called basic. */
+export function kindOfWorkLine(suggestion: SuggestionOut): string {
+  const kind = SUGGESTION_WORDS.kindOfWork(suggestion.family.label);
+  const training =
+    suggestion.horizon === "aim_higher" ? USUAL_TRAINING[suggestion.skill_level] : null;
+  return training === null ? kind : `${kind}. ${training}`;
+}
 
-/** Beside the suggestions when Careerwright knows neither the person's work nor a role they
- *  named; never said to someone who told Careerwright they haven't had a job yet. */
-export const WORK_NOT_KNOWN =
-  "Careerwright doesn't know your current work, so it can't say which directions are close to it.";
+/** How the two sets were placed, among the notes on how Careerwright searched: by what the
+ *  person's reference level was read from. Unknown names no work, so it holds for someone who
+ *  hasn't had a job yet. */
+export const REFERENCE_BASIS: Record<SlateOut["reference"]["basis"], string> = {
+  role_occupation:
+    "Careerwright placed each suggestion by the training its job group usually needs, compared with your role's job group in ESCO.",
+  uk_title_groups:
+    "Careerwright placed each suggestion by the training its job group usually needs, compared with the job group the UK job-title index gives your job title.",
+  unknown:
+    "Careerwright placed each suggestion by the training its job group usually needs: Aim higher is work that usually needs study after A-levels or similar.",
+};
 
 export const EMPHASIS: Record<Emphasis, string> = {
   balanced: "Balanced",
@@ -958,8 +983,13 @@ export const SLATE_NOTE: Worded<SlateNote> = {
 /** Why there are fewer than six suggestions. */
 export const FEWER_REASON: Worded<FewerReason> = {
   nothing_found: () => "None of your answers found work to suggest yet.",
+  // A set of the slate (Task 6g), or the world's first scatter (no set).
   few_matched: (fact) =>
-    `Only ${count(fact.count, "occupation", "occupations")} matched your answers closely enough to suggest. Careerwright doesn't fill the rest with weaker matches.`,
+    fact.horizon === null
+      ? `Only ${count(fact.count, "occupation", "occupations")} matched your answers closely enough to suggest. Careerwright doesn't fill the rest with weaker matches.`
+      : fact.count === 0
+        ? `Careerwright found no work for ${HORIZON[fact.horizon]} that matches your answers closely enough.`
+        : `Careerwright found only ${count(fact.count, "occupation", "occupations")} for ${HORIZON[fact.horizon]} that ${fact.count === 1 ? "matches" : "match"} your answers closely enough, and doesn't fill the rest with weaker matches.`,
   kinds_of_work_shown: (fact) =>
     `${count(fact.count, "more is", "more are")} in kinds of work already shown ${fact.family_limit} times; ask for more depth to see them.`,
   exclusions_removed: (fact) =>
