@@ -421,7 +421,9 @@ asks for or infers age.
   one line shared with ADR 0007's two prompts), and `check_turn` refuses one in the reply, the
   next question, a change's reason or its value, so the bounded repair (decision 9) asks
   again. Code never rewrites the model's words. A dash the person wrote is theirs: a dash
-  that stands between the same words in their messages is not refused. An en dash in a range
+  that stands between the same words in their messages or their saved answers (each text,
+  list item and qualification name, so a list kept word for word and a saved title the reply
+  names keep their dash) is not refused. An en dash in a range
   and a hyphen are not dashes used as punctuation. Known limit: the reply streams before it
   is checked (decision 13), so a refused reply's dash can show for a moment before the
   repair's reply replaces it.
