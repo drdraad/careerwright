@@ -1224,12 +1224,14 @@ code confirms, places and ranks; the person chooses. Decisions 4 and 5 change as
   study or experience than the person's, chosen for how well they follow from the answers,
   never for pay or status. Each quotes 1 to 3 answers and is checked as a title idea is
   (bounded, no dash of the model's, no inferred characteristic, each title once across both
-  lists). The model now reads the person's qualifications with their status, and the prompt
-  says an expected one is never achieved; a title idea or query may quote one by its name.
-  Qualifications alone never start a discovery. The output bound is 2,000 tokens and the prompt
-  bound 10,000 bytes, so an attempt reserves $0.0037 on the test model, $0.053 on Spark and
-  $0.196 on Muse Wonder (two requests, priced from the registry); three attempts fit the default
-  run limit and the session's. The demo proposer proposes none. Inputs and proposals sealed
+  lists, which the prompt says). The model now reads the person's qualifications with their
+  status, and the prompt says an expected one is never achieved; a title idea or query may
+  quote one by its name. Qualifications alone never start a discovery. The output bound, 4,000
+  tokens, holds the largest answer the check accepts (about 2,800 tokens at 3 bytes a token),
+  the reasoning that shares the bound (800) and a tenth more; with the prompt bound of 10,000
+  bytes an attempt reserves $0.0049 on the test model, $0.075 on Spark and $0.292 on Muse
+  Wonder (two requests, priced from the registry); three attempts fit the default run limit and
+  the session's. The demo proposer proposes none. Inputs and proposals sealed
   before carry no qualifications and no Aim higher ideas; the export (format 5) carries them.
 - **Decision 5: code confirms and places every title idea by one rule** (hypotheses `h1`...,
   then Aim higher ideas `a1`...). An ESCO label joins the pool, as before, and its occupation is
