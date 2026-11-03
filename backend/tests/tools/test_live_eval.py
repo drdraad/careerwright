@@ -37,8 +37,9 @@ def test_the_default_live_run_is_four_representative_cases_on_the_test_model() -
     assert {case.kind for case in cases} == {CaseKind.INTERVIEW, CaseKind.DISCOVERY}
     assert plan.model_id == "muse-spark-1.3-contributor"  # never the production model
     assert plan.calls == 8  # one attempt each, at most one validation repair
-    # Three interview attempts at $0.0035 and one discovery at $0.003 (their reservations).
-    assert plan.worst_case_nano_usd == 3 * 3_500_000 + 3_000_000
+    # Three interview attempts at $0.0035 and one discovery at $0.0037 (their reservations; the
+    # discovery's since Task 6g slice B's aim higher ideas).
+    assert plan.worst_case_nano_usd == 3 * 3_500_000 + 3_700_000
 
 
 @pytest.mark.req("MODEL-09")
@@ -81,8 +82,9 @@ def test_the_explanation_case_runs_only_when_named_within_the_controller_s_cap()
 
     assert "EXP-01" not in [case.id for case in select(load_cases(), None)]
     assert plan.calls == 4  # two runs, each the call and at most one repair
-    # Each run reserved at the larger worst case: the explanation's $0.0034.
-    assert plan.worst_case_nano_usd == 2 * 3_400_000
+    # Each run reserved at the larger worst case: the discovery's $0.0037 since Task 6g slice B
+    # (the explanation's is $0.0034).
+    assert plan.worst_case_nano_usd == 2 * 3_700_000
     with pytest.raises(CapExceededError, match="calls used"):
         authorise_eval(MODELS, cases, budget=cap, spent=ScopeSpend(6, 0, 0))
 
@@ -95,8 +97,15 @@ def test_wonder_cases_run_on_the_production_model_within_their_own_caps() -> Non
     plan = authorise_eval(wonder, two, budget=WONDER_BUDGET, spent=NOTHING_SPENT, production=True)
 
     assert (plan.model_id, plan.production, plan.calls) == ("muse-wonder-1.0", True, 4)
-    # An interview attempt ($0.176 on Wonder: two requests) and a discovery ($0.156).
-    assert plan.worst_case_nano_usd == 176_000_000 + 156_000_000 <= WONDER_MAX_COST_NANO_USD
+    # An interview attempt ($0.176 on Wonder: two requests) and a discovery ($0.196 since Task
+    # 6g slice B).
+    assert plan.worst_case_nano_usd == 176_000_000 + 196_000_000 <= WONDER_MAX_COST_NANO_USD
+    # The explanation case's two runs, each at the discovery's $0.196, stay within the cap.
+    explained = select(load_cases(), ["EXP-01"])
+    alone = authorise_eval(
+        wonder, explained, budget=WONDER_BUDGET, spent=NOTHING_SPENT, production=True
+    )
+    assert alone.worst_case_nano_usd == 2 * 196_000_000 <= WONDER_MAX_COST_NANO_USD
     four = select(load_cases(), None)
     with pytest.raises(CapExceededError, match="exceeds the cap"):
         authorise_eval(wonder, four, budget=WONDER_BUDGET, spent=NOTHING_SPENT, production=True)

@@ -343,6 +343,7 @@ def test_without_reference_data_the_evidence_is_unavailable_never_empty(
             "hypotheses": [
                 {"title": "Prompt engineer", "based_on": ["writing prompts for AI tools"]}
             ],
+            "aim_higher": [],
         },
         expect=[],
     )

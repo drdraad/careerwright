@@ -402,7 +402,7 @@
       "requirements": ["REC1-09"],
       "synthetic": true,
       "profile": {"enjoyed_tasks": ["repairing bicycles"]},
-      "discovery_output": {"queries": [{"text": "jobs for women in repair", "channel": "tasks", "based_on": ["repairing bicycles"]}], "hypotheses": []},
+      "discovery_output": {"queries": [{"text": "jobs for women in repair", "channel": "tasks", "based_on": ["repairing bicycles"]}], "hypotheses": [], "aim_higher": []},
       "expect": [{"check": "refused_with", "words": ["did not mention"]}]
     },
     {
@@ -606,7 +606,7 @@
       "requirements": ["DIV1-10", "DIV1-12", "REC1-06"],
       "synthetic": true,
       "profile": {"current_role": "data analyst"},
-      "discovery_output": {"queries": [{"text": "Data analysts", "channel": "transferable", "based_on": ["data analyst"]}], "hypotheses": []},
+      "discovery_output": {"queries": [{"text": "Data analysts", "channel": "transferable", "based_on": ["data analyst"]}], "hypotheses": [], "aim_higher": []},
       "expect": [
         {"check": "size_at_least", "count": 4},
         {"check": "joined_by_skills"},
@@ -692,7 +692,8 @@
           {"title": "data analyst", "based_on": ["analysing data"]},
           {"title": "Prompt engineer", "based_on": ["writing prompts for AI tools"]},
           {"title": "Orbital gardener", "based_on": ["writing prompts for AI tools"]}
-        ]
+        ],
+        "aim_higher": []
       },
       "expect": [
         {"check": "grounded"},
@@ -820,7 +821,8 @@
           {"text": "perform chemical experiments", "channel": "tasks", "based_on": ["doing practicals in the chemistry lab"]},
           {"text": "supervise children", "channel": "transferable", "based_on": ["help run a Brownies group"]}
         ],
-        "hypotheses": []
+        "hypotheses": [],
+        "aim_higher": []
       },
       "expect": [
         {"check": "grounded"},
@@ -850,7 +852,8 @@
           {"text": "communicate with customers", "channel": "transferable", "based_on": ["helping customers on the phone"]},
           {"text": "maintain customer records", "channel": "tasks", "based_on": ["setting up new clients' records"]}
         ],
-        "hypotheses": []
+        "hypotheses": [],
+        "aim_higher": []
       },
       "expect": [
         {"check": "reference_is", "value": {"basis": "unknown", "level": null}},

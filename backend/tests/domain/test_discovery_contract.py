@@ -1,6 +1,7 @@
 """The discovery contract (S2.4; REC-1, DIV-1): the model turns the confirmed profile into
-search queries and a few title hypotheses; deterministic code checks that every query rests
-on the person's own answers and carries no inference about them. Semantic checks only."""
+search queries, a few title hypotheses and up to six "aim higher" title ideas (Task 6g slice
+B); deterministic code checks that every query and idea rests on the person's own answers and
+carries no inference about them. Semantic checks only."""
 
 import json
 import uuid
@@ -12,6 +13,7 @@ from careerwright.profile.dashes import DASH_RULE, EM_DASH, EN_DASH
 from careerwright.profile.discovery import (
     EVIDENCE_FIELDS,
     INSTRUCTIONS,
+    MAX_AIM_HIGHER,
     MAX_HYPOTHESES,
     MAX_PROMPT_BYTES,
     MAX_QUERIES,
@@ -19,10 +21,12 @@ from careerwright.profile.discovery import (
     SCHEMA_ALLOWANCE_TOKENS,
     DiscoveryInput,
     DiscoveryOutput,
+    DiscoveryProposal,
     EvidenceItem,
     QueryChannel,
     check_discovery,
     evidence_of,
+    input_of,
     prompt_bytes,
     render_prompt,
     worst_case_nano_usd,
@@ -58,17 +62,39 @@ P02 = document(
 
 
 def context(doc: Any = P02) -> DiscoveryInput:
-    return DiscoveryInput(profile_version=3, evidence=evidence_of(doc))
+    return input_of(doc, profile_version=3)
 
 
 def query(text: str, channel: str = "tasks", *based_on: str) -> dict[str, Any]:
     return {"text": text, "channel": channel, "based_on": list(based_on) or ["working outdoors"]}
 
 
-def output(*queries: dict[str, Any], hypotheses: list[dict[str, Any]] | None = None) -> Any:
+def idea(title: str, *based_on: str) -> dict[str, Any]:
+    return {"title": title, "based_on": list(based_on) or ["working outdoors"]}
+
+
+def output(
+    *queries: dict[str, Any],
+    hypotheses: list[dict[str, Any]] | None = None,
+    aim_higher: list[dict[str, Any]] | None = None,
+) -> Any:
     return DiscoveryOutput.model_validate(
-        {"queries": list(queries), "hypotheses": hypotheses or []}
+        {"queries": list(queries), "hypotheses": hypotheses or [], "aim_higher": aim_higher or []}
     )
+
+
+# The synthetic school leaver (fixtures/synthetic/school-leaver.json): A-levels expected.
+MAYA = document(
+    enjoyed_tasks=[
+        "doing practicals in the chemistry lab",
+        "helping the younger girls with crafts",
+    ],
+    evidenced_tasks=["help run a Brownies group"],
+    qualifications=[
+        {"name": "A-level biology", "status": "expected"},
+        {"name": "GCSE maths", "status": "achieved"},
+    ],
+)
 
 
 def problems(out: DiscoveryOutput, ctx: DiscoveryInput | None = None) -> list[str]:
@@ -267,6 +293,90 @@ def test_bounds_duplicates_and_empty_output_are_problems() -> None:
     assert problems(output(query("repair work"), hypotheses=hypotheses))
 
 
+LAB = query("perform laboratory tests", "tasks", "doing practicals in the chemistry lab")
+
+
+@pytest.mark.req("DIV1-16", "DIV1-04", "PROF-13")
+def test_aim_higher_ideas_cite_the_answers_or_qualifications_they_come_from() -> None:
+    # Task 6g slice B: the one discovery call also proposes up to six "aim higher" title
+    # ideas, each quoting the answers it came from; the person's qualifications are among them.
+    out = output(
+        LAB,
+        aim_higher=[
+            idea("Clinical scientist", "doing practicals in the chemistry lab", "A-level biology"),
+            idea("Play therapist", "helping the younger girls with crafts"),
+        ],
+    )
+
+    proposal, found = check_discovery(out, context(MAYA), ProposalOrigin.MODEL)
+
+    assert found == []
+    assert proposal is not None
+    assert [h.title for h in proposal.aim_higher] == ["Clinical scientist", "Play therapist"]
+    assert [(e.field, e.text) for e in proposal.aim_higher[0].based_on] == [
+        (ProfileField.ENJOYED_TASKS, "doing practicals in the chemistry lab"),
+        (ProfileField.QUALIFICATIONS, "A-level biology"),
+    ]
+    assert proposal.hypotheses == []
+
+
+@pytest.mark.req("DIV1-16", "REC1-02", "REC1-06")
+def test_aim_higher_ideas_are_checked_as_title_ideas_are() -> None:
+    ctx = context(MAYA)
+    many = [idea(f"Scientist {n}", "A-level biology") for n in range(MAX_AIM_HIGHER + 1)]
+    unsaid = [idea("Forensic scientist", "loves crime dramas")]
+    dashed = [idea(f"Lab manager {EM_DASH} hospital", "A-level biology")]
+
+    assert problems(output(LAB, aim_higher=many), ctx) == [f"aim_higher: at most {MAX_AIM_HIGHER}"]
+    assert problems(output(LAB, aim_higher=unsaid), ctx) == [
+        "aim_higher 1: based_on must quote 1-3 of the person's answer texts exactly"
+    ]
+    assert problems(output(LAB, aim_higher=dashed), ctx) == [
+        "aim_higher 1: no em dash or spaced en dash; use a comma, colon or full stop"
+    ]
+    inferring = output(LAB, aim_higher=[idea("ADHD coach", "A-level biology")])
+    assert any("did not mention" in p for p in problems(inferring, ctx))
+    # One title once, whichever list it is in.
+    twice = output(
+        LAB,
+        hypotheses=[idea("Clinical scientist", "A-level biology")],
+        aim_higher=[idea("clinical  Scientist", "A-level biology")],
+    )
+    assert problems(twice, ctx) == ["title ideas: each title once"]
+
+
+@pytest.mark.req("DIV1-16", "PROF-13")
+def test_the_prompt_reads_qualifications_with_their_status_an_expected_one_never_held() -> None:
+    answers = json.loads(render_prompt(context(MAYA)).partition("\n")[2])["answers"]
+
+    assert {"field": "qualifications", "text": "A-level biology", "status": "expected"} in answers
+    assert {"field": "qualifications", "text": "GCSE maths", "status": "achieved"} in answers
+    assert all("status" not in a for a in answers if a["field"] != "qualifications")
+    said = " ".join(INSTRUCTIONS.split())
+    assert "never treat an expected one as achieved" in said
+    assert f"up to {MAX_AIM_HIGHER} titles" in said
+    assert "never for its pay or status" in said
+    assert PROMPT_VERSION == "discovery-queries-5"
+    # Qualifications inform: the answers that describe work still decide whether one starts.
+    only = document(qualifications=[{"name": "GCSE maths", "status": "achieved"}])
+    assert evidence_of(only) == []
+
+
+@pytest.mark.req("DIV1-16")
+def test_a_proposal_sealed_before_aim_higher_ideas_has_none() -> None:
+    sealed = {
+        "origin": "model",
+        "prompt_version": "discovery-queries-3",
+        "profile_version": 2,
+        "queries": [],
+        "hypotheses": [],
+    }
+
+    assert DiscoveryProposal.model_validate_json(json.dumps(sealed)).aim_higher == []
+    sealed_input = {"profile_version": 1, "evidence": []}
+    assert DiscoveryInput.model_validate(sealed_input).qualifications == []
+
+
 @pytest.mark.req("DIV1-10")
 def test_the_fixture_proposer_reads_the_live_prompt_and_passes_the_same_check() -> None:
     ctx = context()
@@ -280,6 +390,12 @@ def test_the_fixture_proposer_reads_the_live_prompt_and_passes_the_same_check() 
     channels = {q.channel for q in proposal.queries}
     assert QueryChannel.ENVIRONMENT in channels  # the work style informs the search
     assert fixture_queries(prompt_context(render_prompt(ctx))) == out  # deterministic
+    # It never invents a title: no hypothesis and no aim higher idea, and a qualification is
+    # never searched (Task 6g slice B).
+    maya = context(MAYA)
+    demo = fixture_queries(prompt_context(render_prompt(maya)))
+    assert (demo.hypotheses, demo.aim_higher) == ([], [])
+    assert "A-level biology" not in {q.text for q in demo.queries}
 
 
 def test_the_prompt_and_schema_fit_the_bounds_the_reservation_assumes() -> None:
@@ -291,6 +407,8 @@ def test_the_prompt_and_schema_fit_the_bounds_the_reservation_assumes() -> None:
         confident_tasks=long_items,
         evidenced_tasks=long_items,
         work_style=long_items,
+        # Task 6g slice B: the qualifications too, at their bound (eight of 120 characters).
+        qualifications=[{"name": f"{'q' * 118} {n}", "status": "expected"} for n in range(8)],
     )
     assert prompt_bytes(context(busy)) <= MAX_PROMPT_BYTES
     schema = json.dumps(DiscoveryOutput.model_json_schema())
@@ -316,17 +434,21 @@ def test_a_query_or_title_idea_with_an_em_dash_is_refused_unless_it_is_the_perso
         "query 1: no em dash or spaced en dash; use a comma, colon or full stop",
         "hypothesis 1: no em dash or spaced en dash; use a comma, colon or full stop",
     ]
-    assert PROMPT_VERSION == "discovery-queries-4"
+    # Version 4 brought the rule (slice E); version 5 keeps it (Task 6g slice B).
+    assert PROMPT_VERSION in ("discovery-queries-4", "discovery-queries-5")
     assert DASH_RULE in INSTRUCTIONS
 
 
 @pytest.mark.req("MODEL-08")
 def test_an_attempt_reserves_both_requests_at_their_bounds() -> None:
-    # Input bound 8,000 + 1,500 + 1,500 + 1,000 = 12,000 tokens, output 1,500, two requests.
-    # Contributor: (12,000 x 100 + 1,500 x 200) x 2 = 3,000,000 nano-USD ($0.003).
-    # Standard: (12,000 x 1,250 + 1,500 x 4,250) x 2 = 42,750,000 nano-USD ($0.04275).
-    assert worst_case_nano_usd("muse-spark-1.3-contributor") == 3_000_000
-    assert worst_case_nano_usd("muse-spark-1.3") == 42_750_000
+    # Task 6g slice B: up to six more title ideas out, the qualifications in.
+    # Input bound 10,000 + 1,500 + 2,000 + 1,000 = 14,500 tokens, output 2,000, two requests.
+    # Contributor: (14,500 x 100 + 2,000 x 200) x 2 = 3,700,000 nano-USD ($0.0037).
+    # Standard: (14,500 x 1,250 + 2,000 x 4,250) x 2 = 53,250,000 nano-USD ($0.05325).
+    # Muse Wonder: (14,500 x 4,000 + 2,000 x 20,000) x 2 = 196,000,000 nano-USD ($0.196).
+    assert worst_case_nano_usd("muse-spark-1.3-contributor") == 3_700_000
+    assert worst_case_nano_usd("muse-spark-1.3") == 53_250_000
+    assert worst_case_nano_usd("muse-wonder-1.0") == 196_000_000
     assert worst_case_nano_usd("careerwright-fixture-discovery-1") == 0
 
 

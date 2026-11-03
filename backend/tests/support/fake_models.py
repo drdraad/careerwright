@@ -116,6 +116,7 @@ def discovery_answer(
             for text in texts
         ],
         "hypotheses": [{"title": f"{sentinel} orbital gardener".strip(), "based_on": texts[:1]}],
+        "aim_higher": [],
     }
 
 

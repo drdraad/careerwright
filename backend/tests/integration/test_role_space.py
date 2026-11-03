@@ -605,6 +605,7 @@ def test_a_title_idea_the_uk_index_lists_is_a_suggestion_beside_the_slate_never_
                 {"title": "Prompt engineer", "based_on": ["writing prompts for AI tools"]},
                 {"title": "orbital gardener", "based_on": ["writing prompts for AI tools"]},
             ],
+            "aim_higher": [],
         },
         expect=[],
     )
