@@ -209,3 +209,31 @@ committed, and a workspace whose key is stored during the session gets $0.75 a r
 from the API's defaults. So a session's total is at most $5 for each workspace capped at
 start, plus $5 for each workspace keyed during it; the command prints that total when it
 starts. The product's own reservation holds every call to its workspace's caps.
+
+## Amendment line, Task W2F slice D (2026-11-03): role research searches deeper; the run caps follow
+
+The product owner, 3 November 2026: "Widen it. Deeper search", then "Up to 20 pages. We need
+to do this properly. Landing on the home page is useless. We need to use Meta web search more
+effectively."
+- **Role research's search** asks Meta for search context `medium` and at most eight tool
+  calls in its one request (`search.ROLE_SEARCH`); the job search keeps `low` and two
+  (`search.JOB_SEARCH`). Qualification so far covers `low` only: `medium` is unqualified until
+  the controller's live check. Meta's published search price is one price per search,
+  whatever the context ($2.50 per 1,000), so the reservation is priced from the registry.
+  The tokens a `medium` search injects are not measured; the reservation keeps `low`'s bound
+  of 12,000 a call, and a search past it fails `bound_exceeded`, booked at its actual cost.
+- **One reservation for the run kind.** Both searches are the `source_search` kind, and the
+  activity reserves before it opens the sealed input, so the kind reserves role research's
+  larger search for either purpose and holds both to its bounds: 99,000 input tokens, 4,000
+  output, eight searches. That is $0.031 on the test model, $0.161 on Spark and $0.496 on
+  Wonder for one attempt. A job search therefore reserves more than it can spend, and the
+  check that would have failed its third search now fails its ninth.
+- **The run caps rise, each still "three attempts of the costliest run kind fit"** (the
+  product owner's yes, 3 November 2026). The default run limit goes from $0.15 to $0.50
+  (`config.py`, `compose.yaml`): 3 x $0.161 = $0.482. Migration 0047 moves stored limits
+  never changed from the old default (`version` 1, exactly $0.15) to $0.50, as 0009 did
+  before; a limit the person set is kept. The session's run cap goes from $0.75 to $1.60
+  (`tools/session.py`): 3 x $0.496 = $1.488. The $5 per workspace for a session, and the $1.00
+  a month default, are unchanged. A run's hard maximum, after a worker crash, is its run limit,
+  so it rises with it for every kind: a job acquisition's five extractions now show at most
+  $2.50 (five runs at $0.50).
