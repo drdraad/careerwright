@@ -93,11 +93,14 @@ test("[PROF-08][MODEL-03][STATE-06][PROF-04][REC1-07][REC1-11][STATE-05][BND1-11
   const tray = page.getByRole("region", { name: /To review: 4 changes/ });
   // One decision at a time (design review I4): the next question waits for the tray, and so
   // does the reply field (the product owner, 3 November 2026: one place to type and one next
-  // action per step). Focus was on Send, which went, so it is on the card's first choice.
+  // action per step). Focus was on Send, which went, so it is on the card's first choice: here
+  // the first change is the work areas (the demo proposes them first), so it is their Confirm.
   await expect(page.locator(".question")).toHaveCount(0);
   await expect(page.getByRole("textbox", { name: "Reply to Careerwright" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Send" })).toHaveCount(0);
-  await expect(tray.getByRole("button", { name: "Accept current role" })).toBeFocused();
+  const firstChoice = tray.getByRole("button", { name: /^(Accept|Confirm)/ }).first();
+  await expect(firstChoice).toHaveAccessibleName("Confirm work areas as a limit");
+  await expect(firstChoice).toBeFocused();
   await tray.getByRole("button", { name: "Accept current role" }).click();
   await tray.getByRole("button", { name: "Accept tasks you enjoy" }).click();
   await tray.getByRole("button", { name: "Confirm weekly study hours as a limit" }).click();
