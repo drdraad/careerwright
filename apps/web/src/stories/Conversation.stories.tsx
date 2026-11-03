@@ -600,10 +600,11 @@ export const ReplyStreaming: Story = {
 export const ReplyToReview: Story = {
   render: you(chapterRoutes(prefs("unsure"), [turn("complete", proposal)])),
 };
-/** A reply changing lists (session W2): against what is saved, what each adds and removes (a
- *  task taken back reads as removed); the task answers' hints tell one activity's two answers
- *  apart; with four changes, Save stays at the foot of the screen. Typed meanwhile, Send waits
- *  for the card, saying so. */
+/** A reply changing lists (session W2; Task W2F slice E, half the words): each change in about
+ *  two lines, its answer's name with only what it adds (+) and removes (−) against what is
+ *  saved (a task taken back reads as removed), then its origin as a short tag and its actions;
+ *  the task answers' hints one step away; with four changes, Save stays at the foot of the
+ *  screen. Typed meanwhile, Send waits for the card, saying so in a few words. */
 const withTasks: ProfileOut = {
   ...profile,
   document: {
@@ -659,9 +660,20 @@ export const ReplyFailed: Story = { render: you(chapterRoutes(prefs("unsure"), [
 export const Paused: Story = {
   render: you(chapterRoutes(prefs("unsure", true), [turn("complete", proposal)])),
 };
-/** A limit to confirm: Accept and Confirm in leaf green, the limit explained in plain words. */
+/** A limit to confirm: Accept and Confirm in leaf green, the limit's plain words one step away
+ *  (Task W2F slice E). */
 export const ReplyWithALimit: Story = {
   render: you(chapterRoutes(prefs("unsure"), [turn("complete", limitProposal)])),
+};
+/** The same, with the limit's plain words opened from the button beside its name. */
+export const ReplyWithALimitExplained: Story = {
+  render: you(chapterRoutes(prefs("unsure"), [turn("complete", limitProposal)])),
+  play: async ({ canvasElement }) => {
+    const means = await within(canvasElement).findByRole("button", {
+      name: "What total spending limit means",
+    });
+    await userEvent.click(means);
+  },
 };
 /** What we know, its own view: the answers, the limits explained, the early sketch. */
 export const WhatWeKnowView: Story = {

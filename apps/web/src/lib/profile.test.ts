@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { ProfileDocument } from "@/generated/api";
 import openapi from "@/generated/openapi.json";
 import { listLimit } from "./bounds";
-import { changedFields, describeField, draftFrom, inputFrom, rebaseDraft } from "./profile";
+import {
+  changedFields,
+  describeField,
+  draftFrom,
+  inputFrom,
+  isStateCode,
+  rebaseDraft,
+} from "./profile";
 import { PROFILE_FIELDS, type ProfileFieldName } from "./vocabulary";
 
 const SOURCE = "6f1d3c2a-0000-4000-8000-000000000001";
@@ -43,6 +50,26 @@ describe("[API-04] a missing answer reads as its state, never as zero or blank",
     ["cities", "Manchester"],
   ] as const)("%s reads %j", (name, text) => {
     expect(describeField(document()[name])).toBe(text);
+  });
+
+  // Task W2F slice E (the product owner's re-test): a role saved as the text "no_job_yet"
+  // showed the code itself. A state's code is never shown as a value.
+  it("reads a state's code saved as a value in the state's words", () => {
+    const saved = document({
+      current_role: { state: "provided", value: "no_job_yet", source_ref_id: SOURCE },
+      enjoyed_tasks: {
+        state: "provided",
+        value: ["fixing bikes", "Prefer-not-to-say"],
+        source_ref_id: SOURCE,
+      },
+    });
+
+    expect(describeField(saved.current_role, "current_role")).toBe("I haven't had a job yet");
+    expect(describeField(saved.enjoyed_tasks, "enjoyed_tasks")).toBe(
+      "fixing bikes, Prefer not to say",
+    );
+    expect(isStateCode("No job yet")).toBe(true);
+    expect(isStateCode("Unknown Soldier tour guide")).toBe(false);
   });
 });
 

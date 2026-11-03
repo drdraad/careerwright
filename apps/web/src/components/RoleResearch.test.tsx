@@ -320,6 +320,9 @@ describe("[DIV1-15] which titles can be researched", () => {
       ),
     ).toEqual([]);
     expect(researchable(role("Prompt engineer", "ons"), [], [])).toEqual([]);
+    // Task W2F slice E (the product owner's re-test): a role saved as the state's code is no
+    // title, so it has no "Research this role".
+    expect(researchable(role("no_job_yet", "own_words"), [], [])).toEqual([]);
   });
 
   it("keeps a title Careerwright thought of as its idea once it is made a target", () => {

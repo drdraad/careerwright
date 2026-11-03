@@ -1594,9 +1594,11 @@
     border-color: var(--line-reading-control);
   }
 
+  /* The origin, a short tag at the start of the actions' row (Task W2F slice E). */
   .proposal-kind {
     font-size: var(--type-14);
     color: var(--fg-muted);
+    margin-right: var(--space-4);
   }
 
   .proposal-value {
@@ -1604,9 +1606,25 @@
     overflow-wrap: anywhere;
   }
 
+  /* The answer's name and what changes, with the button that shows its hint beside it: a
+     24 px target at least (WCAG 2.5.8), far enough off the words that its focus ring never
+     covers them. */
+  .proposal-head {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-8);
+  }
+
+  .proposal-head .btn-icon {
+    flex: none;
+    min-width: 24px;
+    min-height: 24px;
+  }
+
   .proposal-actions {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: var(--space-4) var(--space-8);
   }
 
@@ -1618,9 +1636,10 @@
   /* The review card's Save and Keep none stay at the foot of the screen while the card is in
      view, so Save is in the first screen however many changes there are (session W2). On a
      card's own surface, as the reply field's Send is: no new colour pairing. Why Save waits
-     takes a line of its own under both buttons, so the bar stays two rows at most on a phone.
-     Whatever focus scrolls into view stops above it (WCAG 2.4.11; 96 px holds its two rows
-     with room to spare), and on a phone it rises above an open sheet. */
+     comes after both buttons, beside them where there is room (one row on a wide screen,
+     since slice E made it a few words) and under them on a phone, so the bar is two rows at
+     most. Whatever focus scrolls into view stops above it (WCAG 2.4.11; 96 px holds its two
+     rows with room to spare), and on a phone it rises above an open sheet. */
   .tray-actions {
     position: sticky;
     bottom: 0;
@@ -1637,7 +1656,6 @@
 
   .tray-actions > .btn + span {
     order: 1;
-    flex-basis: 100%;
   }
 
   html:has(.you-view:not([hidden]) .tray-actions) {

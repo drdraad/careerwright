@@ -4,12 +4,15 @@
 // Accept and Confirm are colour coded as well as worded (session 2, C3: leaf green, on a faint
 // leaf tint once chosen, never a second bright fill beside the one primary action), and a limit
 // says what it means in plain words. Facts the person stated and Careerwright's readings look
-// different (a dashed edge). Edits are checked before anything is
+// different (a dashed edge, and a short tag). Edits are checked before anything is
 // sent; then one decision saves the accepted proposals and the person's own answers together,
 // as one version, or nothing at all (the tray and its edits stay, with the reason). Nothing
 // changes until the person saves. Session W2: a list change says what it adds and removes
-// against what is saved, the task answers show their hints, and Save and Keep none stay in
-// view while the card is.
+// against what is saved, the task answers have their hints, and Save and Keep none stay in
+// view while the card is. Task W2F slice E (the product owner: "too verbose ... unnecessary
+// qualifications"): each change reads in about two lines, its answer's name with only what
+// changes, then its origin as a short tag and its actions; a hint (a limit's plain words
+// included) is one step away, behind a button beside the answer's name.
 import { useState } from "react";
 import type {
   ProfileDocument,
@@ -34,9 +37,9 @@ import {
   EXPLAINED_FIELDS,
   FIELD_STATE,
   fieldStates,
-  LIST_CHANGE,
   PROFILE_FIELDS,
   type ProfileFieldName,
+  REVIEW_CARD,
 } from "@/lib/vocabulary";
 import { Button } from "./Button";
 import { useEvidence } from "./EvidenceDrawer";
@@ -59,17 +62,23 @@ type Props = {
   onSupport(note: SupportNoteOut | null): void;
 };
 
-/** Whether the person said it or Careerwright read it in (a truth the dashed edge also shows).
- *  A limit or target says nothing more: its Confirm button names it (PROF-04). */
-function kindOf(change: ProposedChangeOut): string {
-  return change.basis === "stated"
-    ? "You said"
-    : "Careerwright's reading, not a fact until you accept it";
-}
-
 function proposedValue(change: ProposedChangeOut): string {
   if (change.value === null) return change.state === "provided" ? "" : FIELD_STATE[change.state];
   return describeValue(change.value, change.field as ProfileFieldName);
+}
+
+/** What a change reads as after its answer's name: only what it changes against what is saved
+ *  (each list item it adds or removes, so an item taken back reads as removed), or, for a new
+ *  answer or one that isn't a list, just its value. */
+function changeWords(change: ProposedChangeOut, saved: ProfileDocument): string {
+  const listed = listChange(change, saved[change.field as ProfileFieldName]);
+  if (listed === null) return proposedValue(change);
+  const items = [
+    ...listed.added.map(REVIEW_CARD.added),
+    ...listed.removed.map(REVIEW_CARD.removed),
+  ];
+  if (change.state !== "provided") return [FIELD_STATE[change.state], ...items].join(", ");
+  return items.length === 0 ? proposedValue(change) : items.join(", ");
 }
 
 /** Where an edit starts: the proposal's own answer, or an empty answer to type into when
@@ -101,6 +110,8 @@ export function ReviewTray({
   const [choices, setChoices] = useState<Choices>({});
   const [drafts, setDrafts] = useState<Record<string, FieldDraft>>({});
   const [problems, setProblems] = useState<Record<string, FieldProblem>>({});
+  /** The changes whose hint is open (one step away). */
+  const [explained, setExplained] = useState<Record<string, boolean>>({});
   const chosen = changes.filter(
     (c) => choices[c.change_id] !== undefined && choices[c.change_id] !== "skip",
   );
@@ -192,10 +203,7 @@ export function ReviewTray({
   const failure = decide.error;
   return (
     <section className="known-group" aria-labelledby="tray-title">
-      <h3 id="tray-title">
-        To review: {changes.length} {changes.length === 1 ? "change" : "changes"} from your last
-        message
-      </h3>
+      <h3 id="tray-title">{REVIEW_CARD.heading(changes.length)}</h3>
       {changes.map((change) => {
         const field = change.field as ProfileFieldName;
         const choice = choices[change.change_id];
@@ -204,23 +212,34 @@ export function ReviewTray({
         const draft = drafts[change.change_id] ?? editDraft(change);
         const problem = problems[change.change_id];
         const errorId = `edit-${change.change_id}-error`;
+        const hintId = `hint-${change.change_id}`;
+        const hinted = EXPLAINED_FIELDS.has(field) || CARD_HINTED.has(field);
+        const open = explained[change.change_id] === true;
         const setDraft = (next: FieldDraft) =>
           setDrafts((current) => ({ ...current, [change.change_id]: next }));
-        const listed = listChange(change, profile.document[field]);
         return (
           <div key={change.change_id} className="proposal" data-basis={change.basis}>
-            <span className="proposal-kind">{kindOf(change)}</span>
-            <span className="proposal-value">
-              {label}: {proposedValue(change)}
-            </span>
-            {listed !== null && listed.added.length > 0 && (
-              <span className="small">{LIST_CHANGE.adds(listed.added)}</span>
-            )}
-            {listed !== null && listed.removed.length > 0 && (
-              <span className="small">{LIST_CHANGE.removes(listed.removed)}</span>
-            )}
-            {(EXPLAINED_FIELDS.has(field) || CARD_HINTED.has(field)) && (
-              <span className="small muted">{PROFILE_FIELDS[field].hint}</span>
+            <div className="proposal-head">
+              <span className="proposal-value">
+                {label}: {changeWords(change, profile.document)}
+              </span>
+              {hinted && (
+                <Button
+                  variant="icon"
+                  glyph="info"
+                  aria-label={REVIEW_CARD.means(label)}
+                  aria-expanded={open}
+                  aria-controls={hintId}
+                  onClick={() =>
+                    setExplained((current) => ({ ...current, [change.change_id]: !open }))
+                  }
+                />
+              )}
+            </div>
+            {hinted && (
+              <p id={hintId} className="small muted" hidden={!open}>
+                {PROFILE_FIELDS[field].hint}
+              </p>
             )}
             {editing && (
               <div className="grid gap-8">
@@ -244,6 +263,7 @@ export function ReviewTray({
               </div>
             )}
             <div className="proposal-actions">
+              <span className="proposal-kind">{REVIEW_CARD.origin[change.basis]}</span>
               {change.hard_constraint ? (
                 <Button
                   variant="accept"
@@ -297,11 +317,7 @@ export function ReviewTray({
           variant={primary ? "primary" : "secondary"}
           onClick={() => void save()}
           disabledReason={
-            decide.isPending
-              ? "Saving…"
-              : chosen.length === 0
-                ? "Accept, confirm or edit at least one first."
-                : undefined
+            decide.isPending ? "Saving…" : chosen.length === 0 ? REVIEW_CARD.saveWaits : undefined
           }
         >
           Save {chosen.length > 0 ? chosen.length : ""} to What we know

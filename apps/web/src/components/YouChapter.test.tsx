@@ -438,10 +438,12 @@ describe("[PROF-08][REC1-10] the chapter leads with how to start", () => {
       ]),
     );
     const user = renderYou();
-    const waits = "Choose how to start, then send. Your words stay here.";
+    const waits = "Choose how to start, then send.";
 
-    // At the first question, then at the choice: typed, Send waits and says why.
+    // At the first question, then at the choice: typed, Send waits and says why. With nothing
+    // typed, the line isn't needed, so it isn't shown (slice E).
     const field = await screen.findByLabelText("Reply to Careerwright");
+    expect(screen.queryByText(waits)).toBeNull();
     await user.type(field, "I fix bikes.");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(screen.getByRole("button", { name: "Send" })).toHaveAttribute("aria-disabled", "true");
@@ -579,10 +581,17 @@ describe("[UI-06][UI-04] one idea per view: the conversation, what we know and t
       within(answersShown).getByText(/The most you could pay out in any one month/),
     ).toBeVisible();
 
-    await userEvent.setup().click(screen.getByRole("tab", { name: "Conversation" }));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("tab", { name: "Conversation" }));
     const tray = await screen.findByRole("region", { name: /To review: 1 change/ });
     expect(within(tray).getByText("Monthly payment limit: £200")).toBeVisible();
-    expect(within(tray).getByText(/The most you could pay out in any one month/)).toBeVisible();
+    // On the card it is one step away (Task W2F slice E: half the words).
+    const words = within(tray).getByText(/The most you could pay out in any one month/);
+    expect(words).not.toBeVisible();
+    await user.click(
+      within(tray).getByRole("button", { name: "What monthly payment limit means" }),
+    );
+    expect(words).toBeVisible();
   });
 });
 
@@ -741,11 +750,12 @@ describe("[UI-04][UI-06] one decision at a time, and Resume while paused", () =>
     );
     const { user } = renderLive();
     const tray = await screen.findByRole("region", { name: /To review: 2 changes/ });
-    const waits = "Save the changes above or choose Keep none, then send. Your words stay here.";
+    const waits = "Save or choose Keep none, then send.";
     const messages = () =>
       sent.filter((s) => s.method === "POST" && s.path.endsWith("/interview/turns"));
 
     const field = screen.getByLabelText("Reply to Careerwright");
+    expect(screen.queryByText(waits)).toBeNull(); // only once there is something to send
     await user.type(field, "Not Leeds, I meant York.");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(screen.getByRole("button", { name: "Send" })).toHaveAttribute("aria-disabled", "true");
@@ -827,11 +837,14 @@ describe("[MODEL-03] the reply streams as provisional and the checked reply repl
         },
       ]),
     );
-    renderYou();
+    const user = renderYou();
 
     expect(await screen.findByText("Writing a reply, not checked yet")).toBeVisible();
     expect(screen.getByText("Thanks, I noted")).toBeVisible();
-    expect(screen.getByText("Careerwright is still replying.")).toBeVisible(); // Send says why it waits
+    // Send says why it waits once there is something to send (slice E).
+    expect(screen.queryByText("Careerwright is still replying.")).toBeNull();
+    await user.type(screen.getByLabelText("Reply to Careerwright"), "And weekends?");
+    expect(screen.getByText("Careerwright is still replying.")).toBeVisible();
   });
 
   it("shows only the checked reply once the turn is complete", async () => {
@@ -863,16 +876,18 @@ describe("[STATE-06][PROF-04] the review tray saves only what the person chose a
       ]),
     );
     const user = renderYou();
-    const tray = await screen.findByRole("region", { name: /To review: 2 changes/ });
+    const tray = await screen.findByRole("region", { name: "To review: 2 changes" });
 
     const reading = within(tray).getByText("Work areas: Leeds").closest(".proposal");
     expect(reading).toHaveAttribute("data-basis", "inferred");
-    expect(within(tray).getByText(/not a fact until you accept it/)).toBeVisible();
+    // The origin is a short tag, never hidden (slice E: half the words).
+    expect(within(reading as HTMLElement).getByText("Careerwright's reading")).toBeVisible();
+    expect(within(tray).queryByText(/not a fact until you accept it/)).toBeNull();
     // Procedural helper lines are gone (session 2: "too much helper text"); the limit's
     // Confirm names it, and Save says why while it can't save.
     expect(within(tray).queryByText(/needs your confirmation/)).toBeNull();
     expect(within(tray).queryByText(/Skipped changes are not saved/)).toBeNull();
-    expect(within(tray).getByText("Accept, confirm or edit at least one first.")).toBeVisible();
+    expect(within(tray).getByText("Accept or edit one first.")).toBeVisible();
     // One decision at a time: the next question waits until the tray is decided (D-I4).
     expect(screen.queryByRole("heading", { name: /How many hours a week/ })).toBeNull();
     await user.click(within(tray).getByRole("button", { name: "Accept current role" }));
@@ -927,37 +942,70 @@ describe("[STATE-06] the card says what a list change does, and what each task a
       },
     };
     fakeApi(routes({ preferences: prefs("unsure"), turns: [turn("complete", tasks)] }));
-    renderYou(savedTasks);
-    const tray = await screen.findByRole("region", { name: /To review: 4 changes/ });
+    const user = renderYou(savedTasks);
+    // Slice E (the product owner: "too verbose ... unnecessary qualifications"): the tray says
+    // only how many; each change is its answer's name with only what changes, its origin as a
+    // short tag, and its actions. The hints are one step away.
+    const tray = await screen.findByRole("region", { name: "To review: 4 changes" });
     const card = (value: string) => {
       const found = within(tray).getByText(value).closest(".proposal");
       if (!(found instanceof HTMLElement)) throw new Error(`no proposal for ${value}`);
       return within(found);
     };
 
-    const enjoyed = card("Tasks you enjoy: helping at Brownies, fixing machines");
-    expect(enjoyed.getByText("Adds “fixing machines”")).toBeVisible();
-    expect(enjoyed.getByText("Removes “working outdoors”")).toBeVisible(); // taken back
-    expect(
-      enjoyed.getByText("Work you find satisfying, whether or not you are good at it yet."),
-    ).toBeVisible();
-    const confident = card("Tasks you believe you can do: leading a group");
-    expect(
-      confident.getByText("Things you are confident about, even without proof yet."),
-    ).toBeVisible();
+    // Against what is saved: what it adds, and what it removes (taken back).
+    const enjoyed = card("Tasks you enjoy: + fixing machines, − working outdoors");
+    expect(enjoyed.getByText("Your words")).toBeVisible();
+    expect(enjoyed.queryByText(/^(Adds|Removes) /)).toBeNull();
+    const hint = enjoyed.getByText(
+      "Work you find satisfying, whether or not you are good at it yet.",
+    );
+    expect(hint).not.toBeVisible();
+    const means = enjoyed.getByRole("button", { name: "What tasks you enjoy means" });
+    expect(means).toHaveAttribute("aria-expanded", "false");
+    await user.click(means);
+    expect(means).toHaveAttribute("aria-expanded", "true");
+    expect(hint).toBeVisible();
     // Nothing saved here yet: every item is new, and the value says it.
-    const done = card("Tasks you can show you have done: helping at Brownies");
-    expect(done.queryByText(/^(Adds|Removes) /)).toBeNull();
-    expect(
-      done.getByText(
-        "Things you have done and could point to, such as work, a course or a reference.",
-      ),
-    ).toBeVisible();
+    card("Tasks you believe you can do: leading a group");
+    card("Tasks you can show you have done: helping at Brownies");
     const disliked = card("Tasks you don't enjoy: filling in forms");
     expect(
-      disliked.getByText(
-        "Optional: work you find draining, even if you're good at it. It never rules work out.",
-      ),
+      disliked.getByRole("button", { name: "What tasks you don't enjoy means" }),
+    ).toBeVisible();
+    expect(within(tray).getByText(/Things you are confident about/)).not.toBeVisible();
+    for (const action of ["Accept", "Edit", "Skip", "Source for"]) {
+      expect(enjoyed.getByRole("button", { name: `${action} tasks you enjoy` })).toBeVisible();
+    }
+  });
+
+  it("keeps a limit's plain words one step away and confirms it by name", async () => {
+    const limit: TurnOut["proposal"] = {
+      ...(proposal as NonNullable<TurnOut["proposal"]>),
+      changes: [
+        {
+          change_id: "c9",
+          field: "direct_spend_cap",
+          state: "provided",
+          value: { minor_units: 60000, currency: "GBP" },
+          basis: "stated",
+          message_ids: ["m1"],
+          reason: "You said so.",
+          hard_constraint: true,
+        },
+      ],
+    };
+    fakeApi(routes({ preferences: prefs("unsure"), turns: [turn("complete", limit)] }));
+    const user = renderYou();
+    const tray = await screen.findByRole("region", { name: "To review: 1 change" });
+    const words = within(tray).getByText(/The most you'd spend on your next step, all added up/);
+
+    expect(within(tray).getByText("Total spending limit: £600")).toBeVisible();
+    expect(words).not.toBeVisible();
+    await user.click(within(tray).getByRole("button", { name: "What total spending limit means" }));
+    expect(words).toBeVisible();
+    expect(
+      within(tray).getByRole("button", { name: "Confirm total spending limit as a limit" }),
     ).toBeVisible();
   });
 });

@@ -177,6 +177,15 @@ const PATHS = {
       <path d="M6 6l3.3 3.3M18 6l-3.3 3.3M6 18l3.3-3.3M18 18l-3.3-3.3" {...stroke} />
     </>
   ),
+  // What an answer means, one step away (the review card, Task W2F slice E): a lower-case i in
+  // a circle, never the question mark of "not known yet".
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" {...stroke} />
+      <path d="M12 11v5.5" {...stroke} />
+      <circle cx="12" cy="7.6" r="1.1" fill="currentColor" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>;
 
 export type GlyphName = keyof typeof PATHS;
