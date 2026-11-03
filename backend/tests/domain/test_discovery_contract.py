@@ -4,8 +4,9 @@ B); deterministic code checks that every query and idea rests on the person's ow
 carries no inference about them. Semantic checks only."""
 
 import json
+import math
 import uuid
-from typing import Any
+from typing import Any, get_args
 
 import pytest
 
@@ -14,10 +15,13 @@ from careerwright.profile.discovery import (
     EVIDENCE_FIELDS,
     INSTRUCTIONS,
     MAX_AIM_HIGHER,
+    MAX_BASED_ON,
     MAX_HYPOTHESES,
+    MAX_OUTPUT_TOKENS,
     MAX_PROMPT_BYTES,
     MAX_QUERIES,
     PROMPT_VERSION,
+    QUERY_CHARS,
     SCHEMA_ALLOWANCE_TOKENS,
     DiscoveryInput,
     DiscoveryOutput,
@@ -34,6 +38,7 @@ from careerwright.profile.discovery import (
 from careerwright.profile.document import (
     FIELD_NAMES,
     ProfileInput,
+    TextValue,
     apply_profile_input,
     apply_updates,
     empty_profile,
@@ -434,6 +439,40 @@ def test_the_prompt_and_schema_fit_the_bounds_the_reservation_assumes() -> None:
     assert "never use it to exclude" in INSTRUCTIONS
 
 
+# The output bound holds the largest answer the check accepts, its reasoning and a tenth more
+# (Task 6g slice B, fix round). Bytes become tokens at 3 a token, below what Muse's prompts
+# measured (DSC-01 on Muse Wonder, 31 October 2026: 557 input tokens for 2,366 bytes of
+# instructions and answers, 4.2 a token), for words a tokenizer splits finely. Reasoning
+# shares the bound: at minimal effort the live ledger shows 524 tokens at most in a discovery
+# request and 768 in any request.
+OUTPUT_BYTES_PER_TOKEN = 3
+REASONING_TOKENS = 800
+ANSWER_CHARS = get_args(TextValue)[1].max_length
+
+
+@pytest.mark.req("MODEL-08")
+def test_the_output_bound_holds_the_largest_answer_the_check_accepts_and_its_reasoning() -> None:
+    quotes = [f"answer {n} ".ljust(ANSWER_CHARS, "a") for n in range(MAX_BASED_ON)]
+    longest = QUERY_CHARS[1]
+
+    def ideas(stem: str, count: int) -> list[dict[str, Any]]:
+        return [idea(f"{stem} {n} ".ljust(longest, "t"), *quotes) for n in range(count)]
+
+    widest = max(QueryChannel, key=len)
+    largest = output(
+        *(query(f"query {n} ".ljust(longest, "q"), widest, *quotes) for n in range(MAX_QUERIES)),
+        hypotheses=ideas("hypothesis", MAX_HYPOTHESES),
+        aim_higher=ideas("aim higher", MAX_AIM_HIGHER),
+    )
+    # Every list at its cap, every text at its bound, and still a valid answer.
+    assert problems(largest, context(document(enjoyed_tasks=quotes))) == []
+
+    answer = math.ceil(len(largest.model_dump_json().encode()) / OUTPUT_BYTES_PER_TOKEN)
+    worst = answer + REASONING_TOKENS
+
+    assert worst + worst // 10 <= MAX_OUTPUT_TOKENS
+
+
 # Task W2F slice E (the product owner, 3 November 2026: "Em-dashes are outlawed!"): a query
 # and a title idea are shown to the person in the model's words.
 @pytest.mark.req("DIV1-01")
@@ -457,14 +496,15 @@ def test_a_query_or_title_idea_with_an_em_dash_is_refused_unless_it_is_the_perso
 
 @pytest.mark.req("MODEL-08")
 def test_an_attempt_reserves_both_requests_at_their_bounds() -> None:
-    # Task 6g slice B: up to six more title ideas out, the qualifications in.
-    # Input bound 10,000 + 1,500 + 2,000 + 1,000 = 14,500 tokens, output 2,000, two requests.
-    # Contributor: (14,500 x 100 + 2,000 x 200) x 2 = 3,700,000 nano-USD ($0.0037).
-    # Standard: (14,500 x 1,250 + 2,000 x 4,250) x 2 = 53,250,000 nano-USD ($0.05325).
-    # Muse Wonder: (14,500 x 4,000 + 2,000 x 20,000) x 2 = 196,000,000 nano-USD ($0.196).
-    assert worst_case_nano_usd("muse-spark-1.3-contributor") == 3_700_000
-    assert worst_case_nano_usd("muse-spark-1.3") == 53_250_000
-    assert worst_case_nano_usd("muse-wonder-1.0") == 196_000_000
+    # Task 6g slice B: up to six more title ideas out, the qualifications in; its fix round
+    # sets the output bound from the largest answer the check accepts.
+    # Input bound 10,000 + 1,500 + 4,000 + 1,000 = 16,500 tokens, output 4,000, two requests.
+    # Contributor: (16,500 x 100 + 4,000 x 200) x 2 = 4,900,000 nano-USD ($0.0049).
+    # Standard: (16,500 x 1,250 + 4,000 x 4,250) x 2 = 75,250,000 nano-USD ($0.07525).
+    # Muse Wonder: (16,500 x 4,000 + 4,000 x 20,000) x 2 = 292,000,000 nano-USD ($0.292).
+    assert worst_case_nano_usd("muse-spark-1.3-contributor") == 4_900_000
+    assert worst_case_nano_usd("muse-spark-1.3") == 75_250_000
+    assert worst_case_nano_usd("muse-wonder-1.0") == 292_000_000
     assert worst_case_nano_usd("careerwright-fixture-discovery-1") == 0
 
 
