@@ -91,6 +91,14 @@ two tracks (R15):
   change `careerwright/planning`. Task 12b starts after 7f is integrated.
 Backend tasks fill any wait for a session.
 
+From 2 and 3 November 2026 (the product owner): Task W2F (the You chapter, fixed from session
+W2) comes before 10B, 12bB and 14B; the world's role names become clickable after those three
+screens. **A design system pass** (the product owner, 3 November 2026: "you seem to lack a
+coherent, consistent design system"): consult the `frontend-design:frontend-design` skill for
+one coherent, consistent design system across every chapter. It MUST come after every chapter
+module in the current plan is built (10B, 12bB, 14B, 15, 7e and 8), and before Task M, whose
+moments build on it. Not before.
+
 History: the v1.5 order was, in the main tree, Task A1's documents and the W2C part 1
 re-review → W2E → 6d and 3b → 6e → session W2 → 10 → 12b → 14 → 15 → the end-to-end session
 → 7e → 8 → M → 16 → 17 → the final review, and in the worktree 13a → 12a → 13b (all three
