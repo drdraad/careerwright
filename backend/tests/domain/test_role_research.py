@@ -194,6 +194,31 @@ def test_only_pages_the_search_really_returned_are_read() -> None:
 
 
 @pytest.mark.req("DIV1-15")
+@pytest.mark.parametrize(
+    "returned",
+    [
+        "https://careers.northwind.example/roles/1#apply",
+        "https://careers.northwind.example/roles/1/",
+        "https://Careers.Northwind.example/roles/1",
+        "HTTPS://careers.northwind.example:443/roles/1/#top",
+    ],
+    ids=["a fragment", "a trailing slash", "the host's case", "scheme, port and fragment"],
+)
+def test_a_page_the_search_returned_is_grounded_however_its_address_is_written(
+    returned: str,
+) -> None:
+    # Review of slice D: both sides go through the fetch checks' canonical form before they
+    # are compared, so an address written another way is still the page the search returned.
+    page = "https://careers.northwind.example/roles/1"
+
+    proposal = check_search(role_output(page), ROLE, sources={returned}, queries=["q"])
+
+    assert [(c.url, c.grounded) for c in proposal.candidates] == [(page, True)]
+    assert proposal.excluded == []
+    assert pages_to_read(proposal) == [page]
+
+
+@pytest.mark.req("DIV1-15")
 def test_twenty_pages_are_read_after_home_pages_and_refused_hosts_are_dropped() -> None:
     pages = [f"https://site{n}.example/roles/{n}" for n in range(ROLE_SEARCH.max_candidates)]
     proposed = (*HOME_PAGES, "https://www.linkedin.com/jobs/view/1", *pages)
