@@ -171,10 +171,11 @@ def test_the_slate_controls_change_the_view_only_and_count_their_effect(
     reasons = {n["concept_id"]: n["reason"] for n in without_title["not_included"]}
     assert reasons[title["concept_id"]] == "excluded_occupation"  # "show why"
     deeper = slate(scenario, discovery_id, emphasis="deeper")
-    assert (deeper["emphasis"], deeper["family_limit"]) == ("deeper", 4)
+    # Three: what a set can show of one kind of work (Task 6g slice B).
+    assert (deeper["emphasis"], deeper["family_limit"]) == ("deeper", 3)
     # The relaxation is stated in its own fact (Task W2B re-review 2, N-M3: the slate has
     # other notes too, so any note at all proved nothing).
-    assert {"reason": "more_depth", "family_limit": 4} in deeper["notes"]
+    assert {"reason": "more_depth", "family_limit": 3} in deeper["notes"]
     assert not any(note["reason"] == "more_depth" for note in first["notes"])
     assert scenario.profile()["version"] == 2  # a view never changes the profile
 

@@ -191,6 +191,9 @@ class Case(BaseModel):
     requirements: list[str]
     synthetic: Literal[True]
     live: bool = False  # one of the representative cases the live run may take
+    # Run only live, and only when named (`CASES=...`): its expectations need a model's own
+    # title ideas, so offline it has nothing to check (Task 6g slice B). Never `live`.
+    live_only: bool = False
     # An interview case the demo interviewer also answers offline (Task 6f): its fixed
     # patterns, through the same check, so the demo's expectations are checked without a model.
     demo: bool = False
@@ -385,6 +388,19 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
             or not s["linked_evidence"]
             or not {(x["field"], x["text"]) for x in s["linked_evidence"]} <= answers
         ]
+        # A title the UK job-title index lists, shown in a set or beside it (Task 6g slice B):
+        # it rests on the person's answers and carries the groups ONS codes it to.
+        bad += [
+            i["title"]
+            for i in observed["title_ideas"]
+            if i["reason"] == "in_uk_title_index"
+            and not i["left_out"]
+            and (
+                not i["groups"]
+                or not i["based_on"]
+                or not {(x["field"], x["text"]) for x in i["based_on"]} <= answers
+            )
+        ]
         return Failure(FailureType.GROUNDING, f"{bad}") if bad else None
     if e.check == "distinct":
         titles = [s["title"].casefold() for s in suggestions]
@@ -411,7 +427,12 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
         same = reasons == e.value
         return None if same else Failure(FailureType.UNSUPPORTED_TITLE, f"{reasons}")
     if e.check == "fewer_has_reason":
-        short = len(suggestions) < observed["target_size"] and not observed["fewer_reasons"]
+        # The slate's entries: its suggestions and the titles the UK job-title index lists that
+        # it placed in a set (Task 6g slice B).
+        placed = sum(i["horizon"] is not None for i in observed["title_ideas"])
+        short = (
+            len(suggestions) + placed < observed["target_size"] and not observed["fewer_reasons"]
+        )
         return Failure(FailureType.THIN_EVIDENCE, "fewer, with no reason") if short else None
     if e.check == "joined_by_skills":
         # Sprint W: work joins a title of the person's own only by shared essential skills,
@@ -542,9 +563,36 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
         # and the reference level; Next step is listed first, each set holds at most three.
         return _horizons_by_level(observed)
     if e.check == "both_horizons":
-        sets = {s["horizon"] for s in suggestions}
+        sets = {s["horizon"] for s in suggestions} | {
+            i["horizon"] for i in observed["title_ideas"] if i["horizon"] is not None
+        }
         both = sets == {"next_step", "aim_higher"}
         return None if both else Failure(FailureType.DIVERSITY, f"sets shown: {sorted(sets)}")
+    if e.check == "aim_higher_from_ideas":
+        # Task 6g slice B: the model's title ideas, confirmed by code, reach Aim higher: at
+        # least `count` of its entries came from one (an ESCO occupation a title idea found, or
+        # a title only the UK job-title index lists).
+        entries = aim_higher_entries(observed)
+        ideas = [title for title, how in entries if how == "idea"]
+        enough = len(ideas) >= (e.count or 0)
+        return None if enough else Failure(FailureType.DIVERSITY, f"Aim higher: {entries}")
+    if e.check == "titles_first_in_aim_higher":
+        # Task 6g slice B's rule: within Aim higher, work found by a title (a confirmed idea,
+        # the person's own title or a join to one) is listed before work only searches found.
+        hows = [how for _, how in aim_higher_entries(observed)]
+        searched = [n for n, how in enumerate(hows) if how == "search"]
+        late = bool(searched) and any(how != "search" for how in hows[searched[0] :])
+        if late:
+            return Failure(FailureType.GROUNDING, f"Aim higher: {aim_higher_entries(observed)}")
+        return None
+    if e.check == "set_excludes":
+        # A set (`direction`) shows none of these titles (`words`, as word beginnings).
+        unwanted = [
+            title
+            for title, _ in set_entries(observed, e.direction or "")
+            if _has(title, e.words, whole=e.whole_words)
+        ]
+        return Failure(FailureType.GROUNDING, f"{e.direction}: {unwanted}") if unwanted else None
     if e.check == "limit_reported":
         # The floor is applied with its counts, and pay it cannot compare is never below it
         # (Task 7 slice B). The evaluation holds no reviewed UK SOC mapping, so every pooled
@@ -556,6 +604,44 @@ def _discovery(observed: Json, e: Expectation, answers: set[tuple[str, str]]) ->
             return Failure(FailureType.LIMIT, f"{floor['left_out']} left out with pay unknown")
         return None
     raise ValueError(f"unknown discovery check {e.check!r}")
+
+
+# What found a suggestion, by its channels and reasons (independent of the product's tiers): a
+# title idea, the person's own title or a join to one, or searches alone.
+_IDEA_CHANNELS = frozenset({"hypothesis"})
+_TITLE_CHANNELS = frozenset({"current", "user_proposed", "shared_skills"})
+_TITLE_REASONS = frozenset({"joined_by_shared_skills", "own_title_matched"})
+
+
+def _found_by(suggestion: Json) -> str:
+    channels = set(suggestion.get("channels", []))
+    if channels & _IDEA_CHANNELS:
+        return "idea"
+    reasons = {reason["reason"] for reason in suggestion.get("reasons", [])}
+    return "title" if channels & _TITLE_CHANNELS or reasons & _TITLE_REASONS else "search"
+
+
+def set_entries(observed: Json, horizon: str) -> list[tuple[str, str]]:
+    """A set's entries in the slate's order, each with what found it ("idea", "title" or
+    "search"): its suggestions, with each title idea the UK job-title index lists at its
+    `position` among them."""
+    occupations = [
+        (s["title"], _found_by(s)) for s in observed["suggestions"] if s["horizon"] == horizon
+    ]
+    ideas = sorted(
+        (i for i in observed["title_ideas"] if i["horizon"] == horizon),
+        key=lambda i: i["position"],
+    )
+    entries: list[tuple[str, str]] = []
+    for idea in ideas:
+        while len(entries) < idea["position"] and occupations:
+            entries.append(occupations.pop(0))
+        entries.append((idea["title"], "idea"))
+    return entries + occupations
+
+
+def aim_higher_entries(observed: Json) -> list[tuple[str, str]]:
+    return set_entries(observed, "aim_higher")
 
 
 def isco_skill_level(unit_code: str) -> int:
@@ -587,10 +673,27 @@ def _horizons_by_level(observed: Json) -> Failure | None:
         want = "aim_higher" if level > top else "next_step"
         if s["horizon"] != want:
             wrong.append(f"{s['title']}: {s['horizon']}, level {level}")
+    # Task 6g slice B: a title only the UK job-title index lists is placed by every group ONS
+    # codes it to, only when they agree on level; otherwise it is in neither set.
+    for idea in observed["title_ideas"]:
+        levels = {isco_skill_level(group["code"]) for group in idea["groups"]}
+        if len(levels) != 1:
+            if idea["horizon"] is not None:
+                wrong.append(f"{idea['title']}: {idea['horizon']}, levels {sorted(levels)}")
+            continue
+        [level] = levels
+        if idea["horizon"] is None or (reference == 4 and level == 4):
+            continue
+        top = 2 if reference is None else reference
+        if idea["horizon"] != ("aim_higher" if level > top else "next_step"):
+            wrong.append(f"{idea['title']}: {idea['horizon']}, level {level}")
     order = [s["horizon"] for s in observed["suggestions"]]
     if order != sorted(order, key=["next_step", "aim_higher"].index):
         wrong.append(f"listed {order}")
-    wrong += [f"{h}: {order.count(h)}" for h in ("next_step", "aim_higher") if order.count(h) > 3]
+    for horizon in ("next_step", "aim_higher"):
+        held = len(set_entries(observed, horizon))
+        if held > 3:
+            wrong.append(f"{horizon}: {held}")
     return Failure(FailureType.GROUNDING, f"{wrong}") if wrong else None
 
 
@@ -675,11 +778,14 @@ PAIRED = frozenset({"same_fields_as", "same_slate_as", "pool_includes_pool_of"})
 
 
 def answers_of(case: Case) -> set[tuple[str, str]]:
-    """The answer texts a discovery case's suggestions may cite."""
+    """The answer texts a discovery case's suggestions may cite: a qualification by its name
+    (Task 6g slice B)."""
     found: set[tuple[str, str]] = set()
     for name, value in case.profile.items():
         if isinstance(value, list):
-            found |= {(name, str(item)) for item in value}
+            found |= {
+                (name, str(item["name"] if isinstance(item, dict) else item)) for item in value
+            }
         elif isinstance(value, str):
             found.add((name, value))
     return found

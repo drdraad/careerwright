@@ -23,6 +23,6 @@
     "an income or a salary",
     "anything she didn't say"
   ],
-  "evaluation_cases": ["INT-16", "INT-17", "DSC-21", "STR-01", "STR-02"],
+  "evaluation_cases": ["INT-16", "INT-17", "DSC-21", "STR-01", "STR-02", "DSC-24"],
   "browser_case": "apps/web/e2e/role-space.spec.ts: \"I haven't had a job yet\" lights the world within ten seconds (Task 6f)"
 }
