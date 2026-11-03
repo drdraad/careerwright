@@ -425,7 +425,9 @@
         {"check": "searched_through_skills"},
         {"check": "work_style_not_searched"},
         {"check": "small_pool_has_reason"},
-        {"check": "missed_answers_named"}
+        {"check": "missed_answers_named"},
+        {"check": "reference_is", "value": {"basis": "unknown", "level": null}},
+        {"check": "horizons_by_level"}
       ],
       "note": "Task W2 slice W2B fix round 2: \"repairing physical objects\" is in no single ESCO skill's label and \"practical\" and \"small team\" are how P02 likes to work, so every suggestion comes through \"working outdoors\" (\"work in outdoor conditions\", 12 occupations). The pool is below the soft 60, and the slate says so. Fix round 3: the one-word \"practical\" is still not searched, \"small team\" is (and finds nothing), and the slate names \"repairing physical objects\" and \"small team\" as having found no work."
     },
@@ -455,9 +457,11 @@
         {"check": "includes_direction", "direction": "transferable"},
         {"check": "distinct"},
         {"check": "searched_through_skills"},
-        {"check": "missed_answers_named"}
+        {"check": "missed_answers_named"},
+        {"check": "reference_is", "value": {"basis": "role_occupation", "level": 4}},
+        {"check": "horizons_by_level"}
       ],
-      "note": "Task W2 slice W2B: the role was \"Warehouse shift supervisor\", which ESCO does not list, so it was searched by its words. A title now joins work only by shared essential skills, so the case names an ESCO title (an alternative label of the warehouse manager); a title ESCO does not list is DSC-11's. Fix round 3: \"training new starters\" and \"planning shift rotas\" are in no skill's label, and the slate names both."
+      "note": "Task W2 slice W2B: the role was \"Warehouse shift supervisor\", which ESCO does not list, so it was searched by its words. A title now joins work only by shared essential skills, so the case names an ESCO title (an alternative label of the warehouse manager); a title ESCO does not list is DSC-11's. Fix round 3: \"training new starters\" and \"planning shift rotas\" are in no skill's label, and the slate names both. Task 6g: the warehouse manager is in ISCO-08 unit group 1324, a manager's job group at level 4, so Aim higher is level-4 work in another major group."
     },
     {
       "id": "DSC-04",
@@ -622,7 +626,8 @@
         {"check": "titles_ambiguous", "words": ["bus operator"]},
         {"check": "fewer_has_reason"},
         {"check": "grounded"},
-        {"check": "distinct"}
+        {"check": "distinct"},
+        {"check": "reference_is", "value": {"basis": "unknown", "level": null}}
       ],
       "note": "Task W2 slice W2B fix round 1. \"bus operator\" is an alternative title of the bus driver and the trolley bus driver. Before, the connection said \"A bus operator and ... share N essential skills\", a fact about no single occupation. Fix round 2: before, the two were joined over their skills together, so the taxi driver's line said \"ESCO lists 14 of the same essential skills for both\" (it shares 13 with the bus driver and 9 with the trolley bus driver)."
     },
@@ -794,8 +799,8 @@
       "id": "DSC-21",
       "kind": "discovery",
       "persona": "SL01",
-      "title": "The synthetic school leaver's suggestions from her school subjects and volunteering: grounded in her answers and ESCO, nothing called close to what she does now",
-      "requirements": ["TEST1-16", "REC1-05", "REC1-06"],
+      "title": "The synthetic school leaver's suggestions from her school subjects and volunteering: grounded in her answers and ESCO, nothing called close to what she does now, and with no job yet, each job group's usual training places Next step and Aim higher, both shown",
+      "requirements": ["TEST1-16", "REC1-05", "REC1-06", "DIV1-16"],
       "synthetic": true,
       "profile": {
         "current_role": {"state": "no_job_yet"},
@@ -809,14 +814,55 @@
         "evidenced_tasks": ["help run a Brownies group"],
         "cities": ["Leeds"]
       },
+      "discovery_output": {
+        "queries": [
+          {"text": "perform laboratory tests", "channel": "tasks", "based_on": ["doing practicals in the chemistry lab"]},
+          {"text": "perform chemical experiments", "channel": "tasks", "based_on": ["doing practicals in the chemistry lab"]},
+          {"text": "supervise children", "channel": "transferable", "based_on": ["help run a Brownies group"]}
+        ],
+        "hypotheses": []
+      },
       "expect": [
         {"check": "grounded"},
         {"check": "distinct"},
         {"check": "no_percentage"},
         {"check": "unsupported_not_suggested"},
-        {"check": "nothing_close_to_now"}
+        {"check": "nothing_close_to_now"},
+        {"check": "reference_is", "value": {"basis": "unknown", "level": null}},
+        {"check": "horizons_by_level"},
+        {"check": "both_horizons"}
       ],
-      "note": "Task 6e (plan v1.6; TEST1-16). Offline on the full ESCO release in the integration run; live: CASES=DSC-21."
+      "note": "Task 6e (plan v1.6; TEST1-16). Offline on the full ESCO release in the integration run; live: CASES=DSC-21. Task 6g: she has had no job, so nothing gives her level and ISCO's bands place each suggestion (levels 1 and 2 Next step, 3 and 4 Aim higher); her expected A-levels are never read as met. Offline the case now gives the searches a model might propose in ESCO's skill wording: the demo proposer's searches are her answers as written, which no skill's main name holds, so they found no work and her checks held on an empty slate. Her case set stays within plan v1.6's four to six, so this is her two-set case."
+    },
+    {
+      "id": "DSC-22",
+      "kind": "discovery",
+      "title": "Sam, a client onboarding assistant in his own words: nothing gives his level, so each job group's usual training places Next step and Aim higher, both shown",
+      "requirements": ["DIV1-16", "DIV1-11", "DIV1-12", "REC1-05"],
+      "synthetic": true,
+      "profile": {
+        "current_role": "Client onboarding assistant",
+        "enjoyed_tasks": ["helping customers on the phone", "setting up new clients' records"]
+      },
+      "discovery_output": {
+        "queries": [
+          {"text": "assist customers", "channel": "tasks", "based_on": ["helping customers on the phone"]},
+          {"text": "communicate with customers", "channel": "transferable", "based_on": ["helping customers on the phone"]},
+          {"text": "maintain customer records", "channel": "tasks", "based_on": ["setting up new clients' records"]}
+        ],
+        "hypotheses": []
+      },
+      "expect": [
+        {"check": "reference_is", "value": {"basis": "unknown", "level": null}},
+        {"check": "horizons_by_level"},
+        {"check": "both_horizons"},
+        {"check": "grounded"},
+        {"check": "distinct"},
+        {"check": "no_percentage"},
+        {"check": "searched_through_skills"},
+        {"check": "fewer_has_reason"}
+      ],
+      "note": "Task 6g (the product owner's re-test, 3 November 2026). Session W2's made-up Sam (docs/reviews/session-w2.md): his title is on no list, so nothing gives his level and ISCO's bands place each suggestion (levels 1 and 2 Next step, 3 and 4 Aim higher). The searches are ones a model might propose in ESCO's skill wording from his answers; \"assist customers\" is the search that reached the re-test's bookmaker and club host, and \"communicate with customers\" is too general to find work alone. Live: CASES=DSC-22."
     },
     {
       "id": "STR-01",

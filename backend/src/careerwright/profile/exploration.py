@@ -70,6 +70,7 @@ from careerwright.catalogue.records import (
     UkGroup,
 )
 from careerwright.catalogue.reference import modelled_pay_of, region_codes
+from careerwright.catalogue.skill_levels import SkillLevel, skill_level
 from careerwright.catalogue.taxonomy import SkillSearch, held_release, search_essential_skills
 from careerwright.config import RuntimeMode
 from careerwright.db import Tx
@@ -107,6 +108,7 @@ from careerwright.profile.document import (
     TextListInput,
     TextValue,
 )
+from careerwright.profile.horizons import UNKNOWN_REFERENCE, Horizon, Reference, reference_level
 from careerwright.profile.interview import ProfileField
 from careerwright.profile.records import (
     ExplanationRequest,
@@ -133,6 +135,7 @@ from careerwright.profile.slate import (
     SlateChannel,
     SlateControls,
     build_pool,
+    choose_first_scatter,
     choose_slate,
     skill_join,
     too_general,
@@ -326,6 +329,8 @@ class Suggestion:
     candidate: Candidate
     facts: OccupationFacts
     explanation: Explanation
+    horizon: Horizon  # where the slate placed it, against the person's reference level
+    skill_level: SkillLevel  # its job group's usual ISCO skill level
     # The essential skills it was joined to a title of the person's by, by label (none unless
     # it was joined by shared skills).
     shared_skills: list[SkillRef] = field(default_factory=list)
@@ -892,7 +897,8 @@ def compute_slate(
     pool = build_pool(queries, occupations, familiar_families)
     esco_uris = {concept_id: fact.esco_uri for concept_id, fact in facts.items()}
     left_out, floor, ai_filter = _hard_filters(tx, pool, document, controls, hard, esco_uris)
-    slate = choose_slate(pool, controls, left_out)
+    reference = _reference(role, role_title, facts)
+    slate = choose_slate(pool, controls, left_out, reference=reference)
     changed = release_note(proposal.release, release.dataset_id)
     notes: list[SlateNote] = [] if changed is None else [changed]
     notes += _missed_notes(queries, unsearchable, styles, frozenset(joins))
@@ -940,6 +946,21 @@ def compute_slate(
     )
 
 
+def _reference(
+    role: ResolvedTitle | None,
+    record: TargetRecord | None,
+    facts: dict[uuid.UUID, OccupationFacts],
+) -> Reference:
+    """The person's reference level, from their role alone (`careerwright.profile.horizons`):
+    the ESCO occupation it names (its own, or the closest they chose), else the ISCO-08 groups
+    the UK job-title index codes its title to. Unknown without a role (no job yet, skipped)."""
+    if role is None or record is None:
+        return UNKNOWN_REFERENCE
+    # The role's occupations are pooled as its own search ("r1"), so their facts are held.
+    groups = [facts[concept].unit.code for concept in role.occupations]
+    return reference_level(groups, record.isco_codes)
+
+
 def _occupations(facts: dict[uuid.UUID, OccupationFacts]) -> dict[uuid.UUID, Occupation]:
     return {
         concept_id: Occupation(
@@ -964,6 +985,8 @@ def _suggestions(
             candidate,
             facts[candidate.occupation.concept_id],
             explain(candidate, facts[candidate.occupation.concept_id], familiarity_known),
+            horizon=slate.horizon(candidate),
+            skill_level=skill_level(facts[candidate.occupation.concept_id].unit.code),
             shared_skills=_joined_by(tx, candidate),
         )
         for candidate in slate.suggestions
@@ -1687,8 +1710,9 @@ def first_slate(
 ) -> FirstSlate:
     """The first scatter of destinations follows from the first answer alone: the role's
     occupation joined to others by shared essential skills (the role itself is the origin,
-    never a destination), chosen by the slate's rules and its hard filters (the confirmed
-    salary floor)."""
+    never a destination), chosen by the slate's reranker as one set (`choose_first_scatter`)
+    and its hard filters (the confirmed salary floor). Each destination carries the set the
+    role's level places it in, as a fact for the world's later near and far lines."""
     release = held_release(tx)
     profile = current_profile(tx, workspace_id)
     record = role_record(tx, workspace_id, profile.document, pack)
@@ -1719,7 +1743,7 @@ def first_slate(
     esco_uris = {concept_id: fact.esco_uri for concept_id, fact in facts.items()}
     controls = SlateControls()
     left_out, floor, _ = _hard_filters(tx, pool, profile.document, controls, hard, esco_uris)
-    slate = choose_slate(pool, controls, left_out)
+    slate = choose_first_scatter(pool, left_out, reference=_reference(role, record, facts))
     if not join.hits:
         title = facts[concept].preferred_label
         slate = replace(

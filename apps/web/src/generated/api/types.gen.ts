@@ -3156,7 +3156,8 @@ export type FeeLoanKind = typeof FeeLoanKind[keyof typeof FeeLoanKind];
 /**
  * FewMatched
  *
- * Only these matched closely enough to suggest; weaker matches don't fill the rest.
+ * Only these matched closely enough to suggest in a set; weaker matches don't fill the
+ * rest.
  */
 export type FewMatched = {
     /**
@@ -3167,6 +3168,10 @@ export type FewMatched = {
      * Count
      */
     count: number;
+    /**
+     * The set it is about (each holds up to three); null: the world's first scatter, one set of up to six.
+     */
+    horizon: Horizon | null;
 };
 
 /**
@@ -3610,6 +3615,16 @@ export const Holding = {
  * Holding
  */
 export type Holding = typeof Holding[keyof typeof Holding];
+
+/**
+ * Horizon
+ */
+export const Horizon = { NEXT_STEP: 'next_step', AIM_HIGHER: 'aim_higher' } as const;
+
+/**
+ * Horizon
+ */
+export type Horizon = typeof Horizon[keyof typeof Horizon];
 
 /**
  * HoursField
@@ -7663,6 +7678,24 @@ export type Recurring = {
 };
 
 /**
+ * ReferenceBasis
+ *
+ * What the person's reference level was read from.
+ */
+export const ReferenceBasis = {
+    ROLE_OCCUPATION: 'role_occupation',
+    UK_TITLE_GROUPS: 'uk_title_groups',
+    UNKNOWN: 'unknown'
+} as const;
+
+/**
+ * ReferenceBasis
+ *
+ * What the person's reference level was read from.
+ */
+export type ReferenceBasis = typeof ReferenceBasis[keyof typeof ReferenceBasis];
+
+/**
  * ReferenceLabel
  *
  * The rubrics, crosswalks and gate types' version and review state.
@@ -7684,6 +7717,26 @@ export type ReferenceLabel = {
      * Label Review
      */
     label_review: string;
+};
+
+/**
+ * ReferenceOut
+ *
+ * The person's reference level, which placed each suggestion: Next step is work whose job
+ * group's usual skill level is at or below it, Aim higher work above it (for level 4,
+ * level-4 work in another ISCO-08 major group). Read from their role alone.
+ */
+export type ReferenceOut = {
+    /**
+     * role_occupation: the ESCO occupation their role names; uk_title_groups: the ISCO-08 groups the UK job-title index codes its title to, all at one level; unknown: neither, so ISCO's bands placed each (levels 1 and 2 Next step, 3 and 4 Aim higher).
+     */
+    basis: ReferenceBasis;
+    /**
+     * Level
+     *
+     * Null when unknown: never a number.
+     */
+    level: 1 | 2 | 3 | 4 | null;
 };
 
 /**
@@ -10031,10 +10084,11 @@ export type SlateExplanationOut = {
 /**
  * SlateOut
  *
- * A varied slate of up to six career hypotheses from the discovery's searches, computed
- * deterministically each time it is read, with every count that explains it. A title of
- * the person's own (their role, a target, or a search naming one) joins other work only by
- * shared essential skills, never by its words, and only once it names one occupation.
+ * A varied slate of career hypotheses from the discovery's searches, in two sets of up to
+ * three, Next step then Aim higher, computed deterministically each time it is read, with
+ * every count that explains it. A title of the person's own (their role, a target, or a
+ * search naming one) joins other work only by shared essential skills, never by its words,
+ * and only once it names one occupation.
  */
 export type SlateOut = {
     /**
@@ -10057,8 +10111,11 @@ export type SlateOut = {
      * At most this many from one kind of work.
      */
     family_limit: number;
+    reference: ReferenceOut;
     /**
      * Suggestions
+     *
+     * Next step's, then Aim higher's (each suggestion's `horizon`).
      */
     suggestions: Array<SuggestionOut>;
     /**
@@ -11154,6 +11211,16 @@ export type SuggestionOut = {
      * Its ISCO-08 major group.
      */
     sector: IscoGroupOut;
+    /**
+     * The set the slate placed it in, by its job group's usual skill level against the person's reference level (`SlateOut.reference`): never whether it suits them, whether they are ready, or what it pays.
+     */
+    horizon: Horizon;
+    /**
+     * Skill Level
+     *
+     * Its job group's usual ISCO-08 skill level, by its sub-major group: the training most work there usually needs, from 1 to 4 (a degree or equivalent). A job group's level, never the person's, never pay or status.
+     */
+    skill_level: 1 | 2 | 3 | 4;
     direction: Direction;
     /**
      * Channels

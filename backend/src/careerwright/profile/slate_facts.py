@@ -15,6 +15,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from careerwright.profile.discovery import EvidenceItem
+from careerwright.profile.horizons import Horizon
 from careerwright.profile.interview import ProfileField
 
 
@@ -162,10 +163,15 @@ class NothingFound(Fact):
 
 
 class FewMatched(Fact):
-    """Only these matched closely enough to suggest; weaker matches don't fill the rest."""
+    """Only these matched closely enough to suggest in a set; weaker matches don't fill the
+    rest."""
 
     reason: Literal["few_matched"] = "few_matched"
     count: int
+    horizon: Horizon | None = Field(
+        description="The set it is about (each holds up to three); null: the world's first "
+        "scatter, one set of up to six."
+    )
 
 
 class KindsOfWorkShown(Fact):

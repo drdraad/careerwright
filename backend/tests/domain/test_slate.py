@@ -8,6 +8,7 @@ import uuid
 import pytest
 
 from careerwright.catalogue.records import IscoGroupRef, OccupationFacts
+from careerwright.catalogue.skill_levels import skill_level
 from careerwright.profile.discovery import DiscoveryQuery, EvidenceItem, QueryChannel
 from careerwright.profile.exploration import (
     _general_note,
@@ -15,10 +16,12 @@ from careerwright.profile.exploration import (
     _missed_notes,
     explain,
 )
+from careerwright.profile.horizons import UNKNOWN_REFERENCE, Horizon, reference_level
 from careerwright.profile.interview import ProfileField
 from careerwright.profile.slate import (
     FAMILY_LIMIT,
     FURTHER_QUERY_BONUS,
+    HORIZON_SIZE,
     POOL_LIMIT,
     SLATE_SIZE,
     TOO_GENERAL_OCCUPATIONS,
@@ -28,11 +31,13 @@ from careerwright.profile.slate import (
     Hit,
     NotIncluded,
     Occupation,
+    Pool,
     PoolQuery,
     Slate,
     SlateChannel,
     SlateControls,
     build_pool,
+    choose_first_scatter,
     choose_slate,
     too_general,
 )
@@ -142,14 +147,128 @@ def p02_like_pool() -> list[PoolQuery]:
     ]
 
 
+def chosen_from(pool: Pool, controls: SlateControls | None = None) -> Slate:
+    """The slate for someone whose reference level is unknown: ISCO's bands decide."""
+    return choose_slate(pool, controls, reference=UNKNOWN_REFERENCE)
+
+
 def slate(queries: list[PoolQuery] | None = None, controls: SlateControls | None = None) -> Slate:
-    pool = build_pool(queries or p02_like_pool(), OCCUPATIONS, FAMILIAR)
-    return choose_slate(pool, controls)
+    return chosen_from(build_pool(queries or p02_like_pool(), OCCUPATIONS, FAMILIAR), controls)
+
+
+# Work at every ISCO skill level (Task 6g), each in its own family.
+LADDER = {
+    o.concept_id: o
+    for o in (
+        occupation("Shop assistant", "522"),  # level 2
+        occupation("Cashier", "523"),  # 2
+        occupation("Office cleaner", "911"),  # 1
+        occupation("Waiter", "513"),  # 2
+        occupation("Retail manager", "142"),  # 3: hospitality, retail and other services managers
+        occupation("Sales representative", "332"),  # 3
+        occupation("Marketing manager", "122"),  # 4
+        occupation("Training officer", "242"),  # 4
+    )
+}
+ALL_RUNGS = (
+    ("Shop assistant", 1.0),
+    ("Cashier", 0.95),
+    ("Office cleaner", 0.9),
+    ("Waiter", 0.85),
+    ("Retail manager", 0.78),
+    ("Sales representative", 0.75),
+    ("Marketing manager", 0.7),
+    ("Training officer", 0.65),
+)
+
+
+def sets(chosen: Slate) -> dict[Horizon, set[str]]:
+    return {
+        horizon: {c.occupation.title for c in chosen.suggestions if chosen.horizon(c) is horizon}
+        for horizon in Horizon
+    }
+
+
+@pytest.mark.req("DIV1-16", "DIV1-11")
+def test_the_slate_is_two_sets_next_step_at_or_below_the_reference_and_aim_higher_above_it() -> (
+    None
+):
+    pool = build_pool([pool_query("q1", SlateChannel.TASKS, *ALL_RUNGS)], LADDER, frozenset())
+
+    unknown = chosen_from(pool)
+
+    # Unknown: ISCO's bands, three in each set, each through the same reranker (the waiter
+    # and the marketing manager are in kinds of work, and a sector, already well shown).
+    assert sets(unknown) == {
+        Horizon.NEXT_STEP: {"Shop assistant", "Cashier", "Office cleaner"},
+        Horizon.AIM_HIGHER: {"Retail manager", "Sales representative", "Training officer"},
+    }
+    first = unknown.suggestions[:HORIZON_SIZE]  # Next step is listed first
+    assert {unknown.horizon(c) for c in first} == {Horizon.NEXT_STEP}
+    levels = {
+        h: {
+            skill_level(c.occupation.family_code)
+            for c in unknown.suggestions
+            if unknown.horizon(c) is h
+        }
+        for h in Horizon
+    }
+    assert levels == {Horizon.NEXT_STEP: {1, 2}, Horizon.AIM_HIGHER: {3, 4}}
+    assert unknown.fewer_reasons == []
+
+    # A role at level 3 moves the line: level-3 work is a next step, only level 4 is higher.
+    technician = choose_slate(pool, reference=reference_level(["3322"], []))
+    assert sets(technician) == {
+        Horizon.NEXT_STEP: {"Shop assistant", "Cashier", "Office cleaner"},
+        Horizon.AIM_HIGHER: {"Marketing manager", "Training officer"},
+    }
+    assert technician.reference.level == 3
+    # A set with fewer than three says why, for that set (DIV1-06).
+    assert technician.fewer_reasons == [FewMatched(count=2, horizon=Horizon.AIM_HIGHER)]
+
+
+@pytest.mark.req("DIV1-16", "DIV1-11", "DIV1-12")
+def test_next_step_keeps_no_slot_for_something_different() -> None:
+    # The product owner's re-test (3 November 2026): a forced "less familiar" slot put a
+    # laundromat attendant and an equine dental technician in. Next step's balance is two
+    # close and one transferable.
+    found = {
+        o.concept_id: o
+        for o in (
+            occupation("Bookmaker", "421"),  # less familiar, the best match
+            occupation("Club host", "516"),  # less familiar
+            occupation("Warehouse operative", "933"),  # close: the person's own family
+            occupation("Delivery driver", "832"),  # transferable
+        )
+    }
+    queries = [
+        pool_query("q1", SlateChannel.TASKS, ("Bookmaker", 1.0), ("Club host", 0.95)),
+        pool_query("q2", SlateChannel.TRANSFERABLE, ("Delivery driver", 0.7)),
+        pool_query("q3", SlateChannel.TASKS, ("Warehouse operative", 0.65)),
+    ]
+
+    chosen = chosen_from(build_pool(queries, found, frozenset({"933"})))
+
+    # With no bonus of its own, the less familiar work comes after the transferable and the
+    # close, and only one of it fits.
+    picked = [(c.occupation.title, c.direction) for c in chosen.suggestions]
+    assert picked == [
+        ("Delivery driver", Direction.TRANSFERABLE),
+        ("Warehouse operative", Direction.CLOSE),
+        ("Bookmaker", Direction.LESS_FAMILIAR),
+    ]
+    assert {chosen.horizon(c) for c in chosen.suggestions} == {Horizon.NEXT_STEP}
 
 
 @pytest.mark.req("DIV1-06", "DIV1-11")
-def test_a_varied_slate_of_six_from_several_families_and_all_three_directions() -> None:
-    chosen = slate()
+def test_the_world_s_first_scatter_is_a_varied_six_from_several_families_and_all_directions() -> (
+    None
+):
+    # The origin's first destinations (`first_slate`) keep the first slate's 2/2/2 balance in
+    # one set: the world's near and far lines are a later slice than the two horizons (Task 6g).
+    chosen = choose_first_scatter(
+        build_pool(p02_like_pool(), OCCUPATIONS, FAMILIAR), reference=UNKNOWN_REFERENCE
+    )
 
     titles = [s.occupation.title for s in chosen.suggestions]
     assert len(titles) == SLATE_SIZE
@@ -389,7 +508,7 @@ def test_equal_matches_go_to_the_larger_share_of_essential_skills_never_to_the_t
     again = PoolQuery("q2", "stock shelves", SlateChannel.TASKS, (ENJOY,), reached("Shelf filler"))
 
     pool = build_pool([shelves], tied, frozenset())
-    chosen = choose_slate(pool)
+    chosen = chosen_from(pool)
 
     by_share = ["Shelf filler", "Merchandiser", "Ticket issuing clerk"]
     assert [c.occupation.title for c in pool] == by_share  # 1 of 8, 1 of 27, 1 of 42
@@ -449,7 +568,7 @@ def test_work_a_specific_answer_found_comes_before_work_a_general_one_found() ->
         "Leaflet distributor": 12,
         "Fruit picker": 12,
     }
-    assert choose_slate(pool).suggestions[0].occupation.title == "Bicycle mechanic"
+    assert chosen_from(pool).suggestions[0].occupation.title == "Bicycle mechanic"
 
 
 @pytest.mark.req("DIV1-06", "DIV1-08")
@@ -499,7 +618,7 @@ def test_a_search_too_general_to_find_work_alone_only_adds_weight_to_work_anothe
     assert [m.query.query_id for m in mechanic.matches] == ["q1", "q2"]
     assert mechanic.relevance == 1.0 + FURTHER_QUERY_BONUS
     assert mechanic.reach == 1  # the search that found it, not the general one
-    assert choose_slate(alone).fewer_reasons == [NothingFound()]
+    assert chosen_from(alone).fewer_reasons == [NothingFound()]
     # It adds only that little: its own score never becomes the best, so it never lifts a
     # weak match over the relevance floor.
     weakly = PoolQuery(
@@ -512,7 +631,7 @@ def test_a_search_too_general_to_find_work_alone_only_adds_weight_to_work_anothe
     lifted = {c.occupation.title: c for c in build_pool([weakly, reports], found, frozenset())}
     assert lifted["Chiropractor"].relevance == 0.3 + FURTHER_QUERY_BONUS
     assert lifted["Chiropractor"].best_score == 0.3
-    [left] = choose_slate(build_pool([weakly, reports], found, frozenset())).not_included
+    [left] = chosen_from(build_pool([weakly, reports], found, frozenset())).not_included
     assert left.reason is NotIncluded.BELOW_RELEVANCE_FLOOR
 
 
@@ -743,7 +862,10 @@ def test_a_thin_pool_returns_fewer_with_the_reason_never_filler() -> None:
     chosen = slate(thin)
 
     assert [s.occupation.title for s in chosen.suggestions] == ["Bicycle mechanic"]
-    assert chosen.fewer_reasons == [FewMatched(count=1)]  # said why, as a fact
+    assert chosen.fewer_reasons == [  # said why, as a fact, for each set short of three
+        FewMatched(count=1, horizon=Horizon.NEXT_STEP),
+        FewMatched(count=0, horizon=Horizon.AIM_HIGHER),
+    ]
     [below] = [n for n in chosen.not_included if n.reason is NotIncluded.BELOW_RELEVANCE_FLOOR]
     assert below.candidate.occupation.title == "Tree surgeon"
 
@@ -767,8 +889,9 @@ def test_the_family_limit_is_soft_and_relaxed_visibly_when_depth_is_asked_for() 
     assert any(n.reason is NotIncluded.FAMILY_LIMIT for n in default.not_included)
     assert len(deeper.suggestions) == 3
     assert deeper.notes == [MoreDepth(family_limit=4)]  # the relaxation is stated, never silent
+    # All three are next steps (level 2): Next step had three to choose from, Aim higher none.
     assert default.fewer_reasons == [
-        FewMatched(count=3),
+        FewMatched(count=0, horizon=Horizon.AIM_HIGHER),
         KindsOfWorkShown(count=1, family_limit=FAMILY_LIMIT),
     ]
     broad = slate(narrow, SlateControls(emphasis=Emphasis.BROAD))
@@ -776,7 +899,11 @@ def test_the_family_limit_is_soft_and_relaxed_visibly_when_depth_is_asked_for() 
     without = slate(
         narrow, SlateControls(exclude_concepts=frozenset({concept("Bicycle mechanic")}))
     )
-    assert without.fewer_reasons == [FewMatched(count=2), ExclusionsRemoved(count=1)]
+    assert without.fewer_reasons == [
+        FewMatched(count=2, horizon=Horizon.NEXT_STEP),
+        FewMatched(count=0, horizon=Horizon.AIM_HIGHER),
+        ExclusionsRemoved(count=1),
+    ]
 
 
 @pytest.mark.req("REC1-08", "DIV1-07")
@@ -801,13 +928,13 @@ def test_a_hard_filter_leaves_out_only_what_it_names_and_says_why_for_each() -> 
     # code over the evidence); the slate only leaves those out, each with its own reason,
     # and fills from the rest: nothing else is removed (Task 7 slice B).
     pool = build_pool(p02_like_pool(), OCCUPATIONS, FAMILIAR)
-    unfiltered = choose_slate(pool)
+    unfiltered = chosen_from(pool)
     left_out = {
         concept("Bicycle mechanic"): NotIncluded.BELOW_SALARY_FLOOR,
         concept("Tree surgeon"): NotIncluded.BELOW_AI_RESILIENCE_MINIMUM,
     }
 
-    chosen = choose_slate(pool, left_out=left_out)
+    chosen = choose_slate(pool, left_out=left_out, reference=UNKNOWN_REFERENCE)
 
     shown = {s.occupation.title for s in chosen.suggestions}
     assert not {"Bicycle mechanic", "Tree surgeon"} & shown
@@ -830,7 +957,7 @@ def test_less_familiar_and_more_practical_shift_the_slate_relative_to_the_person
     assert count(practical, Direction.CLOSE) >= 2
     # Familiarity is the person's: the same occupation is close for someone whose current
     # role is in its family, and less familiar for someone else.
-    other = choose_slate(build_pool(p02_like_pool(), OCCUPATIONS, frozenset({"723"})))
+    other = chosen_from(build_pool(p02_like_pool(), OCCUPATIONS, frozenset({"723"})))
     mechanic = next(s for s in other.suggestions if s.occupation.title == "Bicycle mechanic")
     assert mechanic.direction is Direction.CLOSE
 

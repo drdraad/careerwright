@@ -18,6 +18,7 @@ from tools.evaluation import (
     _interview,
     evaluate,
     failures_by_type,
+    isco_skill_level,
     load_cases,
     observe_guard,
     observe_interview_demo,
@@ -307,6 +308,7 @@ def slate(*suggestions: dict[str, Any], **extra: Any) -> dict[str, Any]:
         "ambiguous_titles": [],
         "salary_floor": None,
         "title_ideas": [],
+        "reference": {"basis": "unknown", "level": None},
         **extra,
     }
 
@@ -321,21 +323,32 @@ def small_pool(size: int) -> dict[str, Any]:
 
 
 def few_matched(count: int) -> dict[str, Any]:
-    return {"reason": "few_matched", "count": count}
+    return {"reason": "few_matched", "count": count, "horizon": "aim_higher"}
 
 
 def suggestion(title: str, family: str, direction: str, **extra: Any) -> dict[str, Any]:
+    """Placed as for someone whose reference level is unknown (ISCO's bands, Task 6g)."""
+    level = isco_skill_level(f"{family}1")
     return {
         "concept_id": title,
         "concept_kind": "esco",
         "title": title,
+        "isco_group": {"code": f"{family}1", "label": family},
         "family": {"code": family, "label": family},
+        "skill_level": level,
+        "horizon": "next_step" if level <= 2 else "aim_higher",
         "direction": direction,
         "sources": [{"kind": "esco", "uri": f"http://data.europa.eu/esco/occupation/{title}"}],
         "linked_evidence": [{"field": "enjoyed_tasks", "text": "repairing physical objects"}],
         "reasons": [],
         **extra,
     }
+
+
+def full_slate() -> list[dict[str, Any]]:
+    """Six in six families, listed as the API lists them: Next step's three (levels 2), then
+    Aim higher's (levels 4, 4 and 3)."""
+    return [suggestion(f"o{n}", f"{n}21", "less_familiar") for n in (4, 5, 6, 1, 2, 3)]
 
 
 @pytest.mark.req("DIV1-08", "TEST1-10")
@@ -375,6 +388,41 @@ def test_the_discovery_checks_name_the_failure_they_find() -> None:
     assert [f.type for f in evaluate(BY_ID["DSC-06"], slate(), {})] == [
         FailureType.THIN_EVIDENCE
     ]  # fewer than six with no reason given
+
+
+@pytest.mark.req("DIV1-16", "TEST1-10")
+def test_the_two_sets_checks_name_the_failure_they_find() -> None:
+    # Task 6g: Sam's case. His level is unknown, so ISCO's bands place each suggestion.
+    sam = BY_ID["DSC-22"]
+    his = {
+        "linked_evidence": [{"field": "enjoyed_tasks", "text": "helping customers on the phone"}]
+    }
+    nearer = suggestion("bookmaker", "421", "less_familiar", **his)  # level 2
+    higher = suggestion("customer experience manager", "243", "less_familiar", **his)  # 4
+    short = {"fewer_reasons": [few_matched(1)]}
+
+    def failures(*shown: dict[str, Any], **extra: Any) -> list[FailureType]:
+        return [f.type for f in evaluate(sam, slate(*shown, **{**short, **extra}), {})]
+
+    assert failures(nearer, higher) == []
+    assert failures(nearer) == [FailureType.DIVERSITY]  # only one set shown
+    # Placed against the bands' line (so only one set is shown), or listed out of order.
+    assert failures(nearer, {**higher, "horizon": "next_step"}) == [
+        FailureType.GROUNDING,
+        FailureType.DIVERSITY,
+    ]
+    assert failures(higher, nearer) == [FailureType.GROUNDING]
+    # A level that isn't its job group's, and an unknown reference served as a number.
+    assert failures(nearer, {**higher, "skill_level": 3}) == [FailureType.GROUNDING]
+    unknown_as_two = {"basis": "unknown", "level": 2}
+    assert failures(nearer, higher, reference=unknown_as_two) == [FailureType.GROUNDING]
+    # A level-3 reference puts level-3 work in Next step, not where the bands would.
+    [by_level] = [e for e in sam.expect if e.check == "horizons_by_level"]
+    technician = {"basis": "role_occupation", "level": 3}
+    chef = suggestion("head chef", "343", "less_familiar")  # level 3: Aim higher by the bands
+    assert _discovery(slate(chef, higher, reference=technician), by_level, set()) is not None
+    placed = slate({**chef, "horizon": "next_step"}, higher, reference=technician)
+    assert _discovery(placed, by_level, set()) is None
 
 
 @pytest.mark.req("TEST1-15", "DIV1-04")
@@ -484,7 +532,7 @@ def test_an_answer_whose_every_search_found_nothing_must_be_named() -> None:
     # Task W2B re-review 2, N-I1: P02's slate never said "repairing physical objects" found
     # nothing. One that found work must never be named as having found none.
     p02 = BY_ID["DSC-01"]
-    six = [suggestion(f"o{n}", f"{n}21", "less_familiar") for n in range(1, 7)]
+    six = full_slate()
     repairing = {"field": "enjoyed_tasks", "text": "repairing physical objects"}
     outdoors = {"field": "enjoyed_tasks", "text": "working outdoors"}
     reports = {"field": "enjoyed_tasks", "text": "writing reports"}
@@ -614,7 +662,7 @@ def test_a_pool_below_its_soft_target_must_say_why() -> None:
     # DIV1-02: 60-120 "where evidence permits". Below it, a full slate says how many it chose
     # from; a short slate's own reasons say why it is short.
     case = BY_ID["DSC-01"]
-    six = [suggestion(f"o{n}", f"{n}21", "less_familiar") for n in range(1, 7)]
+    six = full_slate()
     said = slate(*six, pool_size=12, notes=[small_pool(12)])
     silent = slate(*six, pool_size=12)
     short = slate(*six[:3], pool_size=3, fewer_reasons=[few_matched(3)])

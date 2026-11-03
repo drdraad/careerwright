@@ -9,6 +9,10 @@
 // not stand out enough. Needs to be a bright colour"), as asking for suggestions is before
 // there are any.
 //
+// The slate is two sets, Next step and Aim higher (Task 6g), which the API placed by each job
+// group's usual training; an Aim higher card says what Careerwright checked about that
+// training, in its kind of work's line. No set is headed by direction.
+//
 // "Why this could suit you" may also carry a written note (S2.7, ADR 0007 decision 12): one
 // model run per slate, asked for once when the person first sees the slate (the page keeps
 // every request, so a view or chapter change never asks again), whose every quotation the
@@ -19,7 +23,6 @@
 // under the count line, and the open suggestion's choice comes right after its title.
 import { type Ref, useEffect, useId, useRef, useState } from "react";
 import type {
-  Direction,
   DiscoveryOut,
   Emphasis,
   ErrorCode,
@@ -52,14 +55,15 @@ import {
   ADDED_WEIGHT_ONLY,
   ANSWER_SOURCE,
   aiFilterWords,
-  CLOSE_WITHOUT_WORK,
-  DIRECTION,
   EMPHASIS,
   ERROR_STATEMENT,
   ESCO_NAMED,
   FAILURE_CLASS,
   fewerReason,
   floorWords,
+  HORIZON,
+  HORIZON_ORDER,
+  kindOfWorkLine,
   NOT_INCLUDED,
   NOTE_CARD,
   NOTE_RECOVERY,
@@ -67,6 +71,7 @@ import {
   NOTE_REFUSAL_REASON,
   type NoteRefusalWords,
   RECORD_PART,
+  REFERENCE_BASIS,
   SUGGESTION_WORDS,
   slateNote,
   suggestionReason,
@@ -75,7 +80,6 @@ import {
   titleIdeasListed,
   titleIdeasWords,
   UK_TITLE_IDEAS,
-  WORK_NOT_KNOWN,
 } from "@/lib/vocabulary";
 import { Alert } from "./Alert";
 import { Button } from "./Button";
@@ -102,7 +106,6 @@ const EVIDENCE = [
   "evidenced_tasks",
   "work_style",
 ] as const;
-const ORDER: Direction[] = ["close_to_current", "transferable", "less_familiar"];
 const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 const NO_CONTROLS: SlateControls = {
   emphasis: "balanced",
@@ -447,11 +450,10 @@ function SuggestionCard({
           <Glyph name={open ? "expand" : "collapse"} />
         </button>
       </h4>
-      {/* A title to scan: its kind of work under it. Open, the kind of work moves under what
-          the work is, so nothing under the title reads as a second one (session W2, finding 8). */}
-      {!open && (
-        <p className="small muted">{SUGGESTION_WORDS.kindOfWork(suggestion.family.label)}</p>
-      )}
+      {/* A title to scan: its kind of work under it (and an Aim higher one's usual training).
+          Open, the line moves under what the work is, so nothing under the title reads as a
+          second one (session W2, finding 8). */}
+      {!open && <p className="small muted">{kindOfWorkLine(suggestion)}</p>}
       {open && (
         <div id={body} className="grid gap-12">
           {/* The choice first, so its bright action is in view with a real slate; what the
@@ -506,7 +508,7 @@ function SuggestionCard({
           <div className="grid gap-4">
             <p className="section-title">{SUGGESTION_WORDS.whatTheWorkIs}</p>
             {suggestion.workday !== "" && <p>{suggestion.workday}</p>}
-            <p className="small muted">{SUGGESTION_WORDS.kindOfWork(suggestion.family.label)}</p>
+            <p className="small muted">{kindOfWorkLine(suggestion)}</p>
           </div>
           <div className="grid gap-8">
             <p className="section-title">Why this could suit you</p>
@@ -738,24 +740,22 @@ function Slate({
     );
   }
   const data = slate.data;
-  const named = profile.document.target_titles;
-  const titlesGiven = workKnown || (named.state === "provided" && (named.value ?? []).length > 0);
   const emphases = (Object.keys(EMPHASIS) as Emphasis[]).filter(
     (emphasis) => workKnown || emphasis !== "practical",
   );
-  // Only the API's own fact says the person's kind of work is known: a role kept in their own
-  // words names no ESCO occupation, so nothing is "different" from it (design review M-2).
-  const familiarityKnown = data.familiarity_known;
   const excluded = controls.excludeConcepts.length + controls.excludeFamilies.length;
   // Only a search that reached work found the pool: one too general to find work on its own
   // only added weight, and one that reached nothing found none.
   const finding = data.queries.filter((query) => !query.too_general && query.reach > 0).length;
   const first = data.suggestions[0];
   const note: WrittenState = first === undefined ? { kind: "none" } : noteFor(first);
-  // As listed: grouped by direction. The open one, or the first listed once it is not shown.
-  const listed = ORDER.flatMap((direction) =>
-    data.suggestions.filter((s) => s.direction === direction),
-  );
+  // As listed: Next step, then Aim higher. The open one, or the first listed once it is not
+  // shown.
+  const sets = HORIZON_ORDER.map((horizon) => ({
+    horizon,
+    group: data.suggestions.filter((s) => s.horizon === horizon),
+  }));
+  const listed = sets.flatMap((set) => set.group);
   const open = listed.some((s) => s.concept_id === opened) ? opened : listed[0]?.concept_id;
   return (
     <div className="grid gap-16">
@@ -791,8 +791,7 @@ function Slate({
           ...[aiFilterWords(data.ai_resilience_filter), titleIdeasWords(data.title_ideas)].filter(
             (line): line is string => line !== null,
           ),
-          // Never said to someone who told Careerwright they haven't had a job yet (Task 6f).
-          ...(familiarityKnown || titlesGiven || role === "no_job_yet" ? [] : [WORK_NOT_KNOWN]),
+          REFERENCE_BASIS[data.reference.basis],
         ]}
       />
       {note.kind === "unavailable" && (
@@ -816,17 +815,12 @@ function Slate({
           </Button>
         </div>
       )}
-      {ORDER.map((direction) => {
-        const group = data.suggestions.filter((s) => s.direction === direction);
+      {sets.map(({ horizon, group }) => {
         if (group.length === 0) return null;
         return (
-          <section key={direction} className="suggestions" aria-labelledby={`dir-${direction}`}>
-            <h3 id={`dir-${direction}`} className="section-title">
-              {direction === "less_familiar" && !familiarityKnown
-                ? "Directions to consider"
-                : direction === "close_to_current" && !workKnown
-                  ? CLOSE_WITHOUT_WORK
-                  : DIRECTION[direction]}
+          <section key={horizon} className="suggestions" aria-labelledby={`set-${horizon}`}>
+            <h3 id={`set-${horizon}`} className="section-title">
+              {HORIZON[horizon]}
             </h3>
             {group.map((suggestion) => (
               <SuggestionCard

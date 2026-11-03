@@ -157,8 +157,8 @@ export async function roleQuestionWorkspace(token: string): Promise<string> {
   return id;
 }
 
-type Listed = { concept_id: string; title: string; direction: string };
-const LISTED_ORDER = ["close_to_current", "transferable", "less_familiar"];
+type Listed = { concept_id: string; title: string; horizon: string };
+const LISTED_ORDER = ["next_step", "aim_higher"];
 
 /**
  * As `talkedWorkspace`, with the suggestion its slate opens on made a target, from the slate:
@@ -178,9 +178,10 @@ export async function chosenTargetWorkspace(
     `${base}/discoveries/${found.discovery_id}/slate`,
     token,
   );
-  // The slate lists its suggestions grouped by direction, and opens on the first listed.
-  const [first] = LISTED_ORDER.flatMap((direction) =>
-    slate.suggestions.filter((s) => s.direction === direction),
+  // The slate lists its suggestions in two sets, Next step then Aim higher, and opens on the
+  // first listed.
+  const [first] = LISTED_ORDER.flatMap((horizon) =>
+    slate.suggestions.filter((s) => s.horizon === horizon),
   );
   if (first === undefined) throw new Error("no suggestion");
   await asBrowser("POST", `${base}/targets`, token, {

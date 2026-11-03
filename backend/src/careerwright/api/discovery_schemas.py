@@ -14,10 +14,12 @@ from careerwright.api.schemas import ResponseModel, RunOut
 from careerwright.catalogue.esco import concept_id
 from careerwright.catalogue.pay import FloorCounts, FloorUnknown
 from careerwright.catalogue.records import ConceptKind, SkillRef, TaxonomyRelease
+from careerwright.catalogue.skill_levels import SkillLevel
 from careerwright.money import Money
 from careerwright.profile.discovery import DiscoveryProposal, EvidenceItem, QueryChannel
 from careerwright.profile.document import FieldState, PayPeriod
 from careerwright.profile.exploration import AiFilterView, SlateView, Suggestion
+from careerwright.profile.horizons import Horizon, Reference, ReferenceBasis
 from careerwright.profile.interview import ProfileField, ProposalOrigin
 from careerwright.profile.records import TargetCoverage, TargetKind, TargetLink, TargetRecord
 from careerwright.profile.sketch import OccupationRef, Resolution, Sketch, Step, TargetSketch
@@ -250,6 +252,16 @@ class SuggestionOut(ResponseModel):
     isco_group: IscoGroupOut
     family: IscoGroupOut = Field(description="The kind of work: its ISCO-08 minor group.")
     sector: IscoGroupOut = Field(description="Its ISCO-08 major group.")
+    horizon: Horizon = Field(
+        description="The set the slate placed it in, by its job group's usual skill level "
+        "against the person's reference level (`SlateOut.reference`): never whether it suits "
+        "them, whether they are ready, or what it pays."
+    )
+    skill_level: SkillLevel = Field(
+        description="Its job group's usual ISCO-08 skill level, by its sub-major group: the "
+        "training most work there usually needs, from 1 to 4 (a degree or equivalent). A job "
+        "group's level, never the person's, never pay or status."
+    )
     direction: Direction
     channels: list[SlateChannel]
     linked_evidence: list[EvidenceOut] = Field(description="The answers that found it.")
@@ -290,6 +302,8 @@ class SuggestionOut(ResponseModel):
             isco_group=IscoGroupOut(code=facts.unit.code, label=facts.unit.label),
             family=IscoGroupOut(code=facts.family.code, label=facts.family.label),
             sector=IscoGroupOut(code=facts.sector.code, label=facts.sector.label),
+            horizon=suggestion.horizon,
+            skill_level=suggestion.skill_level,
             direction=candidate.direction,
             channels=sorted(candidate.channels),
             linked_evidence=[EvidenceOut.of(e) for e in evidence],
@@ -428,11 +442,30 @@ class AiResilienceFilterOut(ResponseModel):
         )
 
 
+class ReferenceOut(ResponseModel):
+    """The person's reference level, which placed each suggestion: Next step is work whose job
+    group's usual skill level is at or below it, Aim higher work above it (for level 4,
+    level-4 work in another ISCO-08 major group). Read from their role alone."""
+
+    basis: ReferenceBasis = Field(
+        description="role_occupation: the ESCO occupation their role names; uk_title_groups: "
+        "the ISCO-08 groups the UK job-title index codes its title to, all at one level; "
+        "unknown: neither, so ISCO's bands placed each (levels 1 and 2 Next step, 3 and 4 Aim "
+        "higher)."
+    )
+    level: SkillLevel | None = Field(description="Null when unknown: never a number.")
+
+    @classmethod
+    def of(cls, reference: Reference) -> "ReferenceOut":
+        return cls(basis=reference.basis, level=reference.level)
+
+
 class SlateOut(ResponseModel):
-    """A varied slate of up to six career hypotheses from the discovery's searches, computed
-    deterministically each time it is read, with every count that explains it. A title of
-    the person's own (their role, a target, or a search naming one) joins other work only by
-    shared essential skills, never by its words, and only once it names one occupation."""
+    """A varied slate of career hypotheses from the discovery's searches, in two sets of up to
+    three, Next step then Aim higher, computed deterministically each time it is read, with
+    every count that explains it. A title of the person's own (their role, a target, or a
+    search naming one) joins other work only by shared essential skills, never by its words,
+    and only once it names one occupation."""
 
     discovery_id: uuid.UUID
     profile_version: int
@@ -440,7 +473,10 @@ class SlateOut(ResponseModel):
     emphasis: Emphasis
     target_size: int = SLATE_SIZE
     family_limit: int = Field(description="At most this many from one kind of work.")
-    suggestions: list[SuggestionOut]
+    reference: ReferenceOut
+    suggestions: list[SuggestionOut] = Field(
+        description="Next step's, then Aim higher's (each suggestion's `horizon`)."
+    )
     fewer_reasons: list[FewerReason] = Field(
         description="Why there are fewer than six, if there are, as facts the web words."
     )
@@ -493,6 +529,7 @@ class SlateOut(ResponseModel):
             release=ReleaseRefOut.of(view.release),
             emphasis=emphasis,
             family_limit=slate.family_limit,
+            reference=ReferenceOut.of(slate.reference),
             suggestions=[SuggestionOut.of(s, view.release) for s in view.suggestions],
             fewer_reasons=slate.fewer_reasons,
             notes=slate.notes,
