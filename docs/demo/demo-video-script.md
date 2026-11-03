@@ -146,8 +146,9 @@ A quick montage to show Muse's range: same app, a completely different starting 
 software company and wants out of the office. Three fast cuts, each a live Muse reply:
 1. Sam types his job title in his own words; Careerwright keeps it exactly as he wrote it. He
    chooses "Help me explore".
-2. He writes: "good with people, hate spreadsheets, would retrain if it didn't mean a pay cut
-   for three years". Muse picks out the limit and asks what "a pay cut" means to him in pounds.
+2. Muse asks what he'd like his working life to be like. He answers: "working with people, not
+   spreadsheets. I'd retrain, but not if it means a pay cut for three years". Muse picks out the
+   limit and asks what "a pay cut" means to him in pounds.
    He answers with a figure, and the review card shows a money limit waiting for his
    confirmation. (Muse never proposes a figure he didn't give.)
 3. His suggestions on the horizon look nothing like Maya's.
