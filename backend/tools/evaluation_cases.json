@@ -822,7 +822,14 @@
           {"text": "supervise children", "channel": "transferable", "based_on": ["help run a Brownies group"]}
         ],
         "hypotheses": [],
-        "aim_higher": []
+        "aim_higher": [
+          {"title": "Clinical scientist", "based_on": ["doing practicals in the chemistry lab", "A-level biology"]},
+          {"title": "Biomedical scientist", "based_on": ["A-level biology", "A-level chemistry"]},
+          {"title": "Genetic counsellor", "based_on": ["A-level biology", "A-level psychology"]},
+          {"title": "Play therapist", "based_on": ["helping the younger girls with crafts", "A-level psychology"]},
+          {"title": "Children's nurse", "based_on": ["help run a Brownies group", "A-level biology"]},
+          {"title": "STEM outreach officer", "based_on": ["doing practicals in the chemistry lab", "help run a Brownies group"]}
+        ]
       },
       "expect": [
         {"check": "grounded"},
@@ -832,9 +839,12 @@
         {"check": "nothing_close_to_now"},
         {"check": "reference_is", "value": {"basis": "unknown", "level": null}},
         {"check": "horizons_by_level"},
-        {"check": "both_horizons"}
+        {"check": "both_horizons"},
+        {"check": "aim_higher_from_ideas", "count": 3},
+        {"check": "titles_first_in_aim_higher"},
+        {"check": "title_idea_reasons", "value": {"Clinical scientist": "in_uk_title_index", "Biomedical scientist": "in_esco", "Genetic counsellor": "in_uk_title_index", "Play therapist": "in_uk_title_index", "Children's nurse": "in_uk_title_index", "STEM outreach officer": "not_yet_found"}}
       ],
-      "note": "Task 6e (plan v1.6; TEST1-16). Offline on the full ESCO release in the integration run; live: CASES=DSC-21. Task 6g: she has had no job, so nothing gives her level and ISCO's bands place each suggestion (levels 1 and 2 Next step, 3 and 4 Aim higher); her expected A-levels are never read as met. Offline the case now gives the searches a model might propose in ESCO's skill wording: the demo proposer's searches are her answers as written, which no skill's main name holds, so they found no work and her checks held on an empty slate. Her case set stays within plan v1.6's four to six, so this is her two-set case."
+      "note": "Task 6e (plan v1.6; TEST1-16). Offline on the full ESCO release in the integration run; live: DSC-24. Task 6g: she has had no job, so nothing gives her level and ISCO's bands place each suggestion (levels 1 and 2 Next step, 3 and 4 Aim higher); her expected A-levels are never read as met. Offline the case gives the searches a model might propose in ESCO's skill wording: the demo proposer's searches are her answers as written, which no skill's main name holds, so they found no work and her checks held on an empty slate. Slice B: a fixed model output's Aim higher ideas, from her answers and her A-levels (quoted by name; each expected). Code confirms each: ESCO holds \"Biomedical scientist\"; the UK job-title index lists \"Clinical scientist\" (ISCO-08 2131), \"Genetic counsellor\" (3259) and \"Play therapist\" (2269), each placed by its group; \"Children's nurse\" is coded to nurses (2221, level 4) and child care workers (5311, level 2), so it is in neither set and stays beside the slate; \"STEM outreach officer\" is on no list, so it is not yet found. Aim higher holds three confirmed ideas, ranked before work only her searches found."
     },
     {
       "id": "DSC-22",
@@ -844,7 +854,9 @@
       "synthetic": true,
       "profile": {
         "current_role": "Client onboarding assistant",
-        "enjoyed_tasks": ["helping customers on the phone", "setting up new clients' records"]
+        "enjoyed_tasks": ["helping customers on the phone", "setting up new clients' records"],
+        "work_style": ["working with people"],
+        "disliked_tasks": ["spreadsheets"]
       },
       "discovery_output": {
         "queries": [
@@ -853,7 +865,14 @@
           {"text": "maintain customer records", "channel": "tasks", "based_on": ["setting up new clients' records"]}
         ],
         "hypotheses": [],
-        "aim_higher": []
+        "aim_higher": [
+          {"title": "Customer success manager", "based_on": ["helping customers on the phone", "setting up new clients' records"]},
+          {"title": "Training and development officer", "based_on": ["working with people"]},
+          {"title": "Careers adviser", "based_on": ["working with people", "helping customers on the phone"]},
+          {"title": "Human resources officer", "based_on": ["working with people", "setting up new clients' records"]},
+          {"title": "Client executive", "based_on": ["helping customers on the phone"]},
+          {"title": "Onboarding specialist", "based_on": ["setting up new clients' records"]}
+        ]
       },
       "expect": [
         {"check": "reference_is", "value": {"basis": "unknown", "level": null}},
@@ -863,9 +882,71 @@
         {"check": "distinct"},
         {"check": "no_percentage"},
         {"check": "searched_through_skills"},
-        {"check": "fewer_has_reason"}
+        {"check": "fewer_has_reason"},
+        {"check": "aim_higher_from_ideas", "count": 3},
+        {"check": "titles_first_in_aim_higher"},
+        {"check": "set_excludes", "direction": "aim_higher", "words": ["equine"]},
+        {"check": "title_idea_reasons", "value": {"Customer success manager": "in_uk_title_index", "Training and development officer": "in_uk_title_index", "Careers adviser": "in_uk_title_index", "Human resources officer": "in_esco", "Client executive": "in_uk_title_index", "Onboarding specialist": "not_yet_found"}}
       ],
-      "note": "Task 6g (the product owner's re-test, 3 November 2026). Session W2's made-up Sam (docs/reviews/session-w2.md): his title is on no list, so nothing gives his level and ISCO's bands place each suggestion (levels 1 and 2 Next step, 3 and 4 Aim higher). The searches are ones a model might propose in ESCO's skill wording from his answers; \"assist customers\" is the search that reached the re-test's bookmaker and club host, and \"communicate with customers\" is too general to find work alone. Live: CASES=DSC-22."
+      "note": "Task 6g (the product owner's re-test, 3 November 2026). Session W2's made-up Sam (docs/reviews/session-w2.md; his words: \"working with people, not spreadsheets; I'd retrain, but not if it means a pay cut for three years\"): his title is on no list, so nothing gives his level and ISCO's bands place each suggestion (levels 1 and 2 Next step, 3 and 4 Aim higher). His pay-cut limit is a planning limit no suggestion reads (only a confirmed salary floor filters), and what he doesn't enjoy is never searched. The searches are ones a model might propose in ESCO's skill wording from his answers; \"assist customers\" is the search that reached the re-test's bookmaker and club host, and \"communicate with customers\" is too general to find work alone. Slice B: a fixed model output's Aim higher ideas. Code confirms each: ESCO holds \"Human resources officer\"; the UK job-title index lists \"Customer success manager\" (ISCO-08 3339), \"Training and development officer\" (2424) and \"Careers adviser\" (2423); \"Client executive\" is coded to groups at levels 4 and 3 (2431, 3321), so it is in neither set and stays beside the slate; \"Onboarding specialist\" is on no list. Aim higher now holds three confirmed ideas, never the equine dental technician one search found. Live: DSC-23."
+    },
+    {
+      "id": "DSC-23",
+      "kind": "discovery",
+      "title": "Sam, live only: the model's own Aim higher ideas, confirmed by code, reach Aim higher before work only searches found",
+      "requirements": ["DIV1-16", "DIV1-04", "REC1-06"],
+      "synthetic": true,
+      "live_only": true,
+      "profile": {
+        "current_role": "Client onboarding assistant",
+        "enjoyed_tasks": ["helping customers on the phone", "setting up new clients' records"],
+        "work_style": ["working with people"],
+        "disliked_tasks": ["spreadsheets"]
+      },
+      "expect": [
+        {"check": "reference_is", "value": {"basis": "unknown", "level": null}},
+        {"check": "aim_higher_from_ideas", "count": 1},
+        {"check": "titles_first_in_aim_higher"},
+        {"check": "horizons_by_level"},
+        {"check": "grounded"},
+        {"check": "distinct"},
+        {"check": "no_percentage"},
+        {"check": "unsupported_not_suggested"}
+      ],
+      "note": "Task 6g slice B: the controller's capped live check of discovery-queries-5 (CASES=DSC-23; not in the default live set, never offline: the demo proposer proposes no ideas). DSC-22 is the same profile offline with a fixed model output."
+    },
+    {
+      "id": "DSC-24",
+      "kind": "discovery",
+      "persona": "SL01",
+      "title": "Maya, live only: the model reads her expected A-levels and her answers, and its Aim higher ideas, confirmed by code, reach Aim higher; nothing is close to what she does now",
+      "requirements": ["DIV1-16", "TEST1-16", "PROF-13"],
+      "synthetic": true,
+      "live_only": true,
+      "profile": {
+        "current_role": {"state": "no_job_yet"},
+        "work_status": "in_education_or_training",
+        "qualifications": [
+          {"name": "A-level biology", "status": "expected"},
+          {"name": "A-level chemistry", "status": "expected"},
+          {"name": "A-level psychology", "status": "expected"}
+        ],
+        "enjoyed_tasks": ["doing practicals in the chemistry lab", "helping the younger girls with crafts"],
+        "evidenced_tasks": ["help run a Brownies group"],
+        "cities": ["Leeds"]
+      },
+      "expect": [
+        {"check": "reference_is", "value": {"basis": "unknown", "level": null}},
+        {"check": "aim_higher_from_ideas", "count": 1},
+        {"check": "titles_first_in_aim_higher"},
+        {"check": "horizons_by_level"},
+        {"check": "nothing_close_to_now"},
+        {"check": "grounded"},
+        {"check": "distinct"},
+        {"check": "no_percentage"},
+        {"check": "unsupported_not_suggested"}
+      ],
+      "note": "Task 6g slice B: the controller's capped live check of discovery-queries-5 (CASES=DSC-24; not in the default live set, never offline). DSC-21 is the same profile offline with a fixed model output. Her A-levels are expected: the prompt says an expected qualification is never achieved, and no check reads one as met."
     },
     {
       "id": "STR-01",

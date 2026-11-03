@@ -16,6 +16,7 @@ from tools.evaluation import (
     FailureType,
     _discovery,
     _interview,
+    aim_higher_entries,
     evaluate,
     failures_by_type,
     isco_skill_level,
@@ -25,6 +26,7 @@ from tools.evaluation import (
     observe_strength,
     observe_support,
 )
+from tools.live_eval import select
 
 CASES = load_cases()
 BY_ID = {case.id: case for case in CASES}
@@ -90,8 +92,10 @@ def test_the_synthetic_school_leaver_is_labelled_kept_apart_and_has_her_cases() 
     assert "m0" not in SCHOOL_LEAVER.parts  # never in the supplied pack
     assert card["current_role"] == {"state": "no_job_yet"}  # no invented job title
     assert not {"income", "current_net_income_minor", "salary"} & set(card)  # no income
-    # Four to six cases with the browser test of the no-job first answer (Task 6f's).
-    assert 4 <= len(hers) + 1 <= 6
+    # Four to six evaluation cases (plan v1.6), beside the browser test of the no-job first
+    # answer (Task 6f's). Task 6g slice B adds her live-only Aim higher check (DSC-24), the
+    # sixth; until then the browser test was counted too.
+    assert 4 <= len(hers) <= 6
     assert {case.kind for case in hers} == {
         CaseKind.INTERVIEW,
         CaseKind.DISCOVERY,
@@ -366,9 +370,15 @@ def test_the_discovery_checks_name_the_failure_they_find() -> None:
         title_ideas=[
             {
                 "title": "Bicycle mechanic",
+                "based_on": [],
                 "reason": "not_yet_found",
                 "outcome": "not_matched",
                 "occupations": 0,
+                "groups": [],
+                "skill_level": None,
+                "horizon": None,
+                "position": None,
+                "left_out": False,
             }
         ],
     )
@@ -392,8 +402,11 @@ def test_the_discovery_checks_name_the_failure_they_find() -> None:
 
 @pytest.mark.req("DIV1-16", "TEST1-10")
 def test_the_two_sets_checks_name_the_failure_they_find() -> None:
-    # Task 6g: Sam's case. His level is unknown, so ISCO's bands place each suggestion.
-    sam = BY_ID["DSC-22"]
+    # Task 6g: Sam's case. His level is unknown, so ISCO's bands place each suggestion. Slice
+    # A's checks only: slice B's (his Aim higher ideas) have a test of their own.
+    sam = BY_ID["DSC-22"].model_copy(
+        update={"expect": [e for e in BY_ID["DSC-22"].expect if e.check not in SLICE_B_CHECKS]}
+    )
     his = {
         "linked_evidence": [{"field": "enjoyed_tasks", "text": "helping customers on the phone"}]
     }
@@ -425,6 +438,83 @@ def test_the_two_sets_checks_name_the_failure_they_find() -> None:
     assert _discovery(placed, by_level, set()) is None
 
 
+SLICE_B_CHECKS = frozenset(
+    {"aim_higher_from_ideas", "titles_first_in_aim_higher", "set_excludes", "title_idea_reasons"}
+)
+
+
+def listed_idea(title: str, codes: list[str], horizon: str | None, position: int | None) -> Any:
+    """A title only the UK job-title index lists, as the API serves it (Task 6g slice B)."""
+    return {
+        "title": title,
+        "based_on": [{"field": "enjoyed_tasks", "text": "helping customers on the phone"}],
+        "reason": "in_uk_title_index",
+        "outcome": "not_matched",
+        "occupations": 0,
+        "groups": [{"code": code, "label": None} for code in codes],
+        "skill_level": None,
+        "horizon": horizon,
+        "position": position,
+        "left_out": False,
+    }
+
+
+@pytest.mark.req("DIV1-16", "DIV1-04", "TEST1-16")
+def test_the_aim_higher_idea_checks_name_the_failure_they_find() -> None:
+    # Task 6g slice B, evaluated on Sam's case: his ideas reach Aim higher, work found by a
+    # title is listed before work only searches found, and a title is placed by its groups.
+    his = {
+        "linked_evidence": [{"field": "enjoyed_tasks", "text": "helping customers on the phone"}]
+    }
+    hr = suggestion("human resources officer", "242", "less_familiar", channels=["hypothesis"])
+    equine = suggestion("equine dental technician", "324", "less_familiar", channels=["tasks"])
+    hr, equine = {**hr, **his}, {**equine, **his}
+    success = listed_idea("Customer success manager", ["3339"], "aim_higher", 0)
+    observed = slate(hr, equine, title_ideas=[success])
+    by_check = {e.check: e for e in BY_ID["DSC-22"].expect}
+
+    def check(name: str, shown: dict[str, Any]) -> FailureType | None:
+        failure = _discovery(shown, by_check[name], set())
+        return failure.type if failure else None
+
+    assert aim_higher_entries(observed) == [
+        ("Customer success manager", "idea"),
+        ("human resources officer", "idea"),
+        ("equine dental technician", "search"),
+    ]
+    assert check("aim_higher_from_ideas", observed) is FailureType.DIVERSITY  # two of three
+    assert check("titles_first_in_aim_higher", observed) is None
+    assert check("set_excludes", observed) is FailureType.GROUNDING  # the equine technician
+    # Work only searches found, listed before an idea.
+    late = slate(equine, hr, title_ideas=[{**success, "position": 2}])
+    assert check("titles_first_in_aim_higher", late) is FailureType.GROUNDING
+    # A title whose groups disagree on level, in a set; one at level 3 in Next step.
+    split = listed_idea("Account manager", ["1330", "3313"], "aim_higher", 1)
+    assert check("horizons_by_level", slate(hr, title_ideas=[split])) is FailureType.GROUNDING
+    low = listed_idea("Customer success manager", ["3339"], "next_step", 0)
+    assert check("horizons_by_level", slate(hr, title_ideas=[low])) is FailureType.GROUNDING
+    assert check("horizons_by_level", slate(hr, title_ideas=[success])) is None
+    # Four in a set is more than it holds.
+    crowded = [listed_idea(f"Idea {n}", ["2424"], "aim_higher", n) for n in range(3)]
+    assert check("horizons_by_level", slate(hr, title_ideas=crowded)) is FailureType.GROUNDING
+    # A listed title shown must rest on the person's answers and carry its groups.
+    answers = {("enjoyed_tasks", "helping customers on the phone")}
+    assert _discovery(slate(title_ideas=[success]), by_check["grounded"], answers) is None
+    bare = {**success, "groups": []}
+    assert _discovery(slate(title_ideas=[bare]), by_check["grounded"], answers) is not None
+
+
+@pytest.mark.req("TEST1-10", "DIV1-16")
+def test_a_live_only_case_runs_only_when_named_never_offline_or_by_default() -> None:
+    # Task 6g slice B: Sam's and Maya's live checks of the model's own ideas.
+    live_only = [case for case in CASES if case.live_only]
+    assert [case.id for case in live_only] == ["DSC-23", "DSC-24"]
+    assert all(case.kind is CaseKind.DISCOVERY and not case.live for case in live_only)
+    assert all(case.discovery_output is None for case in live_only)
+    assert not {case.id for case in live_only} & {case.id for case in select(CASES, None)}
+    assert [case.id for case in select(CASES, ["DSC-23", "DSC-24"])] == ["DSC-23", "DSC-24"]
+
+
 @pytest.mark.req("TEST1-15", "DIV1-04")
 def test_a_title_idea_s_reason_must_be_what_careerwright_did_with_it() -> None:
     # Task 6d slice B fix round 1, app review M-8: the failure path of `title_idea_reasons`.
@@ -432,11 +522,18 @@ def test_a_title_idea_s_reason_must_be_what_careerwright_did_with_it() -> None:
 
     def idea(title: str, reason: str) -> dict[str, Any]:
         matched = reason == "in_esco"
+        listed = reason == "in_uk_title_index"
         return {
             "title": title,
+            "based_on": [{"field": "enjoyed_tasks", "text": "writing prompts for AI tools"}],
             "reason": reason,
             "outcome": "matched" if matched else "not_matched",
             "occupations": 1 if matched else 0,
+            "groups": [{"code": "2512", "label": None}] if listed else [],
+            "skill_level": 4 if listed else None,
+            "horizon": None,  # beside the slate
+            "position": None,
+            "left_out": False,
         }
 
     analyst = suggestion(

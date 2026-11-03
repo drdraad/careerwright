@@ -677,7 +677,8 @@ class _Option:
 
 def _option(entry: Entry, *, titles_first: bool) -> _Option:
     if isinstance(entry, ListedTitle):
-        order = (-LISTED_RELEVANCE, 1, 0.0, entry.title, entry.title)
+        # As `_order`: ESCO's titles are in lower case, so a title idea's case never decides.
+        order = (-LISTED_RELEVANCE, 1, 0.0, entry.title.casefold(), entry.title)
         return _Option(
             entry,
             entry.family_code,

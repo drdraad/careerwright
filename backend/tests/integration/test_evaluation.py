@@ -33,6 +33,7 @@ from tools.evaluation import (
     Case,
     CaseKind,
     Failure,
+    aim_higher_entries,
     evaluate,
     failures_by_type,
     load_cases,
@@ -61,9 +62,12 @@ def full_release(infra: Infra) -> Iterator[sa.Engine]:
     owner.dispose()
 
 
-@pytest.mark.req("DIV1-08", "TEST1-10", "REC1-09", "REC1-03", "DIV1-06")
+@pytest.mark.req("DIV1-08", "TEST1-10", "REC1-09", "REC1-03", "DIV1-06", "DIV1-16")
 def test_every_discovery_case_passes_on_the_full_release(full_release: sa.Engine) -> None:
-    cases = [case for case in load_cases() if case.kind is CaseKind.DISCOVERY]
+    # A live-only case (Task 6g slice B) needs a model's own title ideas: it runs only live.
+    cases = [
+        case for case in load_cases() if case.kind is CaseKind.DISCOVERY and not case.live_only
+    ]
     with system_transaction(full_release) as tx:
         observed = {case.id: observe_discovery_offline(tx, case) for case in cases}
 
@@ -72,6 +76,14 @@ def test_every_discovery_case_passes_on_the_full_release(full_release: sa.Engine
     }
 
     print(f"discovery cases: {len(cases)}, failures by type: {failures_by_type(results)}")
+    for case_id in ("DSC-21", "DSC-22"):  # Maya's and Sam's Aim higher (Task 6g slice B)
+        print(f"{case_id} Aim higher: {aim_higher_entries(observed[case_id])}")
+        beside = [
+            (i["title"], i["reason"], [g["code"] for g in i["groups"]])
+            for i in observed[case_id]["title_ideas"]
+            if i["horizon"] is None
+        ]
+        print(f"{case_id} ideas in no set: {beside}")
     for case_id in ("DSC-01", "DSC-03", "DSC-21", "DSC-22"):
         shown = [
             (s["title"], s["isco_group"]["code"], s["horizon"], s["direction"])
