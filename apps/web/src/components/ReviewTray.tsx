@@ -13,7 +13,7 @@
 // qualifications"): each change reads in about two lines, its answer's name with only what
 // changes, then its origin as a short tag and its actions; a hint (a limit's plain words
 // included) is one step away, behind a button beside the answer's name.
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type {
   ProfileDocument,
   ProfileOut,
@@ -67,18 +67,18 @@ function proposedValue(change: ProposedChangeOut): string {
   return describeValue(change.value, change.field as ProfileFieldName);
 }
 
-/** What a change reads as after its answer's name: only what it changes against what is saved
- *  (each list item it adds or removes, so an item taken back reads as removed), or, for a new
- *  answer or one that isn't a list, just its value. */
+/** What a change reads as after its answer's name: only what it changes against what is saved,
+ *  in plain words ("adds fixing machines, removes helping at Brownies", so an item taken back
+ *  reads as removed), or, for a new answer or one that isn't a list, just its value. */
 function changeWords(change: ProposedChangeOut, saved: ProfileDocument): string {
   const listed = listChange(change, saved[change.field as ProfileFieldName]);
   if (listed === null) return proposedValue(change);
-  const items = [
-    ...listed.added.map(REVIEW_CARD.added),
-    ...listed.removed.map(REVIEW_CARD.removed),
+  const parts = [
+    ...(listed.added.length > 0 ? [REVIEW_CARD.adds(listed.added)] : []),
+    ...(listed.removed.length > 0 ? [REVIEW_CARD.removes(listed.removed)] : []),
   ];
-  if (change.state !== "provided") return [FIELD_STATE[change.state], ...items].join(", ");
-  return items.length === 0 ? proposedValue(change) : items.join(", ");
+  if (change.state !== "provided") return [FIELD_STATE[change.state], ...parts].join(", ");
+  return parts.length === 0 ? proposedValue(change) : parts.join(", ");
 }
 
 /** Where an edit starts: the proposal's own answer, or an empty answer to type into when
@@ -112,6 +112,22 @@ export function ReviewTray({
   const [problems, setProblems] = useState<Record<string, FieldProblem>>({});
   /** The changes whose hint is open (one step away). */
   const [explained, setExplained] = useState<Record<string, boolean>>({});
+  // Save and Keep none stay at the foot of the window, so whatever is focused or scrolled into
+  // view must stop above them (WCAG 2.2 2.4.11): the window's scroll padding keeps the bar's own
+  // height clear (`--tray-actions-height`, globals.css), as it changes when it wraps (three rows
+  // at 320 px; Task W2F slice E), as the answer form's Save bar does. Measured while the bar is
+  // there (a stale card has none).
+  const measureBar = useCallback((element: HTMLDivElement) => {
+    const root = document.documentElement;
+    const measure = new ResizeObserver(() =>
+      root.style.setProperty("--tray-actions-height", `${element.offsetHeight}px`),
+    );
+    measure.observe(element);
+    return () => {
+      measure.disconnect();
+      root.style.removeProperty("--tray-actions-height");
+    };
+  }, []);
   const chosen = changes.filter(
     (c) => choices[c.change_id] !== undefined && choices[c.change_id] !== "skip",
   );
@@ -312,7 +328,7 @@ export function ReviewTray({
       )}
       {/* Kept in view at the foot of the screen while the card is (session W2: with three or
           more changes, Save sat below the first screen). */}
-      <div className="tray-actions">
+      <div ref={measureBar} className="tray-actions">
         <Button
           variant={primary ? "primary" : "secondary"}
           onClick={() => void save()}

@@ -490,8 +490,7 @@ const unanswered: ProfileOut = {
 export const Start: Story = {
   render: you(chapterRoutes(prefs(null), []), "conversation", unanswered),
 };
-/** Typed before choosing how to start: Send waits for the choice, saying so, and the words
- *  stay in the field (session W2). */
+/** Typed into the reply field (there is none before the start's choice, Task W2F slice E). */
 const typedReply =
   (words: string): Story["play"] =>
   async ({ canvasElement }) => {
@@ -500,10 +499,6 @@ const typedReply =
     });
     await userEvent.type(field, words);
   };
-export const StartSendWaits: Story = {
-  render: you(chapterRoutes(prefs(null), []), "conversation", unanswered),
-  play: typedReply("Synthetic: I fix bikes at weekends."),
-};
 
 // The type-ahead open (Task 6d slice B fix round 1, design review M-3): what the person sees as
 // they type, each from the scripted API's answer for those words.
@@ -601,8 +596,8 @@ export const ReplyToReview: Story = {
   render: you(chapterRoutes(prefs("unsure"), [turn("complete", proposal)])),
 };
 /** A reply changing lists (session W2; Task W2F slice E, half the words): each change in about
- *  two lines, its answer's name with only what it adds (+) and removes (−) against what is
- *  saved (a task taken back reads as removed), then its origin as a short tag and its actions;
+ *  two lines, its answer's name with only what it adds and removes against what is saved, in
+ *  plain words (a task taken back reads as removed), then its origin as a short tag and its actions;
  *  the task answers' hints one step away; with four changes, Save stays at the foot of the
  *  screen. Typed meanwhile, Send waits for the card, saying so in a few words. */
 const withTasks: ProfileOut = {

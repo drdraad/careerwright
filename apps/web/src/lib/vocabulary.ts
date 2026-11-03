@@ -495,11 +495,10 @@ export const PARTIAL_REPLY: Record<PartialCompleteness, { label: string }> = {
 /** A failed turn's reply so far: shown, never saved (MODEL-03). */
 export const FAILED_REPLY_LABEL = "Stopped: not checked, nothing saved";
 
-/** Why Send waits (session W2): for the choice of how to start, and for a reply's review card
- *  to be saved or kept none of, so no reply's proposals are lost. What is typed is kept. Shown
- *  only once there is something to send, in a few words (Task W2F slice E). */
+/** Why Send waits (session W2): for a reply's review card to be saved or kept none of, so no
+ *  reply's proposals are lost. What is typed is kept. Shown only once there is something to
+ *  send, in a few words (Task W2F slice E; before the start's choice there is no reply field). */
 export const SEND_WAITS = {
-  start: "Choose how to start, then send.",
   review: "Save or choose Keep none, then send.",
 } as const;
 
@@ -510,17 +509,17 @@ export const NO_KEY_STORED = "Meta key: none stored. Connect one in the conversa
 // The review card (session W2; Task W2F slice E, the product owner: "too verbose ... unnecessary
 // qualifications that overload cognitive load"): each change in about two lines.
 
-/** The card's own words: how many changes, each one's origin as a short tag, what one item
- *  added or removed reads as (screen readers say "plus" and "minus"), what a hint's button is
- *  called, and why Save waits. */
+/** The card's own words: how many changes, each one's origin as a short tag, what a list
+ *  change adds and removes in plain words (never plus or minus signs, which read as dashes),
+ *  what a hint's button is called, and why Save waits. */
 export const REVIEW_CARD = {
   heading: (count: number) => `To review: ${count} ${count === 1 ? "change" : "changes"}`,
   origin: { stated: "Your words", inferred: "Careerwright's reading" } satisfies Record<
     Basis,
     string
   >,
-  added: (item: string) => `+ ${item}`,
-  removed: (item: string) => `− ${item}`,
+  adds: (items: readonly string[]) => `adds ${plainList(items)}`,
+  removes: (items: readonly string[]) => `removes ${plainList(items)}`,
   /** The accessible name of the button that shows an answer's hint, one step away. */
   means: (label: string) => `What ${label.toLowerCase()} means`,
   saveWaits: "Accept or edit one first.",
@@ -844,6 +843,9 @@ const quotedList = (texts: readonly string[]) =>
   texts.length < 2
     ? texts.map(q).join("")
     : `${texts.slice(0, -1).map(q).join(", ")} and ${q(texts.at(-1) ?? "")}`;
+/** a, a and b, or a, b and c: the person's words, unquoted. */
+const plainList = (texts: readonly string[]) =>
+  texts.length < 2 ? texts.join("") : `${texts.slice(0, -1).join(", ")} and ${texts.at(-1)}`;
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /** Which of the person's answers found a suggestion, as its line starts. */

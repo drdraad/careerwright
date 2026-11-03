@@ -412,8 +412,8 @@ const shots = (scratch: Scratch): Shot[] => [
         page.getByRole("heading", { name: "What do you do now, or what did you do last?" }),
       ).toBeVisible();
       await expect(page.getByRole("combobox", { name: "Your job title" })).toBeVisible();
-      // Chat is immediate (session 2): the reply field is there from the first screen.
-      await expect(page.getByRole("textbox", { name: "Reply to Careerwright" })).toBeVisible();
+      // One place to type (Task W2F slice E): no reply field until the start's choice is made.
+      await expect(page.getByRole("textbox", { name: "Reply to Careerwright" })).toHaveCount(0);
     },
   },
   {

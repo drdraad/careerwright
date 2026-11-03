@@ -109,8 +109,8 @@ export function decisionFor(
   };
 }
 
-/** The start is still showing: no choice of how to start, and no message yet. Send waits for
- *  the choice meanwhile (session W2), so a message never goes before it. */
+/** The start is still showing: no choice of how to start, and no message yet. There is no reply
+ *  field meanwhile (Task W2F slice E), so a message never goes before the choice (session W2). */
 export function entryNeeded(preferences: Pick<PreferencesOut, "entry_mode">, turns: TurnOut[]) {
   return preferences.entry_mode === null && turns.length === 0;
 }

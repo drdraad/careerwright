@@ -30,6 +30,9 @@ const readOn = new Intl.DateTimeFormat("en-GB", {
 const same = (a: string, b: string) =>
   a.trim().replace(/\s+/g, " ").toLowerCase() === b.trim().replace(/\s+/g, " ").toLowerCase();
 const RUNNING = new Set(["searching", "ready_to_read", "reading"]);
+// A research the person can run again: one that stopped, found no pages, or hasn't found the
+// title yet (Task W2F slice E); never one that found it.
+const AGAIN = new Set(["search_stopped", "no_pages", "reading_stopped", "not_yet_found"]);
 
 /** The latest research of a title, if any (the list is newest first). */
 export function latestFor(
@@ -143,18 +146,23 @@ function RoleResearch({
           </Button>
         </div>
       )}
-      {research !== undefined &&
-        (state === "search_stopped" || state === "no_pages" || state === "reading_stopped") && (
+      {state !== undefined && AGAIN.has(state) && (
+        // Its cost first, as for a first research.
+        <div className="grid gap-8">
+          <RunEstimate workspaceId={workspaceId} kind="source_search" />
           <div>
             <Button
               variant="secondary"
               onClick={begin}
-              disabledReason={!canWrite ? ROLE_RESEARCH.noKey : undefined}
+              disabledReason={
+                !canWrite ? ROLE_RESEARCH.noKey : start.isPending ? "Starting…" : undefined
+              }
             >
               {ROLE_RESEARCH.again}
             </Button>
           </div>
-        )}
+        </div>
+      )}
       {[start.error, read.error, cancel.error].map(
         (error, n) => error !== null && <RequestFailure key={String(n)} error={error} />,
       )}

@@ -38,6 +38,7 @@ import {
   turnFailed,
   turnRunning,
 } from "@/lib/conversation";
+import { useFollowLatest } from "@/lib/followLatest";
 import { type MessageSender, useOrigin, useSetPreferences, useTurnReply } from "@/lib/queries";
 import {
   ENGLAND_ONLY,
@@ -389,6 +390,10 @@ export function Conversation({
   const questionTitle = useRef<HTMLHeadingElement>(null);
   const pausedTitle = useRef<HTMLHeadingElement>(null);
   const replyField = useRef<HTMLTextAreaElement>(null);
+  const composer = useRef<HTMLFormElement>(null);
+  const thread = useRef<HTMLElement>(null);
+  // Once the person sends, the newest part stays in view as it arrives (Task W2F slice E).
+  const follow = useFollowLatest(thread, composer);
   const modeId = useId();
   const demo = workspace.data_mode === "demo";
   const support = sender.support;
@@ -475,6 +480,7 @@ export function Conversation({
     );
 
   const send = async (text: string) => {
+    follow();
     const sent = await sender.send({ expected_profile_version: profile.version, message: text });
     // Compared with the field as it is now, not as it was at send: words typed while this
     // message was on its way are the person's next message and are kept.
@@ -485,7 +491,7 @@ export function Conversation({
   const hidden = turns.length - shown.length;
 
   return (
-    <section className="thread" aria-labelledby="conversation-title">
+    <section ref={thread} className="thread" aria-labelledby="conversation-title">
       <h2 id="conversation-title" className="sr-only">
         Conversation with Careerwright
       </h2>
@@ -642,39 +648,44 @@ export function Conversation({
       )}
       {sender.error !== null && <RequestFailure error={sender.error} />}
 
-      <form
-        className="composer"
-        aria-label="Your reply"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (sendBlocked === undefined && message.trim() !== "") void send(message.trim());
-        }}
-      >
-        <label className="sr-only" htmlFor={`${modeId}-reply`}>
-          Reply to Careerwright
-        </label>
-        <textarea
-          ref={replyField}
-          id={`${modeId}-reply`}
-          rows={2}
-          maxLength={2000}
-          placeholder="Reply in your own words"
-          value={message}
-          onChange={(event) => setMessage(event.target.value)}
-        />
-        {/* Bright only with something to send: never Send on an empty field (F17). Why it
-            waits takes a line of its own under the field, so the field keeps its width, and
-            only once there is something to send (slice E: an empty field sends nothing). */}
-        <div className="composer-send">
-          <Button
-            type="submit"
-            variant={primary === "send" && message.trim() !== "" ? "primary" : "secondary"}
-            disabledReason={message.trim() === "" ? undefined : sendBlocked}
-          >
-            Send
-          </Button>
-        </div>
-      </form>
+      {/* One place to type per step (Task W2F slice E): the start has its own, the job title,
+          and its choice; the reply field comes with the conversation's first question. */}
+      {!starting && (
+        <form
+          ref={composer}
+          className="composer"
+          aria-label="Your reply"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (sendBlocked === undefined && message.trim() !== "") void send(message.trim());
+          }}
+        >
+          <label className="sr-only" htmlFor={`${modeId}-reply`}>
+            Reply to Careerwright
+          </label>
+          <textarea
+            ref={replyField}
+            id={`${modeId}-reply`}
+            rows={2}
+            maxLength={2000}
+            placeholder="Reply in your own words"
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+          />
+          {/* Bright only with something to send: never Send on an empty field (F17). Why it
+              waits takes a line of its own under the field, so the field keeps its width, and
+              only once there is something to send (slice E: an empty field sends nothing). */}
+          <div className="composer-send">
+            <Button
+              type="submit"
+              variant={primary === "send" && message.trim() !== "" ? "primary" : "secondary"}
+              disabledReason={message.trim() === "" ? undefined : sendBlocked}
+            >
+              Send
+            </Button>
+          </div>
+        </form>
+      )}
 
       {(!starting || demo) && (
         <div className="thread-meta">

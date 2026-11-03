@@ -273,6 +273,39 @@ describe("[DIV1-15][MODEL-08] research this role", () => {
     expect(first).not.toHaveTextContent(ROLE_RESEARCH.pageUnread);
   });
 
+  // Task W2F slice E (the product owner's re-test): after "not yet found", the person can look
+  // again, seeing what it may cost first, as for a first research; never after "found".
+  it.each([
+    ["not yet found", { state: "not_yet_found", not_yet_found_reason: "one_source_only" }],
+    ["a stopped search", { state: "search_stopped" }],
+    ["no pages", { state: "no_pages" }],
+  ] as const)("offers Research again after %s, with its cost first", async (_, over) => {
+    const ended = research({ ...over, search: run("s1"), reading: run("a1") });
+    const { sent, user } = shown(
+      [ended],
+      [{ method: "POST", path: /\/role-research$/, status: 202, answer: research({}) }],
+    );
+
+    const again = await screen.findByRole("button", { name: ROLE_RESEARCH.again });
+    const cost = await screen.findByText(/This can cost up to \$0\.05 on your Meta key\./);
+    expect(cost.compareDocumentPosition(again) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await user.click(again);
+    await waitFor(() => expect(sent.some((s) => s.method === "POST")).toBe(true));
+    expect(sent.find((s) => s.method === "POST")?.body).toEqual({
+      expected_profile_version: 3,
+      title: TITLE,
+    });
+  });
+
+  it("never offers Research again once the title is found", async () => {
+    const found = research({ state: "found", sources: 2, search: run("s1"), reading: run("a1") });
+    shown([found]);
+
+    expect(await screen.findByText(ROLE_RESEARCH.state.found)).toBeVisible();
+    expect(screen.queryByRole("button", { name: ROLE_RESEARCH.again })).toBeNull();
+    expect(screen.queryByText(/This can cost up to/)).toBeNull();
+  });
+
   it("never offers to make the person's own title a target again", async () => {
     const found = research({ state: "found", sources: 2, search: run("s1"), reading: run("a1") });
     shown([found], [], [{ title: TITLE, why: "role" }]);
