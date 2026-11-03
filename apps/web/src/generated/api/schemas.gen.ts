@@ -4310,7 +4310,8 @@ export const ExclusionReasonSchema = {
         'source_not_permitted',
         'over_the_limit',
         'site_root',
-        'not_returned_by_search'
+        'not_returned_by_search',
+        'search_results_page'
     ],
     title: 'ExclusionReason',
     description: 'Why a proposed page is not a candidate: the URL checks\' refusals, or these.'
@@ -13262,6 +13263,11 @@ export const RolePageOutSchema = {
             ],
             title: 'Source',
             description: 'The independent source it counts in (1, 2, ...): copies of one advert, and pages of one host, share one.'
+        },
+        gone: {
+            type: 'boolean',
+            title: 'Gone',
+            description: 'The page is no longer there (its site answered 404 or 410): never a page without the title.'
         }
     },
     additionalProperties: false,
@@ -13276,7 +13282,8 @@ export const RolePageOutSchema = {
         'retrieved_at',
         'title_verified',
         'quote',
-        'source'
+        'source',
+        'gone'
     ],
     title: 'RolePageOut',
     description: 'One page read for a title: what Careerwright checked, never what the page claims.'
@@ -13330,7 +13337,22 @@ export const RoleResearchOutSchema = {
         candidates: {
             type: 'integer',
             title: 'Candidates',
-            description: 'The pages the search proposed that can be fetched.'
+            description: 'The pages kept to try: Muse\'s picks, then the other pages the search returned, each one the search really returned and that can be fetched.'
+        },
+        sources_returned: {
+            type: 'integer',
+            title: 'Sources Returned',
+            description: 'The distinct pages the search itself returned.'
+        },
+        pages_read: {
+            type: 'integer',
+            title: 'Pages Read',
+            description: 'The pages read so far (their title checked).'
+        },
+        pages_gone: {
+            type: 'integer',
+            title: 'Pages Gone',
+            description: 'The pages no longer there (404 or 410).'
         },
         empty_reason: {
             anyOf: [
@@ -13362,7 +13384,8 @@ export const RoleResearchOutSchema = {
                 $ref: '#/components/schemas/RolePageOut'
             },
             type: 'array',
-            title: 'Pages'
+            title: 'Pages',
+            description: 'The pages tried, in order; pages left untried once enough were read are not listed.'
         }
     },
     additionalProperties: false,
@@ -13377,6 +13400,9 @@ export const RoleResearchOutSchema = {
         'sources',
         'official',
         'candidates',
+        'sources_returned',
+        'pages_read',
+        'pages_gone',
         'empty_reason',
         'search',
         'reading',

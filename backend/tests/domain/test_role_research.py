@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 import pytest
 
 from careerwright.evidence.acquire import FetchRequest, Pacer, acquire_page
+from careerwright.evidence.acquisition import MAX_ROLE_PAGES
 from careerwright.evidence.corroboration import (
     NotYetFoundReason,
     PageEvidence,
@@ -22,9 +23,10 @@ from careerwright.evidence.corroboration import (
 from careerwright.evidence.fetcher import Fetcher
 from careerwright.evidence.pages import EXCERPT_CHARS, EXTRACTION_TEXT_BYTES, role_text
 from careerwright.evidence.records import AdvertiserKind, JobCopy, RightsClass
-from careerwright.evidence.role_research import MAX_PAGES, pages_to_read
+from careerwright.evidence.role_research import pages_to_read
 from careerwright.evidence.search import (
     INSTRUCTIONS,
+    ROLE_CANDIDATES,
     ROLE_INSTRUCTIONS,
     ROLE_PROMPT_VERSION,
     ROLE_SEARCH,
@@ -82,7 +84,7 @@ def test_the_role_search_is_told_the_title_and_england_and_nothing_else() -> Non
 
     assert sent == {"role": TITLE, "country": "England"}
     assert set(RoleSearchInput.model_fields) == {"input_format", "prompt_version", "title"}
-    assert ROLE.prompt_version == ROLE_PROMPT_VERSION == "role-search-2"
+    assert ROLE.prompt_version == ROLE_PROMPT_VERSION
     assert role_prompt_bytes(ROLE) <= ROLE_SEARCH.max_prompt_bytes
     assert ROLE_INSTRUCTIONS != INSTRUCTIONS
     assert "untrusted" in ROLE_INSTRUCTIONS
@@ -219,16 +221,100 @@ def test_a_page_the_search_returned_is_grounded_however_its_address_is_written(
 
 
 @pytest.mark.req("DIV1-15")
-def test_twenty_pages_are_read_after_home_pages_and_refused_hosts_are_dropped() -> None:
+def test_every_page_after_home_pages_and_refused_hosts_are_dropped_is_tried_in_order() -> None:
     pages = [f"https://site{n}.example/roles/{n}" for n in range(ROLE_SEARCH.max_candidates)]
     proposed = (*HOME_PAGES, "https://www.linkedin.com/jobs/view/1", *pages)
 
-    proposal = check_search(role_output(*proposed), ROLE, sources=set(proposed), queries=["q"])
+    proposal = check_search(role_output(*proposed), ROLE, sources=list(proposed), queries=["q"])
 
-    assert MAX_PAGES == 20  # `acquisition_targets.position` holds 0 to 19
+    assert MAX_ROLE_PAGES == 20  # read at most; the reading goes on past a page it can't read
     assert ROLE_SEARCH.max_candidates == 30
     assert [c.url for c in proposal.candidates] == pages
-    assert pages_to_read(proposal) == pages[:MAX_PAGES]
+    assert pages_to_read(proposal) == pages
+
+
+# --- round 2 (the product owner's live try, 3 November 2026): read what the search found ----
+
+PICKS = ("https://careers.northwind.example/roles/1", "https://growers.guild.example/role")
+
+
+@pytest.mark.req("DIV1-15")
+def test_muse_s_picks_come_first_then_every_other_page_the_search_returned() -> None:
+    # Muse kept two of the search's pages (both since gone); the search returned more.
+    returned = [
+        "https://jobs.board.example/ad/7",
+        PICKS[1],
+        "https://studentjob.co.uk/",  # a home page
+        "https://www.linkedin.com/jobs/view/1",  # a site the manifest refuses
+        f"https://jobs.board.example/search?q={TITLE.replace(' ', '+')}",  # results for it
+        "https://jobs.board.example/ad/8#apply",
+        PICKS[0],
+        "https://www.gov.uk/orbital-hydroponics",
+    ]
+
+    proposal = check_search(role_output(*PICKS), ROLE, sources=returned, queries=["q"])
+
+    assert [(c.url, c.grounded) for c in proposal.candidates] == [
+        (PICKS[0], True),
+        (PICKS[1], True),
+        ("https://jobs.board.example/ad/7", True),
+        ("https://jobs.board.example/ad/8", True),
+        ("https://www.gov.uk/orbital-hydroponics", True),
+    ]
+    assert proposal.excluded == []  # only Muse's own picks are listed as excluded
+    assert proposal.sources_seen == len(returned)
+    assert pages_to_read(proposal) == [c.url for c in proposal.candidates]
+
+
+@pytest.mark.req("DIV1-15", "STATE-02")
+def test_when_the_search_tool_returns_no_page_nothing_is_read() -> None:
+    picked = check_search(role_output(*PICKS), ROLE, sources=[], queries=["q"])
+    nothing = check_search(role_output(), ROLE, sources=[], queries=[])
+
+    # Muse's picks are guesses the search never returned: "the search found no page
+    # Careerwright could read", never "not yet found".
+    assert (picked.candidates, picked.empty_reason) == ([], SearchEmptyReason.ALL_EXCLUDED)
+    assert [e.reason for e in picked.excluded] == ["not_returned_by_search"] * 2
+    assert (nothing.candidates, nothing.empty_reason) == (
+        [],
+        SearchEmptyReason.SEARCH_RETURNED_NOTHING,
+    )
+    assert pages_to_read(picked) == pages_to_read(nothing) == []
+
+
+@pytest.mark.req("DIV1-15")
+@pytest.mark.parametrize(
+    "results",
+    [
+        f"https://jobs.board.example/search?q={TITLE.replace(' ', '+')}",
+        "https://jobs.board.example/jobs?keywords=orbital-hydroponics-technician&where=England",
+        "https://jobs.board.example/find?what=Orbital%20Hydroponics%20Technician",
+    ],
+    ids=["q", "keywords, hyphenated", "encoded, another case"],
+)
+def test_a_search_results_page_for_the_title_is_never_read(results: str) -> None:
+    # Such a page repeats the search's own words ("Results for ..."), so the title would be
+    # "on" it whatever it lists. A posting whose address names the title is still read.
+    posting = "https://jobs.board.example/job/123-orbital-hydroponics-technician?from_rss=true"
+
+    proposal = check_search(
+        role_output(results, posting), ROLE, sources=[results, posting], queries=["q"]
+    )
+
+    assert [c.url for c in proposal.candidates] == [posting]
+    assert [(e.url, e.reason) for e in proposal.excluded] == [(results, "search_results_page")]
+    assert pages_to_read(sealed(results, posting)) == [posting]
+
+
+@pytest.mark.req("DIV1-15")
+def test_at_most_forty_pages_are_kept_to_try() -> None:
+    pages = [f"https://site{n}.example/roles/{n}" for n in range(50)]
+
+    proposal = check_search(role_output(*pages[:3]), ROLE, sources=pages, queries=["q"])
+
+    assert ROLE_CANDIDATES == 40  # `acquisition_targets.position` holds 0 to 39
+    assert [c.url for c in proposal.candidates] == pages[:ROLE_CANDIDATES]
+    assert pages_to_read(proposal) == pages[:ROLE_CANDIDATES]
 
 
 @pytest.mark.req("DIV1-15")
@@ -239,6 +325,10 @@ def test_the_role_search_is_told_how_to_search_and_what_never_to_return() -> Non
     for never in ("home page", "search results", "list of many jobs"):
         assert never in ROLE_INSTRUCTIONS, never
     assert "exactly as your search returned it" in ROLE_INSTRUCTIONS
+    # Round 2: at least four distinct searches before answering, the title alone among them.
+    assert ROLE_PROMPT_VERSION == "role-search-3"
+    assert "at least four different searches" in ROLE_INSTRUCTIONS
+    assert "the title alone" in ROLE_INSTRUCTIONS
 
 
 @pytest.mark.req("DIV1-15", "ACQ-06")

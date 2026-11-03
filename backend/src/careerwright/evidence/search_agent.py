@@ -44,10 +44,10 @@ from careerwright.identity.activity import PartialSink, RunTask, TruncationGuard
 from careerwright.identity.model_registry import ModelMode
 
 
-def searched(messages: list[ModelMessage]) -> tuple[set[str], list[str]]:
-    """(URLs the search returned or opened, the queries it ran), from the native tool parts
-    of the run's responses."""
-    sources: set[str] = set()
+def searched(messages: list[ModelMessage]) -> tuple[list[str], list[str]]:
+    """(URLs the search returned or opened, each once, in the order the search gave them; the
+    queries it ran), from the native tool parts of the run's responses."""
+    sources: list[str] = []
     queries: list[str] = []
     for message in messages:
         if not isinstance(message, ModelResponse):
@@ -57,14 +57,14 @@ def searched(messages: list[ModelMessage]) -> tuple[set[str], list[str]]:
                 listed: Any = part.content.get("sources")
                 for source in listed if isinstance(listed, list) else []:
                     if isinstance(source, dict) and isinstance(source.get("url"), str):
-                        sources.add(source["url"])
+                        sources.append(source["url"])
             elif isinstance(part, NativeToolCallPart):
                 args: Any = part.args if isinstance(part.args, dict) else {}
                 if isinstance(args.get("query"), str):
                     queries.append(args["query"][:200])
                 if isinstance(args.get("url"), str):  # an open-page action
-                    sources.add(args["url"])
-    return sources, queries
+                    sources.append(args["url"])
+    return list(dict.fromkeys(sources)), queries
 
 
 def run_search(

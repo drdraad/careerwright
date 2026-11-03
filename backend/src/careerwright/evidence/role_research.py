@@ -5,12 +5,14 @@ amendment): for a title no list holds, the person's own words or a title idea no
    request on the one bounded activity, told only the title and "England" (SEC-05), its
    candidates checked by code against the fetch checks and the source manifest. Its estimated
    cost is the source search's (`GET .../spend/estimate?kind=source_search`).
-2. **The reading** is an acquisition of up to `MAX_PAGES` of those candidates (only pages the
+2. **The reading** is an acquisition that tries those candidates in order (only pages the
    search really returned, never a site's home page; with none, the search found no page
-   Careerwright could read) through the restricted acquisition worker and the guarded
-   fetcher; each page's class comes from the manifest. Each target carries the title, so the
-   worker checks it as a span of the page's visible text and records that check, never a
-   posting, and never hands the page to a model. It calls no model and costs nothing.
+   Careerwright could read) and reads at most `acquisition.MAX_ROLE_PAGES` of them, going on
+   past a page it can't read or that is no longer there, through the restricted acquisition
+   worker and the guarded fetcher; each page's class comes from the manifest. Each target
+   carries the title, so the worker checks it as a span of the page's visible text and records
+   that check, never a posting, and never hands the page to a model. It calls no model and
+   costs nothing.
 3. **Whether the role is found** is decided on read, by `corroboration.corroborate`, from the
    checks recorded: found on two independent sources or one official page; otherwise "not yet
    found in independent sources". A blocked, failed or unread page is never counted as a
@@ -35,7 +37,7 @@ from careerwright.config import RuntimeMode
 from careerwright.db import Tx
 from careerwright.errors import CareerwrightError, ErrorCode, ErrorStage
 from careerwright.evidence import role_store, store
-from careerwright.evidence.acquisition import RECORDABLE_PORTS
+from careerwright.evidence.acquisition import NOT_NEEDED, RECORDABLE_PORTS
 from careerwright.evidence.addresses import CheckedUrl, check_url
 from careerwright.evidence.corroboration import (
     Corroboration,
@@ -52,12 +54,13 @@ from careerwright.evidence.records import (
     StrictModel,
 )
 from careerwright.evidence.search import (
+    ROLE_CANDIDATES,
     ROLE_SEARCH,
     RoleSearchInput,
     SearchEmptyReason,
     SearchProposal,
     SearchPurpose,
-    is_site_root,
+    role_page_refusal,
     role_prompt_bytes,
     worst_case_nano_usd,
 )
@@ -79,9 +82,6 @@ from careerwright.profile.commands import current_profile
 from careerwright.profile.store import stale_version
 from careerwright.vocabulary import WorkState
 
-# The candidate pages one reading fetches (ADR 0009 decision 12, amendments; the product owner,
-# 3 November 2026: "Up to 20 pages"); `acquisition_targets.position` holds 0 to 19.
-MAX_PAGES = 20
 LIST_LIMIT = 20
 _SETTLED = frozenset({WorkState.COMPLETE, WorkState.FAILED, WorkState.CANCELLED})
 
@@ -195,8 +195,10 @@ def _proposal(tx: Tx, keyring: Keyring, run: Run) -> SearchProposal | None:
 
 
 def pages_to_read(proposal: SearchProposal) -> list[str]:
-    """Up to `MAX_PAGES` candidates: only pages the search really returned, never a site's
-    home page (held here too for proposals sealed before the search excluded them), each
+    """The pages the reading tries, in order, up to `ROLE_CANDIDATES`: it reads at most
+    `MAX_ROLE_PAGES` of them and goes on past any it can't read (`acquisition.acquire_target`).
+    Only pages the search really returned, never a site's home page or a page of results
+    for the title (held here too for proposals sealed before the search excluded them), each
     still passing the fetch checks but the port's. The port is left, as a job acquisition's
     targets leave it (`acquisition.RECORDABLE_PORTS`), to the restricted worker's own fetch
     check: it refuses a port other than 80 or 443 as a blocked attempt, on record, and it
@@ -208,11 +210,11 @@ def pages_to_read(proposal: SearchProposal) -> list[str]:
         checked = check_url(candidate.url, allowed_ports=RECORDABLE_PORTS)
         if (
             isinstance(checked, CheckedUrl)
-            and not is_site_root(checked.url)
+            and role_page_refusal(checked.url, proposal.target) is None
             and checked.url not in urls
         ):
             urls.append(checked.url)
-    return urls[:MAX_PAGES]
+    return urls[:ROLE_CANDIDATES]
 
 
 def start_reading(
@@ -302,6 +304,10 @@ class PageView:
     title_verified: bool | None  # None: the page wasn't read
     quote: str | None  # the page's own words around the title, where verified
     source: int | None  # which independent source it counts in (1, 2, ...), where verified
+    gone: bool  # no longer there (404 or 410): never a page without the title
+
+
+GONE_STATUSES = frozenset({404, 410})
 
 
 @dataclass(frozen=True)
@@ -312,6 +318,7 @@ class ResearchView:
     reading: Run | None
     candidates: int
     empty_reason: SearchEmptyReason | None
+    sources_returned: int  # distinct pages the search returned
     pages: list[PageView] = field(default_factory=list)
     corroboration: Corroboration | None = None
 
@@ -321,6 +328,14 @@ class ResearchView:
             return None
         return self.corroboration.reason
 
+    @property
+    def pages_read(self) -> int:
+        return sum(1 for p in self.pages if p.title_verified is not None)
+
+    @property
+    def pages_gone(self) -> int:
+        return sum(1 for p in self.pages if p.gone)
+
 
 def _host(url: str | None) -> str | None:
     if url is None:
@@ -329,7 +344,8 @@ def _host(url: str | None) -> str | None:
 
 
 def _pages(tx: Tx, reading: Run) -> tuple[list[PageView], Corroboration]:
-    targets = store.targets(tx, reading.run_id)
+    # A page left unfetched because enough were read before it is no page of this reading.
+    targets = [t for t in store.targets(tx, reading.run_id) if t.status != NOT_NEEDED]
     last = {a.position: a for a in store.attempts_of_run(tx, reading.run_id)}
     checks = role_store.page_checks(tx, [a.attempt_id for a in last.values()])
     evidence = [
@@ -366,6 +382,7 @@ def _pages(tx: Tx, reading: Run) -> tuple[list[PageView], Corroboration]:
                 title_verified=check.verified if check is not None else None,
                 quote=check.excerpt if check is not None else None,
                 source=group_of.get(str(attempt.attempt_id)) if attempt is not None else None,
+                gone=attempt is not None and attempt.http_status in GONE_STATUSES,
             )
         )
     return pages, result
@@ -390,6 +407,7 @@ def research_view(
             reading=reading,
             candidates=len(proposal.candidates) if proposal else 0,
             empty_reason=proposal.empty_reason if proposal else None,
+            sources_returned=proposal.sources_seen if proposal else 0,
             pages=pages or [],
             corroboration=result,
         )

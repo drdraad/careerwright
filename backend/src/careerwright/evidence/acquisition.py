@@ -110,6 +110,11 @@ DOCUMENT_KIND = "source_document"
 PASTED_PROVIDER = "pasted_text"
 PASTED_RIGHTS = "pasted by the person: their own input, kept privately in this workspace"
 RECORDABLE_PORTS = frozenset(range(1, 65_536))
+# The pages one role research reading reads at most (the product owner, 3 November 2026: "Up
+# to 20 pages"). It tries its targets in order and goes on past a page it can't read or that
+# is no longer there; once this many are read, the rest are not needed and never fetched.
+MAX_ROLE_PAGES = 20
+NOT_NEEDED = "not_needed"  # a role target left unfetched: enough pages were read before it
 
 Url = Annotated[str, StringConstraints(min_length=1, max_length=2_048)]
 
@@ -940,6 +945,12 @@ def _record_copies(
     )
 
 
+def _role_pages_read(tx: Tx, run_id: uuid.UUID) -> int:
+    """The pages this role reading has read: each a target whose page was retrieved and its
+    title check recorded."""
+    return sum(1 for t in store.targets(tx, run_id) if t.status == AttemptStatus.SUCCEEDED.value)
+
+
 def acquire_target(rt: AcquisitionRuntime, run_id: uuid.UUID, position: int) -> dict[str, str]:
     """One target: the attempt is recorded first, the source is asked for, and the result
     is recorded. Raises `TransientAcquisitionError` (after recording it) so the DBOS step
@@ -960,8 +971,11 @@ def acquire_target(rt: AcquisitionRuntime, run_id: uuid.UUID, position: int) -> 
             and previous is not None
             and not (previous.transient or previous.status is AttemptStatus.PENDING)
         )
-        if target.status in ("succeeded", "blocked") or finished_for_good:
+        if target.status in ("succeeded", "blocked", NOT_NEEDED) or finished_for_good:
             return {"status": target.status}  # recorded by an earlier execution of this step
+        if target.role_title is not None and _role_pages_read(tx, run_id) >= MAX_ROLE_PAGES:
+            store.set_target_status(tx, run_id, position, NOT_NEEDED)
+            return {"status": NOT_NEEDED}
         if run_store.mark_running(tx, run_id):
             identity_store.append_event(
                 tx,
@@ -1100,7 +1114,10 @@ def publish_acquisition(rt: AcquisitionRuntime, run_id: uuid.UUID) -> None:
                     no_posting_readable=len(unread) - handed,
                     model_extractions=handed,
                     blocked=statuses.count("blocked"),
-                    failed=len(statuses) - statuses.count("succeeded") - statuses.count("blocked"),
+                    failed=len(statuses)
+                    - statuses.count("succeeded")
+                    - statuses.count("blocked")
+                    - statuses.count(NOT_NEEDED),  # never tried: enough pages were read
                 )
                 body = summary.model_dump_json().encode()
                 output_id = uuid.uuid4()

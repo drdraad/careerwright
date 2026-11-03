@@ -543,6 +543,10 @@ class RolePageOut(ResponseModel):
         description="The independent source it counts in (1, 2, ...): copies of one advert, "
         "and pages of one host, share one."
     )
+    gone: bool = Field(
+        description="The page is no longer there (its site answered 404 or 410): never a page "
+        "without the title."
+    )
 
     @classmethod
     def of(cls, page: PageView) -> "RolePageOut":
@@ -570,14 +574,23 @@ class RoleResearchOut(ResponseModel):
         description="An official page (gov.uk, public sector or a "
         "professional body, by the source manifest) shows the title."
     )
-    candidates: int = Field(description="The pages the search proposed that can be fetched.")
+    candidates: int = Field(
+        description="The pages kept to try: Muse's picks, then the other pages the search "
+        "returned, each one the search really returned and that can be fetched."
+    )
+    sources_returned: int = Field(description="The distinct pages the search itself returned.")
+    pages_read: int = Field(description="The pages read so far (their title checked).")
+    pages_gone: int = Field(description="The pages no longer there (404 or 410).")
     empty_reason: SearchEmptyReason | None = Field(
         description="With no_pages: why the search proposed none (never that the role "
         "doesn't exist)."
     )
     search: RunOut
     reading: RunOut | None = Field(description="None until the pages are being read.")
-    pages: list[RolePageOut]
+    pages: list[RolePageOut] = Field(
+        description="The pages tried, in order; pages left untried once enough were read are "
+        "not listed."
+    )
 
     @classmethod
     def of(cls, view: ResearchView, search: RunOut, reading: RunOut | None) -> "RoleResearchOut":
@@ -592,6 +605,9 @@ class RoleResearchOut(ResponseModel):
             sources=result.sources if result else 0,
             official=result.official if result else False,
             candidates=view.candidates,
+            sources_returned=view.sources_returned,
+            pages_read=view.pages_read,
+            pages_gone=view.pages_gone,
             empty_reason=view.empty_reason,
             search=search,
             reading=reading,

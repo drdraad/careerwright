@@ -2859,7 +2859,8 @@ export const ExclusionReason = {
     SOURCE_NOT_PERMITTED: 'source_not_permitted',
     OVER_THE_LIMIT: 'over_the_limit',
     SITE_ROOT: 'site_root',
-    NOT_RETURNED_BY_SEARCH: 'not_returned_by_search'
+    NOT_RETURNED_BY_SEARCH: 'not_returned_by_search',
+    SEARCH_RESULTS_PAGE: 'search_results_page'
 } as const;
 
 /**
@@ -8202,6 +8203,12 @@ export type RolePageOut = {
      * The independent source it counts in (1, 2, ...): copies of one advert, and pages of one host, share one.
      */
     source: number | null;
+    /**
+     * Gone
+     *
+     * The page is no longer there (its site answered 404 or 410): never a page without the title.
+     */
+    gone: boolean;
 };
 
 /**
@@ -8248,9 +8255,27 @@ export type RoleResearchOut = {
     /**
      * Candidates
      *
-     * The pages the search proposed that can be fetched.
+     * The pages kept to try: Muse's picks, then the other pages the search returned, each one the search really returned and that can be fetched.
      */
     candidates: number;
+    /**
+     * Sources Returned
+     *
+     * The distinct pages the search itself returned.
+     */
+    sources_returned: number;
+    /**
+     * Pages Read
+     *
+     * The pages read so far (their title checked).
+     */
+    pages_read: number;
+    /**
+     * Pages Gone
+     *
+     * The pages no longer there (404 or 410).
+     */
+    pages_gone: number;
     /**
      * With no_pages: why the search proposed none (never that the role doesn't exist).
      */
@@ -8262,6 +8287,8 @@ export type RoleResearchOut = {
     reading: RunOut | null;
     /**
      * Pages
+     *
+     * The pages tried, in order; pages left untried once enough were read are not listed.
      */
     pages: Array<RolePageOut>;
 };

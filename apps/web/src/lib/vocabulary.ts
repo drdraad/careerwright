@@ -740,6 +740,8 @@ export const ROLE_RESEARCH = {
   pageVerified: "Uses the title",
   pageNotVerified: "Doesn't use the title word for word",
   pageUnread: "Not read",
+  // 404 or 410: the page has gone, so nothing is known of the title on it.
+  pageGone: "No longer there",
   read: (date: string) => `Read on ${date}`,
   makeTarget: "Make this a target",
   targetSaved: "Saved as one of your targets.",

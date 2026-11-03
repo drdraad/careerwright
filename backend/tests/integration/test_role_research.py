@@ -28,11 +28,13 @@ ADVERT = (
     f"<h1>{TITLE}</h1><p>{TITLE} wanted at our Leeds growing hub. You will tend the racks, log "
     "the nutrient readings and train two apprentices each season.</p>"
 )
+SITES = [f"site{n}.example" for n in range(22)]  # more pages than one reading reads
 NAMES = {
     "careers.northwind.example": [LOOPBACK],
     "growers.guild.example": [LOOPBACK],
     "jobs.board.example": [LOOPBACK],
     "www.gov.uk": [LOOPBACK],
+    **{site: [LOOPBACK] for site in SITES},
 }
 
 
@@ -51,6 +53,8 @@ def sources() -> Iterator[SourceServer]:
             )
         ),
         "/role/careers": Scripted(body=html(f"<h1>{TITLE}: what the job involves</h1>")),
+        "/role/gone": Scripted(status=404, body=html("<p>Not found</p>")),
+        "/role/expired": Scripted(status=410, body=html("<p>This job has closed</p>")),
     }
     with source_server(routes) as server:
         yield server
@@ -340,10 +344,77 @@ def test_the_search_is_told_only_the_title_and_england_and_reserved_at_its_bound
     assert run["status"] == "complete"
     assert shown["state"] == "ready_to_read"
     assert shown["candidates"] == 1  # the page the search returned; never a guess
+    assert (shown["sources_returned"], shown["pages_read"], shown["pages_gone"]) == (1, 0, 0)
     [attempt] = scenario.attempts(research["search"]["run_id"])
     # One request at its bounds, test model: 8 tool calls, 99,000 tokens in, 4,000 out.
     assert attempt["reserved_nano_usd"] == 30_700_000
     assert scenario.leaks() == []  # the profile's private text reached no journal or log
+
+
+@pytest.mark.req("DIV1-15", "STATE-02")
+def test_a_page_no_longer_there_is_never_a_page_without_the_title_and_the_reading_goes_on(
+    infra: Infra,
+    api: ApiClient,
+    ada: str,
+    sources: SourceServer,
+    service_url: str,
+    tmp_path: Path,
+) -> None:
+    # The product owner's live try (3 November 2026): both pages read had expired (404).
+    scenario = make_scenario(infra, api, ada, tmp_path)
+    shown = research_of(
+        infra,
+        api,
+        scenario,
+        sources,
+        service_url,
+        tmp_path,
+        [
+            ("careers.northwind.example", "/role/gone"),
+            ("jobs.board.example", "/role/expired"),
+            ("careers.northwind.example", "/role/northwind"),
+            ("growers.guild.example", "/role/guild"),
+        ],
+    )
+
+    assert shown["state"] == "found"
+    assert [(p["gone"], p["title_verified"]) for p in shown["pages"]] == [
+        (True, None),
+        (True, None),
+        (False, True),
+        (False, True),
+    ]
+    assert (shown["pages_read"], shown["pages_gone"]) == (2, 2)
+
+
+@pytest.mark.req("DIV1-15")
+def test_a_reading_reads_at_most_twenty_pages_and_tries_no_more_once_it_has(
+    infra: Infra,
+    api: ApiClient,
+    ada: str,
+    sources: SourceServer,
+    service_url: str,
+    tmp_path: Path,
+) -> None:
+    scenario = make_scenario(infra, api, ada, tmp_path)
+    shown = research_of(
+        infra,
+        api,
+        scenario,
+        sources,
+        service_url,
+        tmp_path,
+        [("careers.northwind.example", "/role/gone"), *((s, "/role/careers") for s in SITES)],
+    )
+    tried = [s.host for s in sources.seen if s.path == "/role/careers"]
+
+    # The pages are one page's copies, so they count as one source: the reading is the point.
+    assert shown["reading"]["status"] == "complete"
+    assert (shown["pages_read"], shown["pages_gone"]) == (20, 1)
+    # The gone page, then 20 read; the last two sites were never asked for.
+    assert len(shown["pages"]) == 21
+    assert {h.split(":")[0] for h in tried if h} >= set(SITES[:20])
+    assert not {h.split(":")[0] for h in tried if h} & set(SITES[20:])
 
 
 @pytest.mark.req("DIV1-15", "STATE-02")
