@@ -495,9 +495,9 @@ export const PARTIAL_REPLY: Record<PartialCompleteness, { label: string }> = {
 /** A failed turn's reply so far: shown, never saved (MODEL-03). */
 export const FAILED_REPLY_LABEL = "Stopped: not checked, nothing saved";
 
-/** Why Send waits (session W2): for a reply's review card to be saved or kept none of, so no
- *  reply's proposals are lost. What is typed is kept. Shown only once there is something to
- *  send, in a few words (Task W2F slice E; before the start's choice there is no reply field). */
+/** Why a message waits (session W2): for a reply's review card to be saved or kept none of, so
+ *  no reply's proposals are lost. Said by Try again; the reply field steps aside while a card
+ *  waits, keeping what is typed (Task W2F slice E: one place to type and one next action). */
 export const SEND_WAITS = {
   review: "Save or choose Keep none, then send.",
 } as const;

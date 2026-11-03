@@ -613,8 +613,21 @@ describe("[STATE-09] a reply typed while the last one is on its way is kept", ()
 });
 
 describe("[UI-06] moving between the views keeps what the person typed or chose", () => {
-  it("keeps a typed reply, the tray's choices, the answer form's edits and the slate's picks", async () => {
+  it("keeps a typed reply", async () => {
     // App review I1: each view unmounted when another opened, and took these with it.
+    const decided = { ...turn("complete", proposal), decision: {} as TurnOut["decision"] };
+    fakeApi(routes({ preferences: prefs("unsure"), turns: [decided] }));
+    const user = renderYou();
+
+    await user.type(await screen.findByLabelText("Reply to Careerwright"), "Half a thought");
+    await user.click(screen.getByRole("tab", { name: "What we know" }));
+    await user.click(screen.getByRole("tab", { name: "Conversation" }));
+
+    expect(screen.getByLabelText("Reply to Careerwright")).toHaveValue("Half a thought");
+  });
+
+  it("keeps the tray's choices, the answer form's edits and the slate's picks", async () => {
+    // While the tray waits there is no reply field: its decision comes first.
     const sent = fakeApi(
       routes({ preferences: prefs("unsure"), turns: [turn("complete", proposal)] }, [
         {
@@ -627,8 +640,7 @@ describe("[UI-06] moving between the views keeps what the person typed or chose"
     );
     const user = renderYou();
 
-    await user.type(await screen.findByLabelText("Reply to Careerwright"), "Half a thought");
-    const tray = screen.getByRole("region", { name: /To review: 2 changes/ });
+    const tray = await screen.findByRole("region", { name: /To review: 2 changes/ });
     await user.click(within(tray).getByRole("button", { name: "Accept current role" }));
 
     await user.click(screen.getByRole("tab", { name: "What we know" }));
@@ -646,7 +658,6 @@ describe("[UI-06] moving between the views keeps what the person typed or chose"
     );
 
     await user.click(screen.getByRole("tab", { name: "Conversation" }));
-    expect(screen.getByLabelText("Reply to Careerwright")).toHaveValue("Half a thought");
     expect(screen.getByRole("button", { name: "Accept current role" })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -715,15 +726,28 @@ describe("[UI-04][UI-06] one decision at a time, and Resume while paused", () =>
     expect(saved.compareDocumentPosition(question) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("[STATE-06] keeps Send waiting until the card is saved or Keep none, with what was typed kept", async () => {
+  it("[STATE-06] has no reply field while a card waits, and brings it back with what was typed after Keep none", async () => {
     // Session W2: a message sent while a card waited replaced it, and nothing from it was saved.
+    // The product owner (3 November 2026): one place to type and one clear next action per
+    // step, so while a card waits its Save or Keep none comes first, with no reply field beside.
     const state: Live = {
       preferences: prefs("unsure"),
-      turns: [turn("complete", proposal)],
+      turns: [turn("running")],
       profile,
     };
     const sent = fakeApi(
       liveRoutes(state, [
+        {
+          method: "GET",
+          path: /\/turns\/t1\/reply$/,
+          answer: {
+            turn_id: "t1",
+            completeness: "streaming",
+            seq: 1,
+            text: "Thanks, a shift",
+            updated_at: null,
+          },
+        },
         {
           method: "POST",
           path: /\/turns\/t1\/decision$/,
@@ -741,25 +765,33 @@ describe("[UI-04][UI-06] one decision at a time, and Resume while paused", () =>
         },
       ]),
     );
-    const { user } = renderLive();
-    const tray = await screen.findByRole("region", { name: /To review: 2 changes/ });
-    const waits = "Save or choose Keep none, then send.";
+    const { user, queries } = renderLive();
     const messages = () =>
       sent.filter((s) => s.method === "POST" && s.path.endsWith("/interview/turns"));
 
-    const field = screen.getByLabelText("Reply to Careerwright");
-    expect(screen.queryByText(waits)).toBeNull(); // only once there is something to send
-    await user.type(field, "Not Leeds, I meant York.");
-    await user.click(screen.getByRole("button", { name: "Send" }));
-    expect(screen.getByRole("button", { name: "Send" })).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByText(waits)).toBeVisible();
+    // Typed while the reply is on its way.
+    await user.type(
+      await screen.findByLabelText("Reply to Careerwright"),
+      "Not Leeds, I meant York.",
+    );
+    // The reply is checked, with two changes: its card comes first, and the reply field goes.
+    // Focus was in the field, so it goes to the card's first choice, never to the page.
+    state.turns = [turn("complete", proposal)];
+    await act(() => queries.invalidateQueries());
+    const tray = await screen.findByRole("region", { name: /To review: 2 changes/ });
+    expect(screen.queryByLabelText("Reply to Careerwright")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+    await waitFor(() =>
+      expect(within(tray).getByRole("button", { name: "Accept current role" })).toHaveFocus(),
+    );
     expect(messages()).toEqual([]);
-    expect(field).toHaveValue("Not Leeds, I meant York.");
 
+    // Decided: the field is back with what was typed, and focus is in it.
     await user.click(within(tray).getByRole("button", { name: "Keep none" }));
     expect(await screen.findByRole("heading", { name: "Nothing saved" })).toBeVisible();
-    expect(screen.queryByText(waits)).toBeNull();
+    const field = await screen.findByLabelText("Reply to Careerwright");
     expect(field).toHaveValue("Not Leeds, I meant York.");
+    await waitFor(() => expect(field).toHaveFocus());
     await user.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() =>
       expect(messages().map((s) => s.body)).toEqual([
@@ -897,7 +929,13 @@ describe("[UI-06] the conversation follows its newest part, as a chat does", () 
   // layout is stubbed at its edge: where the reply field and the newest message sit, the
   // window's scroll position, and its notices that the conversation changed size.
   it("follows once the person sends, stops when they scroll up, resumes at the end, and never moves focus", async () => {
-    const layout = { fieldBottom: 1400, newestTop: 500, scrollY: 0, reduced: false };
+    const layout = {
+      fieldBottom: 1400,
+      threadBottom: 1100,
+      newestTop: 500,
+      scrollY: 0,
+      reduced: false,
+    };
     const grown: Array<() => void> = [];
     const rect = (top: number, bottom: number) =>
       ({ top, bottom, left: 0, right: 0, width: 0, height: bottom - top, x: 0, y: top }) as DOMRect;
@@ -915,6 +953,7 @@ describe("[UI-06] the conversation follows its newest part, as a chat does", () 
       .mockImplementation(function (this: HTMLElement) {
         if (this.matches("form.composer")) return rect(layout.fieldBottom - 90, layout.fieldBottom);
         if (this.matches(".turn-you")) return rect(layout.newestTop, layout.newestTop + 60);
+        if (this.matches("section.thread")) return rect(0, layout.threadBottom);
         return rect(0, 0);
       });
     const scrollBy = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
@@ -936,28 +975,28 @@ describe("[UI-06] the conversation follows its newest part, as a chat does", () 
       });
     try {
       const decided = { ...turn("complete", proposal), decision: {} as TurnOut["decision"] };
-      const state = { preferences: prefs("unsure"), turns: [decided] as TurnOut[] };
+      const answering = {
+        ...turn("running"),
+        turn_id: "t2",
+        message_id: "m2",
+        message: "Synthetic: about 6 hours.",
+        run: { ...turn("running").run, run_id: "t2" },
+      };
+      const state: Live = { preferences: prefs("unsure"), turns: [decided], profile };
       fakeApi(
-        routes(state, [
+        liveRoutes(state, [
           {
             method: "POST",
             path: /\/interview\/turns$/,
             status: 202,
             answer: () => {
-              const sent = {
-                ...turn("running"),
-                turn_id: "t2",
-                message_id: "m2",
-                message: "Synthetic: about 6 hours.",
-                run: { ...turn("running").run, run_id: "t2" },
-              };
-              state.turns = [decided, sent];
-              return { ...sent, support_note: null };
+              state.turns = [decided, answering];
+              return { ...answering, support_note: null };
             },
           },
         ]),
       );
-      const user = renderYou();
+      const { user, queries } = renderLive();
       const field = await screen.findByLabelText("Reply to Careerwright");
 
       // Opening the chapter never scrolls it: the person hasn't sent or come to the end.
@@ -994,6 +1033,19 @@ describe("[UI-06] the conversation follows its newest part, as a chat does", () 
       document.documentElement.dataset.calm = "true";
       grow();
       expect(scrollBy).toHaveBeenLastCalledWith({ top: 232, behavior: "instant" });
+
+      // The reply's card arrives: the reply field goes until it is decided, so the end of the
+      // conversation itself is kept in view.
+      state.turns = [
+        decided,
+        { ...answering, run: { ...answering.run, status: "complete" }, proposal },
+      ];
+      await act(() => queries.invalidateQueries());
+      await screen.findByRole("region", { name: /To review: 2 changes/ });
+      expect(screen.queryByLabelText("Reply to Careerwright")).toBeNull();
+      scrollBy.mockClear();
+      grow();
+      expect(scrollBy).toHaveBeenLastCalledWith({ top: 332, behavior: "instant" });
     } finally {
       globalThis.ResizeObserver = original;
       boxes.mockRestore();
@@ -1037,7 +1089,9 @@ describe("[STATE-06][PROF-04] the review tray saves only what the person chose a
     await user.click(within(tray).getByRole("button", { name: "Confirm work areas as a limit" }));
     const save = within(tray).getByRole("button", { name: /Save 2 to What we know/ });
     expect(save).toHaveClass("btn-primary"); // the one primary action while reviewing
-    expect(screen.getByRole("button", { name: "Send" })).toHaveClass("btn-secondary");
+    // And the one next action: no reply field or Send beside it until it is decided.
+    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+    expect(visiblePrimaries()).toBe(1);
     await user.click(save);
 
     await waitFor(() => expect(sent.some((s) => s.path.endsWith("/decision"))).toBe(true));
@@ -1329,10 +1383,12 @@ describe("[STATE-06][PROF-01] undo restores the earlier answers with their sourc
     expect(accept).toHaveAttribute("aria-pressed", "true");
     await user.click(within(tray).getByRole("button", { name: /Save 1 to What we know/ }));
 
-    // B-I4: the save is announced and focus lands on the notice that says what it did, right
-    // where the decision was made, not on nothing.
+    // B-I4: the save is announced, and the notice that says what it did is right where the
+    // decision was made. The card came first; replying is the next step, so focus lands in the
+    // reply field, back now (the product owner, 3 November 2026), never on nothing.
     const saved = await screen.findByRole("heading", { name: "Saved to What we know" });
-    await waitFor(() => expect(saved).toHaveFocus());
+    await waitFor(() => expect(screen.getByLabelText("Reply to Careerwright")).toHaveFocus());
+    expect(saved).toBeVisible();
     expect(screen.getByTestId("you-announcer")).toHaveTextContent("Saved to What we know.");
     const undo = await screen.findByRole("button", { name: "Undo the last save" });
     expect(undo).toHaveClass("btn-undo");

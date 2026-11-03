@@ -518,18 +518,21 @@ const shots = (scratch: Scratch): Shot[] => [
     },
   },
   {
-    // The reply's proposals decided: what it saved, with Undo in its own colour.
+    // The reply's proposals decided: what it saved, with Undo in its own colour, and the reply
+    // field back, focused (none while the card waited).
     name: "you--saved",
     as: "ada",
     url: chapterUrl("you", scratch.decided),
     ready: async (page) => {
       const tray = page.getByRole("region", { name: /To review:/ });
       await expect(tray).toBeVisible();
+      await expect(page.getByRole("textbox", { name: "Reply to Careerwright" })).toHaveCount(0);
       for (const choose of await tray.getByRole("button", { name: /^(Accept|Confirm)/ }).all()) {
         await choose.click();
       }
       await tray.getByRole("button", { name: /^Save \d to What we know/ }).click();
-      await expect(page.getByRole("heading", { name: "Saved to What we know" })).toBeFocused();
+      await expect(page.getByRole("heading", { name: "Saved to What we know" })).toBeVisible();
+      await expect(page.getByRole("textbox", { name: "Reply to Careerwright" })).toBeFocused();
       await expect(page.getByRole("button", { name: "Undo the last save" })).toBeVisible();
     },
   },
@@ -597,6 +600,8 @@ const shots = (scratch: Scratch): Shot[] => [
       await expect(page.getByRole("heading", { level: 1, name: "You" })).toBeVisible();
       await expect(page.getByText(/^Demo interviewer \(synthetic\):/)).toBeVisible();
       await expect(page.getByRole("region", { name: /To review:/ })).toBeVisible();
+      // The card's Save or Keep none comes first: no reply field beside it.
+      await expect(page.getByRole("textbox", { name: "Reply to Careerwright" })).toHaveCount(0);
     },
   },
   {
@@ -676,7 +681,8 @@ const shots = (scratch: Scratch): Shot[] => [
   {
     // A message with a risk stem is sent as usual, with the support panel beside it. The
     // send is answered here so the scratch conversation is left as it was. Sent where no reply
-    // waits for review: Send waits for a waiting card's decision (session W2).
+    // waits for review: while a card waits there is no reply field (session W2; Task W2F
+    // slice E).
     name: "you--support-note",
     as: "ada",
     context: "support-note",

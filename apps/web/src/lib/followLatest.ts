@@ -32,8 +32,8 @@ function padding(): { top: number; bottom: number } {
 
 /**
  * `thread`: the conversation, watched for changes in size; `end`: what marks its end (the
- * reply field). Returns `follow`, called when the person sends: from then on the newest part
- * is kept in view.
+ * reply field), or the conversation's own end while there is none (a review card waits).
+ * Returns `follow`, called when the person sends: from then on the newest part is kept in view.
  */
 export function useFollowLatest(
   thread: RefObject<HTMLElement | null>,
@@ -42,16 +42,16 @@ export function useFollowLatest(
   const following = useRef(false);
 
   const atEnd = useCallback(() => {
-    const element = end.current;
+    const element = end.current ?? thread.current;
     return (
       element !== null &&
       element.getBoundingClientRect().bottom <= window.innerHeight - padding().bottom + AT_END
     );
-  }, [end]);
+  }, [thread, end]);
 
   const keep = useCallback(() => {
     const conversation = thread.current;
-    const element = end.current;
+    const element = end.current ?? conversation;
     // A hidden view (another of the chapter's tabs is open) is never scrolled to.
     if (!following.current || conversation === null || element === null) return;
     if (conversation.closest("[hidden]") !== null) return;

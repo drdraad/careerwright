@@ -15,13 +15,25 @@
 //
 // Task W2E: before the entry choice, one plain line says what Careerwright is for; until the
 // first answer, one says Careerwright covers England for now (BND1-02); and the entry choice
-// is the bright action, never Send on an empty field (F17). Session W2: Send waits, saying
-// why, until the person has chosen how to start and until a waiting review card is saved or
-// kept none of (`sendBlocked`), and the field keeps what is typed meanwhile. Task W2F slice E:
-// Send says why it waits only once there is something to send.
+// is the bright action, never Send on an empty field (F17). Session W2: no message is sent
+// while a review card waits, so no reply's proposals are lost. Task W2F slice E: Send says why
+// it waits only once there is something to send; and one place to type and one clear next
+// action per step (the product owner, 3 November 2026), so while a card waits its Save or Keep
+// none comes first and there is no reply field. What was typed is kept and comes back with the
+// field; focus in the field goes to the card's first choice, and after the decision the
+// chapter puts it back in the field.
 // Each demo question offers one-tap example replies the demo interviewer reads (STATE-09), and
 // the role-or-explore question offers two ways on that open existing views.
-import { type ReactNode, type Ref, useEffect, useId, useRef, useState } from "react";
+import {
+  type ReactNode,
+  type Ref,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import type {
   EntryMode,
   PreferencesOut,
@@ -72,6 +84,10 @@ type Props = {
   sender: MessageSender;
   /** Why no message can be sent now (paused, no key, a reply on its way), if so. */
   sendBlocked: string | undefined;
+  /** A review card waits: its Save or Keep none comes first, so there is no reply field. */
+  reviewing: boolean;
+  /** The reply field, held by the chapter, which puts focus in it after a card's decision. */
+  replyField: RefObject<HTMLTextAreaElement | null>;
   /** Which action in the chapter is the filled primary one (one per view). */
   primary: string;
   announce(text: string): void;
@@ -375,6 +391,8 @@ export function Conversation({
   turns,
   sender,
   sendBlocked,
+  reviewing,
+  replyField,
   primary,
   announce,
   onEditAnswers,
@@ -389,11 +407,32 @@ export function Conversation({
   const [focusTo, setFocusTo] = useState<"question" | "paused" | "resumed" | null>(null);
   const questionTitle = useRef<HTMLHeadingElement>(null);
   const pausedTitle = useRef<HTMLHeadingElement>(null);
-  const replyField = useRef<HTMLTextAreaElement>(null);
   const composer = useRef<HTMLFormElement>(null);
   const thread = useRef<HTMLElement>(null);
   // Once the person sends, the newest part stays in view as it arrives (Task W2F slice E).
   const follow = useFollowLatest(thread, composer);
+  // Where the person acts next: the reply field, or while a card waits (there is none) the
+  // card's first choice, its first change's Accept or Confirm (the info button is not a choice).
+  const nextAction = () =>
+    replyField.current ??
+    thread.current?.querySelector<HTMLElement>(".proposal button[aria-pressed]") ??
+    null;
+  // When a card arrives the reply field goes, and focus in it goes to the card's first choice,
+  // never to the page. The form's ref is let go before it leaves the page, so focus is still in
+  // it then.
+  const focusGone = useRef(false);
+  const holdComposer = useCallback((form: HTMLFormElement) => {
+    composer.current = form;
+    return () => {
+      focusGone.current = form.contains(document.activeElement);
+      composer.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    if (!focusGone.current) return;
+    focusGone.current = false;
+    nextAction()?.focus();
+  });
   const modeId = useId();
   const demo = workspace.data_mode === "demo";
   const support = sender.support;
@@ -448,7 +487,8 @@ export function Conversation({
 
   // The control just used is replaced, so focus moves to what replaced it once it is there:
   // after choosing how to start, the first question; after pausing, "Paused"; after resuming,
-  // the question, or the reply field while no question is shown.
+  // the question, or while no question is shown the next action (the reply field, or a waiting
+  // card's first choice).
   useEffect(() => {
     const target =
       focusTo === "question"
@@ -456,7 +496,7 @@ export function Conversation({
         : focusTo === "paused"
           ? pausedTitle.current
           : focusTo === "resumed" && !preferences.paused
-            ? (questionTitle.current ?? replyField.current)
+            ? (questionTitle.current ?? nextAction())
             : null;
     if (target !== null) {
       target.focus();
@@ -633,7 +673,7 @@ export function Conversation({
           note={note}
           onDismiss={() => {
             sender.dismissNote();
-            replyField.current?.focus(); // the button goes; focus is never lost (M-1)
+            nextAction()?.focus(); // the button goes; focus is never lost (M-1)
           }}
         />
       )}
@@ -642,17 +682,18 @@ export function Conversation({
           note={titleNote}
           onDismiss={() => {
             setTitleNote(null);
-            replyField.current?.focus();
+            nextAction()?.focus();
           }}
         />
       )}
       {sender.error !== null && <RequestFailure error={sender.error} />}
 
       {/* One place to type per step (Task W2F slice E): the start has its own, the job title,
-          and its choice; the reply field comes with the conversation's first question. */}
-      {!starting && (
+          and its choice; the reply field comes with the conversation's first question, and
+          steps aside while a review card waits. */}
+      {!starting && !reviewing && (
         <form
-          ref={composer}
+          ref={holdComposer}
           className="composer"
           aria-label="Your reply"
           onSubmit={(event) => {

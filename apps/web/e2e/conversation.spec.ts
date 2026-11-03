@@ -91,8 +91,13 @@ test("[PROF-08][MODEL-03][STATE-06][PROF-04][REC1-07][REC1-11][STATE-05][BND1-11
   });
   await expect(page.getByText(/not checked yet/)).toHaveCount(0);
   const tray = page.getByRole("region", { name: /To review: 4 changes/ });
-  // One decision at a time (design review I4): the next question waits for the tray.
+  // One decision at a time (design review I4): the next question waits for the tray, and so
+  // does the reply field (the product owner, 3 November 2026: one place to type and one next
+  // action per step). Focus was on Send, which went, so it is on the card's first choice.
   await expect(page.locator(".question")).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "Reply to Careerwright" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Send" })).toHaveCount(0);
+  await expect(tray.getByRole("button", { name: "Accept current role" })).toBeFocused();
   await tray.getByRole("button", { name: "Accept current role" }).click();
   await tray.getByRole("button", { name: "Accept tasks you enjoy" }).click();
   await tray.getByRole("button", { name: "Confirm weekly study hours as a limit" }).click();
@@ -102,10 +107,11 @@ test("[PROF-08][MODEL-03][STATE-06][PROF-04][REC1-07][REC1-11][STATE-05][BND1-11
   await tray.getByRole("button", { name: /Save 4 to What we know/ }).click();
   await expect(saved(page, 1)).toHaveText("Answers saved");
   await expect(banner.getByText("Leeds")).toBeVisible();
-  // Right where the decision was made: what it did, focused, with Undo in its own colour; the
-  // next question follows it.
-  await expect(page.getByRole("heading", { name: "Saved to What we know" })).toBeFocused();
+  // Right where the decision was made: what it did, with Undo in its own colour; the next
+  // question follows it, and focus lands in the reply field, back now.
+  await expect(page.getByRole("heading", { name: "Saved to What we know" })).toBeVisible();
   await expect(page.locator(".question")).toHaveCount(1);
+  await expect(page.getByRole("textbox", { name: "Reply to Careerwright" })).toBeFocused();
 
   // Undo restores the answers from before the save, as a new version.
   await page.getByRole("button", { name: "Undo the last save" }).click();
@@ -181,7 +187,8 @@ async function keepAll(page: Page) {
     await choose.click();
   }
   await tray.getByRole("button", { name: /^Save \d+ to What we know/ }).click();
-  await expect(page.getByRole("heading", { name: "Saved to What we know" })).toBeFocused();
+  await expect(page.getByRole("heading", { name: "Saved to What we know" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Reply to Careerwright" })).toBeFocused();
 }
 
 /** The question in view, or null once there is none. */
