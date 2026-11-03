@@ -167,6 +167,22 @@ def test_removing_a_target_or_putting_one_back_leaves_a_slate_current() -> None:
     assert not stays_current([pinned, answered(one_left, removed_by, cities=["York"])], choices)
 
 
+@pytest.mark.req("STATE-10", "DIV1-16")
+def test_a_title_idea_of_the_slate_made_a_target_leaves_it_current() -> None:
+    # Task 6g slice B: a title idea only the UK job-title index lists is made a target through
+    # the profile's one write path (a save of the targets, as a found role's is). It is a title
+    # the slate itself suggested, so it asks the slate nothing new.
+    pinned = document(current_role="Client onboarding assistant")
+    saved = uuid.uuid4()
+    ideas = frozenset({"Customer success manager"})
+    idea = answered(pinned, saved, target_titles=["Customer success manager"])
+    other = answered(pinned, saved, target_titles=["Customer success manager", "Astronaut"])
+
+    assert stays_current([pinned, idea], frozenset(), ideas)
+    assert not stays_current([pinned, idea], frozenset())  # not one of this slate's ideas
+    assert not stays_current([pinned, other], frozenset(), ideas)  # another title typed in
+
+
 @pytest.mark.req("STATE-10", "REC1-03")
 def test_a_change_to_the_tasks_the_person_doesnt_enjoy_alone_leaves_a_slate_current() -> None:
     # Task W2F: no suggestion reads them, so changing them asks the slate nothing new.

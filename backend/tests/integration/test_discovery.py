@@ -489,6 +489,36 @@ def test_removing_a_target_through_the_profile_save_or_undoing_it_leaves_the_sla
     assert not current()
 
 
+@pytest.mark.req("STATE-10", "DIV1-16")
+def test_a_title_idea_made_a_target_through_the_profile_save_leaves_the_slate_current(
+    scenario: Scenario,
+) -> None:
+    # Task 6g slice B: a title idea the UK job-title index lists is made a target through the
+    # profile's one write path, the save (as a found role's is). It is the slate's own idea, so
+    # the slate stays current; any other title typed in beside it is still a change. Here the
+    # test model's idea, exactly as it wrote it.
+    discovery_id = discover(scenario)["discovery_id"]
+    path = f"{base(scenario)}/discoveries/{discovery_id}"
+
+    def current() -> bool:
+        found = scenario.api.get(path, scenario.token)
+        assert found.status_code == 200, found.text
+        return bool(found.json()["current"])
+
+    def targets(version: int, titles: list[str]) -> None:
+        answer = {"state": "provided", "value": titles}
+        body = {"expected_version": version, "profile": {**ANSWERS, "target_titles": answer}}
+        put = scenario.api.write("PUT", f"{base(scenario)}/profile", scenario.token, body)
+        assert put.status_code == 201, put.text
+
+    proposal = scenario.api.get(path, scenario.token).json()["proposal"]
+    [idea] = [h["title"] for h in proposal["hypotheses"] + proposal["aim_higher"]]
+    targets(2, [idea])
+    assert current()
+    targets(3, [idea, "Astronaut"])
+    assert not current()
+
+
 @pytest.mark.req("DIV1-06", "DIV1-03")
 def test_a_role_esco_does_not_list_is_reported_never_searched_by_its_words(
     scenario: Scenario,

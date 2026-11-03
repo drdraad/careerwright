@@ -70,6 +70,11 @@ class DiscoveryProposalOut(ResponseModel):
     prompt_version: str
     queries: list[QueryOut]
     hypotheses: list[HypothesisOut]
+    aim_higher: list[HypothesisOut] = Field(
+        description="Titles the model thought of as work that usually needs more training than "
+        "the person's (Task 6g); code confirms each and places it by its job group's level, so "
+        "one may be in either set or in none."
+    )
 
     @classmethod
     def of(cls, proposal: DiscoveryProposal) -> "DiscoveryProposalOut":
@@ -88,6 +93,10 @@ class DiscoveryProposalOut(ResponseModel):
             hypotheses=[
                 HypothesisOut(title=h.title, based_on=[EvidenceOut.of(e) for e in h.based_on])
                 for h in proposal.hypotheses
+            ],
+            aim_higher=[
+                HypothesisOut(title=h.title, based_on=[EvidenceOut.of(e) for e in h.based_on])
+                for h in proposal.aim_higher
             ],
         )
 
@@ -372,7 +381,10 @@ class PoolQueryOut(ResponseModel):
 
 class ExcludedOut(ResponseModel):
     occupations: int = Field(description="Pooled occupations your excluded titles removed.")
-    families: int = Field(description="Pooled occupations your excluded kinds of work removed.")
+    families: int = Field(
+        description="Pooled occupations, and title ideas the UK job-title index lists, your "
+        "excluded kinds of work removed."
+    )
 
 
 class FloorReasonOut(ResponseModel):
@@ -475,7 +487,9 @@ class SlateOut(ResponseModel):
     family_limit: int = Field(description="At most this many from one kind of work.")
     reference: ReferenceOut
     suggestions: list[SuggestionOut] = Field(
-        description="Next step's, then Aim higher's (each suggestion's `horizon`)."
+        description="Next step's, then Aim higher's (each suggestion's `horizon`). A set may "
+        "also hold title ideas the UK job-title index lists (`title_ideas`, each with its "
+        "`horizon` and `position`), which take their place among these."
     )
     fewer_reasons: list[FewerReason] = Field(
         description="Why there are fewer than six, if there are, as facts the web words."
@@ -499,10 +513,12 @@ class SlateOut(ResponseModel):
     queries: list[PoolQueryOut] = Field(description="Every search that ran, with its hits.")
     unsearchable_queries: list[str] = Field(description="Queries with no searchable word.")
     title_ideas: list[TitleIdea] = Field(
-        description="Titles Careerwright thought of, each with what it did with it (`reason`): "
-        "one ESCO holds as a label joins the slate's pool; one the UK job-title index lists "
-        "(exactly) is a suggestion in its own list beside the slate, never in it; one no list "
-        "holds is not yet found and never suggested."
+        description="Titles Careerwright thought of (the model's hypotheses, then its aim "
+        "higher ideas), each with what it did with it (`reason`): one ESCO holds as a label "
+        "joins the slate's pool; one the UK job-title index lists (exactly) is a suggestion, "
+        "never in the pool: in the set its job groups place it in (`horizon`), else in its own "
+        "list beside the slate, unless the person's exclusions or a filter left it out; one no "
+        "list holds is not yet found and never suggested."
     )
     not_included: list[NotIncludedOut] = Field(description="Show why this wasn't included.")
     unmatched_titles: list[str] = Field(

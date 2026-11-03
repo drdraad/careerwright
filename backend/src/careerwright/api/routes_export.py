@@ -52,7 +52,8 @@ PAGE = 500
 class WorkspaceExport(ResponseModel):
     format: Literal["careerwright.workspace-export"] = "careerwright.workspace-export"
     # 4 (Task 6b): each discovery carries its slate's written explanation, if asked for.
-    format_version: Literal[4] = 4
+    # 5 (Task 6g slice B): each discovery's proposal carries its aim higher title ideas.
+    format_version: Literal[5] = 5
     exported_at: datetime
     synthetic: bool
     workspace: WorkspaceOut

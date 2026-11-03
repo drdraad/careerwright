@@ -9,6 +9,7 @@ from careerwright.profile.horizons import (
     Reference,
     ReferenceBasis,
     place,
+    place_title,
     reference_level,
 )
 
@@ -89,3 +90,20 @@ def test_for_a_level_4_role_aim_higher_is_level_4_work_in_another_major_group() 
     assert place("3434", teacher) is NEXT  # level 3
     assert place("1345", teacher) is AIM  # level 4, managers: another major group
     assert place("1411", teacher) is NEXT  # level 3 managers: below, whatever the group
+
+
+@pytest.mark.req("DIV1-16")
+def test_a_uk_title_is_placed_only_when_every_group_ons_codes_it_to_agrees() -> None:
+    # Task 6g slice B: a title idea the UK job-title index lists is placed by its ISCO-08
+    # groups, as any work is; one whose groups disagree goes in neither set.
+    teacher = reference_level(["2330"], [])
+    assert place_title(["3339"], UNKNOWN_REFERENCE) is AIM  # customer success manager
+    assert place_title(["2424", "2423"], UNKNOWN_REFERENCE) is AIM  # both level 4
+    assert place_title(["4313"], UNKNOWN_REFERENCE) is NEXT
+    # Account manager: managers and professionals (4) and associate professionals (3).
+    assert place_title(["1330", "2431", "3313"], UNKNOWN_REFERENCE) is None
+    # Children's nurse: nurses (4) and child care workers (2), whichever set each would be in.
+    assert place_title(["2221", "5311"], teacher) is None
+    # Level 4 in the role's major group and in another: one level, but two sets.
+    assert place_title(["2310", "1345"], teacher) is None
+    assert place_title([], UNKNOWN_REFERENCE) is None

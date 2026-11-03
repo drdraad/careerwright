@@ -10,8 +10,10 @@
 // there are any.
 //
 // The slate is two sets, Next step and Aim higher (Task 6g), which the API placed by each job
-// group's usual training; an Aim higher card says what Careerwright checked about that
-// training, in its kind of work's line. No set is headed by direction.
+// group's usual training; under Aim higher's heading one line says what Careerwright checked
+// about that training (slice B: once, never on every card). No set is headed by direction. A
+// set may also hold a title Careerwright thought of that the UK job-title index lists, at the
+// place the API gave it (slice B): made a target through the profile's own save.
 //
 // "Why this could suit you" may also carry a written note (S2.7, ADR 0007 decision 12): one
 // model run per slate, asked for once when the person first sees the slate (the page keeps
@@ -35,17 +37,19 @@ import type {
   SlateOut,
   SuggestionOut,
   TargetRecordOut,
+  TitleIdea,
   WrittenWhyOut,
 } from "@/generated/api";
 import { ApiError } from "@/lib/api";
 import { listLimit } from "@/lib/bounds";
 import { stillRunning } from "@/lib/conversation";
-import { isStateCode } from "@/lib/profile";
+import { inputOf, isStateCode } from "@/lib/profile";
 import {
   type SlateControls,
   useChooseTarget,
   useNoteRequests,
   useOrigin,
+  useSaveProfile,
   useSketch,
   useSlate,
   useSubmitDiscovery,
@@ -55,6 +59,7 @@ import {
   ADDED_WEIGHT_ONLY,
   ANSWER_SOURCE,
   aiFilterWords,
+  aimHigherTraining,
   EMPHASIS,
   ERROR_STATEMENT,
   ESCO_NAMED,
@@ -63,7 +68,6 @@ import {
   floorWords,
   HORIZON,
   HORIZON_ORDER,
-  kindOfWorkLine,
   NOT_INCLUDED,
   NOTE_CARD,
   NOTE_RECOVERY,
@@ -77,6 +81,7 @@ import {
   suggestionReason,
   suggestionWords,
   TITLE_IDEA_SHOWN,
+  titleIdeasFound,
   titleIdeasListed,
   titleIdeasWords,
   UK_TITLE_IDEAS,
@@ -419,6 +424,7 @@ function SuggestionCard({
   const already = targets.some((t) => t.concept_id === suggestion.concept_id);
   const full = targets.length >= listLimit("target_titles");
   const words = suggestionWords(suggestion);
+  const kindOfWork = SUGGESTION_WORDS.kindOfWork(suggestion.family.label);
   const body = useId();
   const saved = useRef<HTMLHeadingElement>(null);
   // The choice is replaced by the words that say it is saved; focus follows once they show.
@@ -450,10 +456,9 @@ function SuggestionCard({
           <Glyph name={open ? "expand" : "collapse"} />
         </button>
       </h4>
-      {/* A title to scan: its kind of work under it (and an Aim higher one's usual training).
-          Open, the line moves under what the work is, so nothing under the title reads as a
-          second one (session W2, finding 8). */}
-      {!open && <p className="small muted">{kindOfWorkLine(suggestion)}</p>}
+      {/* A title to scan: its kind of work under it. Open, the line moves under what the work
+          is, so nothing under the title reads as a second one (session W2, finding 8). */}
+      {!open && <p className="small muted">{kindOfWork}</p>}
       {open && (
         <div id={body} className="grid gap-12">
           {/* The choice first, so its bright action is in view with a real slate; what the
@@ -508,7 +513,7 @@ function SuggestionCard({
           <div className="grid gap-4">
             <p className="section-title">{SUGGESTION_WORDS.whatTheWorkIs}</p>
             {suggestion.workday !== "" && <p>{suggestion.workday}</p>}
-            <p className="small muted">{kindOfWorkLine(suggestion)}</p>
+            <p className="small muted">{kindOfWork}</p>
           </div>
           <div className="grid gap-8">
             <p className="section-title">Why this could suit you</p>
@@ -544,6 +549,152 @@ function SuggestionCard({
       )}
     </article>
   );
+}
+
+const folded = (text: string) => text.trim().replace(/\s+/g, " ").toLowerCase();
+
+/** A title Careerwright thought of that the UK job-title index lists, in the set the API
+ *  placed it in by its job groups (Task 6g slice B; ADR 0015 decision 2). Closed: its title and
+ *  kind of work. Open: Make this a target first, through the profile's own save (the slate
+ *  stays current: the API counts its own ideas), then what Careerwright checked and the answers
+ *  it came from. Nothing about it is compared with the person's experience yet. */
+function ListedTitleCard({
+  profile,
+  idea,
+  open,
+  primary,
+  onOpen,
+  removal,
+}: {
+  profile: ProfileOut;
+  idea: TitleIdea;
+  open: boolean;
+  primary: boolean;
+  onOpen(): void;
+  removal: TargetRemoval;
+}) {
+  const title = sentence(idea.title);
+  const where = `title:${idea.title}`;
+  const heading = useId();
+  const body = useId();
+  const save = useSaveProfile(profile.workspace_id);
+  const held = targetTitles(profile);
+  const mine = held.filter((target) => folded(target) === folded(idea.title));
+  const full = held.length >= listLimit("target_titles");
+  const labels = idea.groups.flatMap((group) => (group.label === null ? [] : [group.label]));
+  const kindOfWork = labels.length > 0 ? SUGGESTION_WORDS.kindOfWork(labels.join("; ")) : null;
+  const saved = useRef<HTMLHeadingElement>(null);
+  const [focusSaved, setFocusSaved] = useState(false);
+  useEffect(() => {
+    if (focusSaved && saved.current !== null) {
+      saved.current.focus();
+      setFocusSaved(false);
+    }
+  });
+  const choose = () =>
+    save.mutate(
+      {
+        expectedVersion: profile.version,
+        profile: {
+          ...inputOf(profile.document),
+          target_titles: { state: "provided", value: [...held, idea.title] },
+        },
+        idempotencyKey: crypto.randomUUID(),
+      },
+      { onSuccess: () => setFocusSaved(true) },
+    );
+  return (
+    <article className="card suggestion" data-open={open} aria-labelledby={heading}>
+      <h4 id={heading}>
+        <button
+          type="button"
+          className="suggestion-toggle"
+          aria-expanded={open}
+          aria-controls={open ? body : undefined}
+          aria-disabled={open || undefined}
+          onClick={open ? undefined : onOpen}
+        >
+          {title}
+          <Glyph name={open ? "expand" : "collapse"} />
+        </button>
+      </h4>
+      {!open && kindOfWork !== null && <p className="small muted">{kindOfWork}</p>}
+      {open && (
+        <div id={body} className="grid gap-12">
+          <RemovalNotice removal={removal} where={where} level="h5" />
+          {mine.length > 0 ? (
+            <div className="target-saved flex flex-wrap items-center justify-between gap-8">
+              <h5 className="status font-semibold" tabIndex={-1} ref={saved}>
+                <Glyph name="accept" />
+                <span>{SUGGESTION_WORDS.chosen}</span>
+              </h5>
+              <div>
+                <RemoveButton
+                  title={title}
+                  onRemove={() => removal.remove(mine, where)}
+                  busy={removal.busy}
+                />
+              </div>
+            </div>
+          ) : (
+            <div>
+              <Button
+                variant={primary ? "primary" : "secondary"}
+                onClick={choose}
+                disabledReason={
+                  full
+                    ? SUGGESTION_WORDS.full(listLimit("target_titles"))
+                    : save.isPending
+                      ? "Saving…"
+                      : undefined
+                }
+              >
+                Make this a target <span className="sr-only">: {title}</span>
+              </Button>
+            </div>
+          )}
+          {save.error !== null && <RequestFailure error={save.error} />}
+          <div className="grid gap-4">
+            <p className="section-title">{SUGGESTION_WORDS.whatTheWorkIs}</p>
+            <p className="small">{UK_TITLE_IDEAS.found}</p>
+            {kindOfWork !== null && <p className="small muted">{kindOfWork}</p>}
+          </div>
+          <div className="grid gap-4">
+            <p className="section-title">Why this could suit you</p>
+            <ul className="plain-list">
+              {idea.based_on.map((answer) => (
+                <li key={`${answer.field}:${answer.text}`}>
+                  {UK_TITLE_IDEAS.from} {ANSWER_SOURCE[answer.field].toLowerCase()}: “{answer.text}”
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+    </article>
+  );
+}
+
+/** One entry of a set: an ESCO occupation, or a title the UK job-title index lists. */
+type Entry =
+  | { key: string; suggestion: SuggestionOut; idea?: undefined }
+  | { key: string; idea: TitleIdea; suggestion?: undefined };
+
+/** A set's entries in the slate's order: each title at the place the API gave it among the
+ *  set's suggestions, which keep theirs. */
+function setEntries(suggestions: SuggestionOut[], ideas: TitleIdea[]): Entry[] {
+  const occupations: Entry[] = suggestions.map((suggestion) => ({
+    key: suggestion.concept_id,
+    suggestion,
+  }));
+  const entries: Entry[] = [];
+  for (const idea of [...ideas].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))) {
+    while (entries.length < (idea.position ?? 0) && occupations.length > 0) {
+      entries.push(occupations.shift() as Entry);
+    }
+    entries.push({ key: `title:${idea.title}`, idea });
+  }
+  return [...entries, ...occupations];
 }
 
 /** The slate's notes on how it searched, one step away (session 2's "never overwhelming"):
@@ -749,14 +900,24 @@ function Slate({
   const finding = data.queries.filter((query) => !query.too_general && query.reach > 0).length;
   const first = data.suggestions[0];
   const note: WrittenState = first === undefined ? { kind: "none" } : noteFor(first);
-  // As listed: Next step, then Aim higher. The open one, or the first listed once it is not
-  // shown.
+  // As listed: Next step, then Aim higher, each with the titles the UK job-title index lists
+  // at their places (Task 6g slice B). The open one, or the first listed once it is not shown.
+  const found = titleIdeasFound(data.title_ideas);
   const sets = HORIZON_ORDER.map((horizon) => ({
     horizon,
-    group: data.suggestions.filter((s) => s.horizon === horizon),
+    group: setEntries(
+      data.suggestions.filter((s) => s.horizon === horizon),
+      found.filter((idea) => idea.horizon === horizon),
+    ),
   }));
   const listed = sets.flatMap((set) => set.group);
-  const open = listed.some((s) => s.concept_id === opened) ? opened : listed[0]?.concept_id;
+  const open = listed.some((entry) => entry.key === opened) ? opened : listed[0]?.key;
+  // Aim higher's usual training, said once under its heading (never on every card).
+  const levels = (entries: Entry[]) =>
+    entries.flatMap((entry) => {
+      const level = entry.suggestion?.skill_level ?? entry.idea?.skill_level;
+      return level === null || level === undefined ? [] : [level];
+    });
   return (
     <div className="grid gap-16">
       <p className="sr-only" role="status">
@@ -776,10 +937,12 @@ function Slate({
         ))}
       </fieldset>
       <p className="small muted">
-        {data.suggestions.length} of up to {data.target_size}, from {data.pool_size} occupations
-        found by {finding} {finding === 1 ? "search" : "searches"} of ESCO
-        {data.release.sample ? " (test sample)" : ""}.
-        {data.beyond_pool_limit > 0 && ` ${data.beyond_pool_limit} more were found but not kept.`}
+        {listed.length} of up to {data.target_size}, from {data.pool_size} occupations found by{" "}
+        {finding} {finding === 1 ? "search" : "searches"} of ESCO
+        {data.release.sample ? " (test sample)" : ""}
+        {found.length > 0 &&
+          ` and ${found.length} ${found.length === 1 ? "title" : "titles"} found in the UK job-title index`}
+        .{data.beyond_pool_limit > 0 && ` ${data.beyond_pool_limit} more were found but not kept.`}
         {excluded > 0 &&
           ` Your exclusions removed ${data.excluded.occupations + data.excluded.families}.`}
       </p>
@@ -791,7 +954,8 @@ function Slate({
           ...[aiFilterWords(data.ai_resilience_filter), titleIdeasWords(data.title_ideas)].filter(
             (line): line is string => line !== null,
           ),
-          REFERENCE_BASIS[data.reference.basis],
+          // How the sets were placed, only once a set has something in it (Task 6g slice B).
+          ...(listed.length > 0 ? [REFERENCE_BASIS[data.reference.basis]] : []),
         ]}
       />
       {note.kind === "unavailable" && (
@@ -817,59 +981,73 @@ function Slate({
       )}
       {sets.map(({ horizon, group }) => {
         if (group.length === 0) return null;
+        const training = horizon === "aim_higher" ? aimHigherTraining(levels(group)) : null;
         return (
           <section key={horizon} className="suggestions" aria-labelledby={`set-${horizon}`}>
             <h3 id={`set-${horizon}`} className="section-title">
               {HORIZON[horizon]}
             </h3>
-            {group.map((suggestion) => (
-              <SuggestionCard
-                key={suggestion.concept_id}
-                workspaceId={workspaceId}
-                suggestion={suggestion}
-                slate={data}
-                targets={targets}
-                written={noteFor(suggestion)}
-                open={suggestion.concept_id === open}
-                primary={choosePrimary}
-                focusSaved={chosen === suggestion.concept_id}
-                onSavedFocused={() => setChosen(null)}
-                onOpen={() => setOpened(suggestion.concept_id)}
-                choosing={choose.isPending}
-                onChoose={() =>
-                  choose.mutate(
-                    {
-                      expected_version: profile.version,
-                      concept_id: suggestion.concept_id,
-                      discovery_id: discovery.discovery_id,
-                    },
-                    { onSuccess: () => setChosen(suggestion.concept_id) },
-                  )
-                }
-                onExcludeTitle={() =>
-                  setControls((current) => ({
-                    ...current,
-                    excludeConcepts: [...current.excludeConcepts, suggestion.concept_id],
-                  }))
-                }
-                onExcludeFamily={() =>
-                  setControls((current) => ({
-                    ...current,
-                    excludeFamilies: [...current.excludeFamilies, suggestion.family.code],
-                  }))
-                }
-                removal={removal}
-                // Every title of the person's that names this occupation, by its stored record.
-                onRemove={() => {
-                  const held = targetTitles(profile);
-                  const titles = targets
-                    .filter((t) => t.concept_id === suggestion.concept_id)
-                    .map((t) => t.title)
-                    .filter((t) => held.includes(t));
-                  if (titles.length > 0) removal.remove(titles, suggestion.concept_id);
-                }}
-              />
-            ))}
+            {training !== null && <p className="small muted">{training}</p>}
+            {group.map(({ key, suggestion, idea }) =>
+              idea !== undefined ? (
+                <ListedTitleCard
+                  key={key}
+                  profile={profile}
+                  idea={idea}
+                  open={key === open}
+                  primary={choosePrimary}
+                  onOpen={() => setOpened(key)}
+                  removal={removal}
+                />
+              ) : (
+                <SuggestionCard
+                  key={suggestion.concept_id}
+                  workspaceId={workspaceId}
+                  suggestion={suggestion}
+                  slate={data}
+                  targets={targets}
+                  written={noteFor(suggestion)}
+                  open={suggestion.concept_id === open}
+                  primary={choosePrimary}
+                  focusSaved={chosen === suggestion.concept_id}
+                  onSavedFocused={() => setChosen(null)}
+                  onOpen={() => setOpened(suggestion.concept_id)}
+                  choosing={choose.isPending}
+                  onChoose={() =>
+                    choose.mutate(
+                      {
+                        expected_version: profile.version,
+                        concept_id: suggestion.concept_id,
+                        discovery_id: discovery.discovery_id,
+                      },
+                      { onSuccess: () => setChosen(suggestion.concept_id) },
+                    )
+                  }
+                  onExcludeTitle={() =>
+                    setControls((current) => ({
+                      ...current,
+                      excludeConcepts: [...current.excludeConcepts, suggestion.concept_id],
+                    }))
+                  }
+                  onExcludeFamily={() =>
+                    setControls((current) => ({
+                      ...current,
+                      excludeFamilies: [...current.excludeFamilies, suggestion.family.code],
+                    }))
+                  }
+                  removal={removal}
+                  // Every title of the person's that names this occupation, by its stored record.
+                  onRemove={() => {
+                    const held = targetTitles(profile);
+                    const titles = targets
+                      .filter((t) => t.concept_id === suggestion.concept_id)
+                      .map((t) => t.title)
+                      .filter((t) => held.includes(t));
+                    if (titles.length > 0) removal.remove(titles, suggestion.concept_id);
+                  }}
+                />
+              ),
+            )}
           </section>
         );
       })}

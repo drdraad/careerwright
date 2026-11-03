@@ -14,6 +14,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from careerwright.catalogue.skill_levels import SkillLevel
 from careerwright.profile.discovery import EvidenceItem
 from careerwright.profile.horizons import Horizon
 from careerwright.profile.interview import ProfileField
@@ -299,12 +300,20 @@ class TitleIdeaReason(StrEnum):
 
     # ESCO holds it as a label: its occupation (or each of several) joins the slate's pool.
     IN_ESCO = "in_esco"
-    # ESCO doesn't, and the UK job-title index lists it exactly: a suggestion in its own short
-    # list beside the slate, never in the slate's pool.
+    # ESCO doesn't, and the UK job-title index lists it exactly: a suggestion, never in the
+    # slate's pool; in the set its job groups place it in (Task 6g slice B), else in its own
+    # short list beside the slate.
     IN_UK_TITLE_INDEX = "in_uk_title_index"
     NOT_YET_FOUND = "not_yet_found"  # neither: shown as not yet found, never a suggestion
     # It rests only on one-word answers about how the person likes to work: not looked up.
     NOT_SEARCHED = "not_searched"
+
+
+class JobGroup(Fact):
+    """An ISCO-08 unit group the UK job-title index codes a title to."""
+
+    code: str
+    label: str | None = Field(description="ESCO's label for the group; null where none is held.")
 
 
 class TitleIdea(Fact):
@@ -319,4 +328,30 @@ class TitleIdea(Fact):
     ] = Field(description="What matching it in ESCO did.")
     occupations: int | None = Field(
         description="Occupations matching it in ESCO; null when it wasn't searched."
+    )
+    # Task 6g slice B: a title only the UK job-title index lists is placed by its job groups.
+    groups: list[JobGroup] = Field(
+        default_factory=list,
+        description="Every ISCO-08 group the UK job-title index codes it to (`in_uk_title_index` "
+        "only).",
+    )
+    skill_level: SkillLevel | None = Field(
+        default=None,
+        description="Its job groups' usual ISCO-08 skill level, when they are all at one level: "
+        "a job group's, never the person's, pay or status.",
+    )
+    horizon: Horizon | None = Field(
+        default=None,
+        description="The set of the slate it is shown in, among the suggestions; null: in no "
+        "set. One the UK job-title index lists that is in no set and not `left_out` is shown in "
+        "the list beside the slate (its groups differ in level, or its set held others first).",
+    )
+    position: int | None = Field(
+        default=None,
+        description="Its place in its set, among the set's suggestions and titles, from 0.",
+    )
+    left_out: bool = Field(
+        default=False,
+        description="The person's exclusions or a hard filter (unscored work left out) took it "
+        "out of the slate, as they take an occupation: shown nowhere.",
     )

@@ -769,23 +769,30 @@ export const HORIZON: Record<Horizon, string> = {
 };
 export const HORIZON_ORDER: readonly Horizon[] = ["next_step", "aim_higher"];
 
-/** What Careerwright checked about an Aim higher suggestion's job group (its ISCO skill level):
- *  the training most work there usually needs. Never that the work suits the person, that they
- *  are ready, or that it pays more. Level 1 is above no other level, so it is never said. */
-const USUAL_TRAINING: Record<SuggestionOut["skill_level"], string | null> = {
+type SkillLevel = SuggestionOut["skill_level"];
+
+/** What Careerwright checked about a job group (its ISCO skill level): the training most work
+ *  there usually needs. Never that the work suits the person, that they are ready, or that it
+ *  pays more. Level 1 is above no other level, so it is never said. */
+const USUAL_TRAINING: Record<SkillLevel, string | null> = {
   1: null,
-  2: "Most work in this job group usually needs GCSEs or similar, sometimes A-levels or a vocational course.",
-  3: "Most work in this job group usually needs one to three years of study after A-levels or similar.",
-  4: "Most work in this job group usually needs a degree or equivalent training.",
+  2: "GCSEs or similar, sometimes A-levels or a vocational course",
+  3: "one to three years of study after A-levels or similar",
+  4: "a degree or equivalent training",
 };
 
-/** A suggestion's kind of work, with an Aim higher suggestion's usual training after it in the
- *  same line: a Next step card says nothing of its training, so no work is called basic. */
-export function kindOfWorkLine(suggestion: SuggestionOut): string {
-  const kind = SUGGESTION_WORDS.kindOfWork(suggestion.family.label);
-  const training =
-    suggestion.horizon === "aim_higher" ? USUAL_TRAINING[suggestion.skill_level] : null;
-  return training === null ? kind : `${kind}. ${training}`;
+/** Aim higher's usual training, said once under its heading (Task 6g slice B; slice A's review,
+ *  Minor 1: never on every card): what most work in its entries' job groups usually needs, each
+ *  level once, lowest first. Null with nothing to say. Next step says nothing of training, so
+ *  no work is called basic. */
+export function aimHigherTraining(levels: readonly SkillLevel[]): string | null {
+  const needs = [...new Set(levels)]
+    .sort()
+    .map((level) => USUAL_TRAINING[level])
+    .filter((need): need is string => need !== null);
+  if (needs.length === 0) return null;
+  const groups = levels.length === 1 ? "this job group" : "these job groups";
+  return `Most work in ${groups} usually needs ${needs.join(", or ")}.`;
 }
 
 /** How the two sets were placed, among the notes on how Careerwright searched: by what the
@@ -1110,9 +1117,10 @@ export function aiFilterWords(filter: AiResilienceFilterOut): string | null {
 
 /** Where each title idea is shown, by what Careerwright did with it (Task 6d slice B; ADR 0015
  *  decision 2): an idea ESCO holds is in the slate itself; one the UK job-title index lists is
- *  a suggestion in its own list beside the slate; one no list holds is named as not yet found,
- *  never as a suggestion; one resting only on one-word answers about how the person likes to
- *  work wasn't looked up, which that note already says. */
+ *  a suggestion, in the set the API placed it in (Task 6g slice B) or else in its own list
+ *  beside the slate; one no list holds is named as not yet found, never as a suggestion; one
+ *  resting only on one-word answers about how the person likes to work wasn't looked up, which
+ *  that note already says. */
 export const TITLE_IDEA_SHOWN: Record<TitleIdeaReason, "uk_title_index" | "not_yet_found" | null> =
   {
     in_esco: null,
@@ -1121,9 +1129,15 @@ export const TITLE_IDEA_SHOWN: Record<TitleIdeaReason, "uk_title_index" | "not_y
     not_searched: null,
   };
 
-/** The title ideas shown in a list of their own: those the UK job-title index lists. */
+/** The title ideas the UK job-title index lists that the slate can show: in a set, or beside
+ *  it; never one the person's exclusions or a filter left out. */
+export const titleIdeasFound = (ideas: SlateOut["title_ideas"]) =>
+  ideas.filter((idea) => TITLE_IDEA_SHOWN[idea.reason] === "uk_title_index" && !idea.left_out);
+
+/** The title ideas shown in a list of their own beside the slate: those the UK job-title index
+ *  lists that are in no set (their job groups differ in level, or their set held others first). */
 export const titleIdeasListed = (ideas: SlateOut["title_ideas"]) =>
-  ideas.filter((idea) => TITLE_IDEA_SHOWN[idea.reason] === "uk_title_index");
+  titleIdeasFound(ideas).filter((idea) => idea.horizon === null);
 
 /** The heading of the list beside the slate, and what each idea in it says. */
 export const UK_TITLE_IDEAS = {
