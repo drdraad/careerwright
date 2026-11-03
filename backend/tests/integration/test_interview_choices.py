@@ -88,7 +88,7 @@ def test_the_entry_mode_and_pause_are_saved_with_versions_and_reach_the_intervie
     assert (opened["entry_mode"], opened["conversation_mode"], opened["prompt_version"]) == (
         "sure",
         "gentle",
-        "interview-turn-6",
+        "interview-turn-7",
     )
     worker = scenario.worker("worker")  # leave no queued run behind
     scenario.wait_terminal(turn["turn_id"])

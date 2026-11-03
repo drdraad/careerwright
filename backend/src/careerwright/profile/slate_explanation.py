@@ -38,11 +38,14 @@ from pydantic import BaseModel, ConfigDict
 from careerwright.catalogue.records import OccupationFacts
 from careerwright.errors import CareerwrightError, ErrorCode, ErrorStage
 from careerwright.identity.model_registry import worst_case_cost_nano_usd
+from careerwright.profile.dashes import DASH_PROBLEM, DASH_RULE, model_dash
 from careerwright.profile.discovery import EvidenceItem
 from careerwright.profile.interview import ProfileField, ProposalOrigin
 from careerwright.profile.safety import inferred_sensitive_terms
 
-PROMPT_VERSION = "slate-explanation-1"
+# 2 (Task W2F slice E, the product owner: "Em-dashes are outlawed!"): never an em dash or a
+# spaced en dash in a claim.
+PROMPT_VERSION = "slate-explanation-2"
 INPUT_FORMAT: Literal["careerwright.slate-explanation-input"] = (
     "careerwright.slate-explanation-input"
 )
@@ -497,6 +500,8 @@ def _checked_claim(
         problems.append(
             f"{where}: no quotation marks in the claim; put each quotation in quotes instead"
         )
+    if model_dash(text, (item.text for item in answers)):
+        problems.append(f"{where}: {DASH_PROBLEM}")
     unsupported = unsupported_claim_terms(text, record_texts)
     if unsupported:
         problems.append(
@@ -625,7 +630,7 @@ For each occupation, by its ref, write 1-{MAX_CLAIMS} claims. A claim is one pla
 at most {CLAIM_CHARS[1]} characters that links something the person said to something in that
 occupation's record. Under each claim, quote at least one of the person's answers (source
 "answer") and that occupation's record at least once (source "esco"), each a few words
-copied exactly from its source. Never put quotation marks in the claim itself.
+copied exactly from its source. Never put quotation marks in the claim itself. {DASH_RULE}
 
 Say only what the quotations support. Never say the person is ready, qualified or likely to
 be hired, and never mention pay, cost, money, funding, demand or vacancies: Careerwright checks

@@ -13,6 +13,7 @@ from hypothesis import strategies as st
 
 from careerwright.catalogue.records import IscoGroupRef, OccupationFacts
 from careerwright.errors import CareerwrightError, ErrorCode
+from careerwright.profile.dashes import DASH_RULE, EM_DASH, EN_DASH
 from careerwright.profile.discovery import evidence_of
 from careerwright.profile.document import (
     FIELD_NAMES,
@@ -28,6 +29,7 @@ from careerwright.profile.slate_explanation import (
     MAX_CLAIMS,
     MAX_PROMPT_BYTES,
     MAX_QUOTES,
+    PROMPT_VERSION,
     REPAIR_ALLOWANCE_TOKENS,
     REPAIR_MESSAGE_BYTES,
     SCHEMA_ALLOWANCE_TOKENS,
@@ -180,6 +182,58 @@ def test_a_valid_explanation_keeps_each_quotation_in_its_source_s_own_words() ->
         (QuoteSource.ESCO, None, RecordPart.ESSENTIAL_SKILL, "repair bicycles"),
     ]
     assert gardener.concept_id == GARDENER.concept_id
+
+
+# Task W2F slice E (the product owner, 3 November 2026): "Em-dashes are outlawed!"
+@pytest.mark.req("REC1-11")
+def test_a_claim_with_an_em_dash_or_a_spaced_en_dash_is_refused() -> None:
+    dashed = claim(
+        f"You enjoy fixing bikes {EM_DASH} and this work is mostly maintaining and repairing them.",
+        quote("answer", "repairing bicycles"),
+        quote("esco", "maintain and repair a variety of bicycle models"),
+    )
+    spaced = claim(
+        f"You like being outside {EN_DASH} and this work keeps you outside most days.",
+        quote("answer", "working outdoors"),
+        quote("esco", "working outdoors"),
+    )
+
+    assert problems(output(("o1", [dashed]), ("o2", [spaced]))) == [
+        "o1 claim 1: no em dash or spaced en dash; use a comma, colon or full stop",
+        "o2 claim 1: no em dash or spaced en dash; use a comma, colon or full stop",
+    ]
+    assert PROMPT_VERSION == "slate-explanation-2"
+    assert DASH_RULE in INSTRUCTIONS
+
+
+@pytest.mark.req("REC1-11")
+def test_a_quotation_keeps_the_dash_its_source_has_and_never_the_model_s() -> None:
+    # The person's dash is theirs; a dash the model typed for their hyphen is never shown.
+    person = document(
+        enjoyed_tasks=[f"repairing bicycles {EM_DASH} mostly road bikes", "outdoors - any weather"]
+    )
+    ctx = build_input(
+        discovery_id=DISCOVERY,
+        profile_version=3,
+        release="esco-v1.2.1-en-csv",
+        answers=evidence_of(person),
+        occupations=[MECHANIC],
+    )
+    theirs = claim(
+        "You enjoy fixing bikes, and this work is mostly maintaining and repairing them.",
+        quote("answer", f"repairing bicycles {EM_DASH} mostly road bikes"),
+        quote("answer", f"outdoors {EM_DASH} any weather"),
+        quote("esco", "maintain and repair a variety of bicycle models"),
+    )
+
+    written, found = check_explanation(output(("o1", [theirs])), ctx, ProposalOrigin.MODEL)
+
+    assert found == []
+    assert written is not None
+    assert [q.text for q in written.suggestions[0].claims[0].quotations[:2]] == [
+        f"repairing bicycles {EM_DASH} mostly road bikes",
+        "outdoors - any weather",
+    ]
 
 
 @pytest.mark.req("REC1-11")

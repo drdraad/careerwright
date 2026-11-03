@@ -23,6 +23,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 from careerwright.identity.model_registry import worst_case_cost_nano_usd
+from careerwright.profile.dashes import DASH_PROBLEM, DASH_RULE, model_dash
 from careerwright.profile.document import FieldState, ProfileDocument
 from careerwright.profile.interview import ProfileField, ProposalOrigin
 from careerwright.profile.safety import inferred_sensitive_terms
@@ -30,8 +31,9 @@ from careerwright.profile.safety import inferred_sensitive_terms
 # 2 (Task W2B fix round 2): short phrases in ESCO's skill wording, never work style alone.
 # 3 (fix round 3): never a phrase too general to find work alone; a one-word work style is
 # never searched alone, a longer one may be; "plan shifts" (now too general) leaves the
-# examples.
-PROMPT_VERSION = "discovery-queries-3"
+# examples. 4 (Task W2F slice E, the product owner: "Em-dashes are outlawed!"): queries and
+# title ideas are shown in the model's words, so never an em dash or a spaced en dash.
+PROMPT_VERSION = "discovery-queries-4"
 INPUT_FORMAT: Literal["careerwright.discovery-input"] = "careerwright.discovery-input"
 MAX_QUERIES = 8
 MAX_HYPOTHESES = 3
@@ -200,10 +202,13 @@ def check_discovery(
             "do not search by a health condition, personality type or personal characteristic "
             f"the person did not mention ({', '.join(inferred)})"
         )
+    own_words = [item.text for item in context.evidence]
     queries: list[DiscoveryQuery] = []
     for index, model_query in enumerate(output.queries, start=1):
         if not _bounded(model_query.text):
             problems.append(f"query {index}: {QUERY_CHARS[0]}-{QUERY_CHARS[1]} characters")
+        if model_dash(model_query.text, own_words):
+            problems.append(f"query {index}: {DASH_PROBLEM}")
         cited = _cited(model_query.based_on, evidence, f"query {index}", problems)
         queries.append(
             DiscoveryQuery(
@@ -217,6 +222,8 @@ def check_discovery(
     for index, model_hypothesis in enumerate(output.hypotheses, start=1):
         if not _bounded(model_hypothesis.title):
             problems.append(f"hypothesis {index}: {QUERY_CHARS[0]}-{QUERY_CHARS[1]} characters")
+        if model_dash(model_hypothesis.title, own_words):
+            problems.append(f"hypothesis {index}: {DASH_PROBLEM}")
         cited = _cited(model_hypothesis.based_on, evidence, f"hypothesis {index}", problems)
         hypotheses.append(
             Hypothesis(title=" ".join(model_hypothesis.title.split()), based_on=cited)
@@ -264,8 +271,8 @@ In based_on, quote exactly the answer texts each query comes from. Also give up 
 come from; Careerwright checks each against ESCO and drops any it cannot find.
 
 A preference informs the search; never use it to exclude work. Never search by age, sex,
-health, ethnicity, religion, nationality or personality type. Answer only with the JSON
-object.
+health, ethnicity, religion, nationality or personality type. {DASH_RULE} Answer only with
+the JSON object.
 """
 
 CONTEXT_MARKER = "Discovery context (JSON):\n"

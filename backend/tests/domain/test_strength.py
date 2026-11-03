@@ -23,6 +23,7 @@ from careerwright.capability.strength import (
 )
 from careerwright.catalogue.records import SkillRef
 from careerwright.errors import CareerwrightError, ErrorCode
+from careerwright.profile.dashes import EM_DASH
 from careerwright.profile.discovery import EvidenceItem
 from careerwright.profile.interview import ProfileField, ProposalOrigin
 
@@ -109,6 +110,29 @@ def test_a_verified_quotation_against_a_listed_essential_skill_is_proposed() -> 
         "explained the monthly figures",
     )
     assert (checked.turn_id, checked.profile_version) == (TURN, 3)
+
+
+# Task W2F slice E (the product owner: "Em-dashes are outlawed!"): the model writes no prose
+# here, only a quotation, and what is kept is the person's own characters, never the model's.
+@pytest.mark.req("REC1-06")
+def test_a_dash_the_model_types_in_a_quotation_is_never_what_the_person_reads() -> None:
+    answers = [EvidenceItem(field=ProfileField.ENJOYED_TASKS, text="tidying data - mostly sales")]
+    built = build_input(
+        turn_id=TURN,
+        profile_version=3,
+        release="esco-v1.2.1-en-csv",
+        answers=answers,
+        destinations=[STATISTICIAN],
+    )
+
+    checked, problems = check_strength(
+        proposal("d1", "s2", f"tidying data {EM_DASH} mostly sales"), built, ProposalOrigin.MODEL
+    )
+
+    assert problems == []
+    assert checked is not None
+    assert checked.strength is not None
+    assert checked.strength.quotation.text == "tidying data - mostly sales"
 
 
 def test_finding_none_is_an_answer_never_a_failure() -> None:
