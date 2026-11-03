@@ -816,6 +816,7 @@ def test_a_title_idea_that_was_never_searched_has_no_count_of_matching_occupatio
                 {"title": "workshop technician", "based_on": ["practical"]},
                 {"title": "orbital gardener", "based_on": ["tuning bicycles"]},
             ],
+            "aim_higher": [],
         },
         expect=[],
     )

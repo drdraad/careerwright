@@ -5,9 +5,10 @@ It reads the same prompt a live model reads and answers the same discovery schem
 answer text becomes a query in the channel its field implies (enjoyed tasks: tasks;
 confident and evidenced tasks and the current role: transferable; a target title: the same
 work elsewhere; work style: environment, which the slate does not run for a one-word
-answer, as it would not a model's). It proposes no title hypotheses: it never invents a
-title. Its output passes the same check and is stored with origin `fixture`. It exercises
-the product offline; it does not evaluate discovery.
+answer, as it would not a model's; a qualification: none, so it is never searched). It
+proposes no title hypotheses and no aim higher ideas: it never invents a title. Its output
+passes the same check and is stored with origin `fixture`. It exercises the product offline;
+it does not evaluate discovery.
 """
 
 from careerwright.profile.discovery import (
@@ -48,4 +49,4 @@ def fixture_queries(context: PromptDiscoveryContext) -> DiscoveryOutput:
             continue
         seen.add(key)
         queries.append(ModelQuery(text=text, channel=channel, based_on=[answer.text]))
-    return DiscoveryOutput(queries=queries[:MAX_QUERIES], hypotheses=[])
+    return DiscoveryOutput(queries=queries[:MAX_QUERIES], hypotheses=[], aim_higher=[])

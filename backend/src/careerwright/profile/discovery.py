@@ -2,29 +2,38 @@
 
 A discovery run sends the model the person's confirmed answers that describe work (current
 role, targets, the three task fields and work style; never limits, places, money or a
-name) and gets back a bounded `DiscoveryOutput`: short search phrases in ESCO's own skill
-wording (an essential skill's name must hold every word of one to reach work), or the
-person's own titles, each tagged with a discovery channel and citing the answers it comes
-from, and up to three "surprising but plausible" title hypotheses.
+name) and their qualifications, each with its status (Task 6g slice B: an expected one is
+never read as achieved), and gets back a bounded `DiscoveryOutput`: short search phrases in
+ESCO's own skill wording (an essential skill's name must hold every word of one to reach
+work), or the person's own titles, each tagged with a discovery channel and citing the
+answers it comes from; up to three "surprising but plausible" title hypotheses; and up to six
+"aim higher" title ideas, work that usually needs more training than theirs (the product
+owner's two horizons, 3 November 2026).
 
-The model proposes searches; it never names a suggestion. `check_discovery` validates the
-output deterministically: every query and hypothesis rests on the person's own answer
-texts, and none uses a health condition, a personality type or a protected characteristic
-the person never gave (`careerwright.profile.safety`). What it returns is the stored
-`DiscoveryProposal`. Retrieval, de-duplication and the slate are deterministic code over the
-pinned taxonomy (`careerwright.profile.slate`, `careerwright.profile.exploration`); a hypothesis
-becomes a suggestion only if ESCO holds it (DIV1-04).
+The model proposes searches and title ideas; it never names a suggestion. `check_discovery`
+validates the output deterministically: every query and title idea rests on the person's own
+answer texts, and none uses a health condition, a personality type or a protected
+characteristic the person never gave (`careerwright.profile.safety`). What it returns is the
+stored `DiscoveryProposal`. Retrieval, de-duplication and the slate are deterministic code over
+the pinned taxonomy (`careerwright.profile.slate`, `careerwright.profile.exploration`); a title
+idea becomes a suggestion only where code confirms it, and code alone places it in a set
+(ADR 0015 decision 2; ADR 0007, Task 6g amendments).
 """
 
 import json
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from careerwright.identity.model_registry import worst_case_cost_nano_usd
 from careerwright.profile.dashes import DASH_PROBLEM, DASH_RULE, model_dash
-from careerwright.profile.document import FieldState, ProfileDocument
+from careerwright.profile.document import (
+    FieldState,
+    ProfileDocument,
+    QualificationAnswer,
+    QualificationStatus,
+)
 from careerwright.profile.interview import ProfileField, ProposalOrigin
 from careerwright.profile.safety import inferred_sensitive_terms
 
@@ -33,16 +42,23 @@ from careerwright.profile.safety import inferred_sensitive_terms
 # never searched alone, a longer one may be; "plan shifts" (now too general) leaves the
 # examples. 4 (Task W2F slice E, the product owner: "Em-dashes are outlawed!"): queries and
 # title ideas are shown in the model's words, so never an em dash or a spaced en dash.
-PROMPT_VERSION = "discovery-queries-4"
+# 5 (Task 6g slice B, the product owner's two horizons): up to six "aim higher" title ideas,
+# and the person's qualifications, an expected one never read as achieved.
+PROMPT_VERSION = "discovery-queries-5"
 INPUT_FORMAT: Literal["careerwright.discovery-input"] = "careerwright.discovery-input"
 MAX_QUERIES = 8
 MAX_HYPOTHESES = 3
+MAX_AIM_HIGHER = 6
 MAX_BASED_ON = 3
 QUERY_CHARS = (3, 80)
 # Bounds for the spend reservation (bytes bound tokens for byte-level BPE tokenizers).
-MAX_PROMPT_BYTES = 8_000  # instructions plus the rendered evidence, at every list bound
+# Task 6g slice B: the prompt gained the qualifications (eight of up to 120 characters, with
+# their status) and a paragraph; the output six more title ideas beside the eleven items the
+# earlier bound of 1,500 tokens was set for. 2,000 keeps an attempt on Muse Wonder within
+# $0.20, so the live evaluation's explanation case (two runs) stays inside its $0.40 cap.
+MAX_PROMPT_BYTES = 10_000  # instructions plus the rendered evidence, at every list bound
 SCHEMA_ALLOWANCE_TOKENS = 1_500
-MAX_OUTPUT_TOKENS = 1_500
+MAX_OUTPUT_TOKENS = 2_000
 REPAIR_ALLOWANCE_TOKENS = 1_000
 MAX_REQUESTS = 2  # the first request and at most one repair
 # The answers that describe work, in the order the model reads them.
@@ -89,6 +105,7 @@ class DiscoveryOutput(BaseModel):
 
     queries: list[ModelQuery]
     hypotheses: list[ModelHypothesis]
+    aim_higher: list[ModelHypothesis]
 
 
 class EvidenceItem(BaseModel):
@@ -109,9 +126,21 @@ class DiscoveryInput(BaseModel):
     prompt_version: str = PROMPT_VERSION
     profile_version: int
     evidence: list[EvidenceItem]
+    # The person's qualifications, each with its status (Task 6g slice B; none in inputs
+    # sealed before). The model reads them and may quote one by its name.
+    qualifications: list[QualificationAnswer] = Field(default_factory=list)
     # The ESCO release held at submission (its dataset ID); None in inputs sealed before
     # it was recorded. Never sent to the model.
     release: str | None = None
+
+    def quotable(self) -> list[EvidenceItem]:
+        """The answer texts a query or title idea may quote: the answers that describe work,
+        then each qualification by its name."""
+        named = [
+            EvidenceItem(field=ProfileField.QUALIFICATIONS, text=q.name)
+            for q in self.qualifications
+        ]
+        return [*self.evidence, *named]
 
 
 class DiscoveryQuery(BaseModel):
@@ -144,7 +173,15 @@ class DiscoveryProposal(BaseModel):
     profile_version: int
     queries: list[DiscoveryQuery]
     hypotheses: list[Hypothesis]
+    # Task 6g slice B: work that usually needs more training than the person's, in the
+    # model's view; code confirms each and places it by level. None in proposals before.
+    aim_higher: list[Hypothesis] = Field(default_factory=list)
     release: str | None = None  # the release the searches were chosen for (from the input)
+
+    @property
+    def title_ideas(self) -> list[Hypothesis]:
+        """Every title the model thought of: its hypotheses, then its aim higher ideas."""
+        return [*self.hypotheses, *self.aim_higher]
 
 
 def _key(text: str) -> str:
@@ -163,6 +200,26 @@ def evidence_of(document: ProfileDocument) -> list[EvidenceItem]:
     return items
 
 
+def qualifications_of(document: ProfileDocument) -> list[QualificationAnswer]:
+    field = document.qualifications
+    if field.state is not FieldState.PROVIDED or not field.value:
+        return []
+    return list(field.value)
+
+
+def input_of(
+    document: ProfileDocument, *, profile_version: int, release: str | None = None
+) -> DiscoveryInput:
+    """What a discovery of this profile version sends the model: the answers that describe
+    work and the qualifications (`evidence_of` alone decides whether one can start)."""
+    return DiscoveryInput(
+        profile_version=profile_version,
+        evidence=evidence_of(document),
+        qualifications=qualifications_of(document),
+        release=release,
+    )
+
+
 def _cited(
     texts: list[str], evidence: dict[str, EvidenceItem], where: str, problems: list[str]
 ) -> list[EvidenceItem]:
@@ -179,22 +236,53 @@ def _bounded(text: str) -> bool:
     return QUERY_CHARS[0] <= len(text.strip()) <= QUERY_CHARS[1]
 
 
+def _ideas(
+    ideas: list[ModelHypothesis],
+    where: str,
+    evidence: dict[str, EvidenceItem],
+    own_words: list[str],
+    problems: list[str],
+) -> list[Hypothesis]:
+    """Title ideas, each checked as any is: bounded, no dash of the model's, and quoting the
+    answers it comes from."""
+    checked: list[Hypothesis] = []
+    for index, idea in enumerate(ideas, start=1):
+        label = f"{where} {index}"
+        if not _bounded(idea.title):
+            problems.append(f"{label}: {QUERY_CHARS[0]}-{QUERY_CHARS[1]} characters")
+        if model_dash(idea.title, own_words):
+            problems.append(f"{label}: {DASH_PROBLEM}")
+        cited = _cited(idea.based_on, evidence, label, problems)
+        checked.append(Hypothesis(title=" ".join(idea.title.split()), based_on=cited))
+    return checked
+
+
 def check_discovery(
     output: DiscoveryOutput, context: DiscoveryInput, origin: ProposalOrigin
 ) -> tuple[DiscoveryProposal | None, list[str]]:
     """The validated proposal, or the problems that prevent it (never both)."""
     problems: list[str] = []
-    evidence = {_key(item.text): item for item in context.evidence}
+    quotable = context.quotable()
+    evidence: dict[str, EvidenceItem] = {}
+    for item in quotable:  # an answer that is also a qualification's name is the answer
+        evidence.setdefault(_key(item.text), item)
     if not 1 <= len(output.queries) <= MAX_QUERIES:
         problems.append(f"queries: 1-{MAX_QUERIES}")
     if len(output.hypotheses) > MAX_HYPOTHESES:
         problems.append(f"hypotheses: at most {MAX_HYPOTHESES}")
+    if len(output.aim_higher) > MAX_AIM_HIGHER:
+        problems.append(f"aim_higher: at most {MAX_AIM_HIGHER}")
     keys = [_key(q.text) for q in output.queries]
     if len(set(keys)) != len(keys):
         problems.append("queries: each query once")
+    titles = [_key(idea.title) for idea in [*output.hypotheses, *output.aim_higher]]
+    if len(set(titles)) != len(titles):
+        problems.append("title ideas: each title once")
+    own_words = [item.text for item in quotable]
     inferred = inferred_sensitive_terms(
-        [q.text for q in output.queries] + [h.title for h in output.hypotheses],
-        [item.text for item in context.evidence],
+        [q.text for q in output.queries]
+        + [idea.title for idea in [*output.hypotheses, *output.aim_higher]],
+        own_words,
         kindred=True,  # a search may name who the work serves (not so a reply)
     )
     if inferred:
@@ -202,7 +290,6 @@ def check_discovery(
             "do not search by a health condition, personality type or personal characteristic "
             f"the person did not mention ({', '.join(inferred)})"
         )
-    own_words = [item.text for item in context.evidence]
     queries: list[DiscoveryQuery] = []
     for index, model_query in enumerate(output.queries, start=1):
         if not _bounded(model_query.text):
@@ -218,16 +305,8 @@ def check_discovery(
                 based_on=cited,
             )
         )
-    hypotheses: list[Hypothesis] = []
-    for index, model_hypothesis in enumerate(output.hypotheses, start=1):
-        if not _bounded(model_hypothesis.title):
-            problems.append(f"hypothesis {index}: {QUERY_CHARS[0]}-{QUERY_CHARS[1]} characters")
-        if model_dash(model_hypothesis.title, own_words):
-            problems.append(f"hypothesis {index}: {DASH_PROBLEM}")
-        cited = _cited(model_hypothesis.based_on, evidence, f"hypothesis {index}", problems)
-        hypotheses.append(
-            Hypothesis(title=" ".join(model_hypothesis.title.split()), based_on=cited)
-        )
+    hypotheses = _ideas(output.hypotheses, "hypothesis", evidence, own_words, problems)
+    aim_higher = _ideas(output.aim_higher, "aim_higher", evidence, own_words, problems)
     if problems:
         return None, problems
     return (
@@ -237,6 +316,7 @@ def check_discovery(
             profile_version=context.profile_version,
             queries=queries,
             hypotheses=hypotheses,
+            aim_higher=aim_higher,
             release=context.release,
         ),
         [],
@@ -261,14 +341,24 @@ Cover different kinds of work, one channel per query: what they enjoy ("tasks"),
 like to work ("environment"), skills they could carry over from what they do or have done
 ("transferable"), the same tasks in other industries ("cross_industry"), and specialist,
 vocational or less familiar work they may not have considered ("less_familiar"). Base each
-query and hypothesis on what they do, enjoy, can do or have done, where they like to work
-("work in outdoor conditions"), or a role they named: a one-word answer about how they like
-to work ("structured") matches too loosely, so Careerwright never searches with it alone. Do
-not favour popular, prestigious or well-paid work.
+query and title on what they do, enjoy, can do or have done, where they like to work ("work
+in outdoor conditions"), a role they named, or a qualification: a one-word answer about how
+they like to work ("structured") matches too loosely, so Careerwright never searches with it
+alone. Do not favour popular, prestigious or well-paid work.
 
-In based_on, quote exactly the answer texts each query comes from. Also give up to
+In based_on, quote exactly the answer texts each query or title comes from. Also give up to
 {MAX_HYPOTHESES} surprising but plausible occupation titles ("hypotheses"), with the answers they
-come from; Careerwright checks each against ESCO and drops any it cannot find.
+come from.
+
+Also give up to {MAX_AIM_HIGHER} titles ("aim_higher") of work they could aim for over the next
+years: work that usually needs more training, study or experience than what they do now or
+have done, even by a long path. Choose each for how well it follows from their answers, never
+for its pay or status, and name it as employers in England do. Careerwright checks every title
+against ESCO and the UK job-title index, suggests only those it finds, and decides itself how
+much training each usually needs.
+
+Qualifications come with their status: "achieved" is held; "expected" is being taken now or
+still to be awarded, so never treat an expected one as achieved.
 
 A preference informs the search; never use it to exclude work. Never search by age, sex,
 health, ethnicity, religion, nationality or personality type. {DASH_RULE} Answer only with
@@ -283,10 +373,12 @@ class PromptEvidence(BaseModel):
 
     field: ProfileField
     text: str
+    status: QualificationStatus | None = None  # a qualification's only
 
 
 class PromptDiscoveryContext(BaseModel):
-    """What the model reads: answer texts and their fields, nothing else."""
+    """What the model reads: answer texts and their fields, a qualification with its status,
+    nothing else."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -295,10 +387,12 @@ class PromptDiscoveryContext(BaseModel):
 
 def render_prompt(context: DiscoveryInput) -> str:
     """The user prompt. The fixture proposer reads the same text."""
-    prompt = PromptDiscoveryContext(
-        answers=[PromptEvidence(field=item.field, text=item.text) for item in context.evidence]
-    )
-    payload = json.loads(prompt.model_dump_json())
+    answers = [PromptEvidence(field=item.field, text=item.text) for item in context.evidence]
+    answers += [
+        PromptEvidence(field=ProfileField.QUALIFICATIONS, text=q.name, status=q.status)
+        for q in context.qualifications
+    ]
+    payload = json.loads(PromptDiscoveryContext(answers=answers).model_dump_json(exclude_none=True))
     return CONTEXT_MARKER + json.dumps(payload, ensure_ascii=False)
 
 

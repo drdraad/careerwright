@@ -94,7 +94,6 @@ from careerwright.profile.commands import (
     current_profile,
 )
 from careerwright.profile.discovery import (
-    DiscoveryInput,
     DiscoveryProposal,
     DiscoveryQuery,
     EvidenceItem,
@@ -530,8 +529,7 @@ def submit_discovery(
     profile = current_profile(tx, workspace_id)
     if command.expected_profile_version != profile.version:
         raise stale_version(profile.version)
-    evidence = evidence_of(profile.document)
-    if not evidence:
+    if not evidence_of(profile.document):
         raise CareerwrightError(
             ErrorCode.INSUFFICIENT_EVIDENCE,
             "Tell Careerwright what you do now, what you enjoy or what you can do first.",
@@ -539,8 +537,8 @@ def submit_discovery(
             details={"needs": [field.value for field in discovery.EVIDENCE_FIELDS]},
         )
     release = held_release(tx)
-    context = DiscoveryInput(
-        profile_version=profile.version, evidence=evidence, release=release.dataset_id
+    context = discovery.input_of(
+        profile.document, profile_version=profile.version, release=release.dataset_id
     )
     run = submit_run(
         tx,

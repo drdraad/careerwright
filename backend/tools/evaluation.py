@@ -46,10 +46,10 @@ from careerwright.db import Tx
 from careerwright.identity.model_registry import FIXTURE_DISCOVERY_MODEL_ID
 from careerwright.identity.records import Run, RunKind
 from careerwright.profile.discovery import (
-    DiscoveryInput,
     DiscoveryOutput,
     check_discovery,
     evidence_of,
+    input_of,
 )
 from careerwright.profile.discovery import render_prompt as render_discovery_prompt
 from careerwright.profile.document import (
@@ -775,7 +775,7 @@ def observe_guard(case: Case) -> Json:
     """A canned output through the same deterministic check the live output passes."""
     document = document_of(case)
     if case.discovery_output is not None:
-        context = DiscoveryInput(profile_version=1, evidence=evidence_of(document))
+        context = input_of(document, profile_version=1)
         output = DiscoveryOutput.model_validate(case.discovery_output)
         _, found = check_discovery(output, context, ProposalOrigin.MODEL)
         return {"problems": found, "changes": []}
@@ -909,7 +909,7 @@ def observe_explanation_offline(tx: Tx, case: Case) -> Json:
 
 def _offline_slate(tx: Tx, case: Case, release: str | None) -> SlateView:
     document = document_of(case)
-    context = DiscoveryInput(profile_version=1, evidence=evidence_of(document), release=release)
+    context = input_of(document, profile_version=1, release=release)
     output = (
         DiscoveryOutput.model_validate(case.discovery_output)
         if case.discovery_output is not None
