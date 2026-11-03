@@ -400,6 +400,19 @@ def _is_state(text: str) -> bool:
     return re.sub(r"[\W_]+", "", text.casefold()) in _STATE_KEYS
 
 
+def _saved_words(profile: dict[ProfileField, ContextField]) -> list[str]:
+    """The words of the person's saved answers: each text, list item and qualification name.
+    They are the person's words like their messages, so a dash in one is theirs, quoted as they
+    wrote it (review of slice E, important 1: a list kept word for word was refused)."""
+    words: list[str] = []
+    for field in profile.values():
+        for item in field.value if isinstance(field.value, list) else [field.value]:
+            name = item.get("name") if isinstance(item, dict) else item
+            if isinstance(name, str):
+                words.append(name)
+    return words
+
+
 def trips_support_screen(update: ModelUpdate) -> bool:
     """Whether a proposed change's words, its value or its reason, trip the support screen
     (`careerwright.profile.safety.has_risk_stem`). Such a change is never proposed, so a
@@ -441,8 +454,9 @@ def check_turn(
         problems.append("proposed_updates: at most one update per field")
     refs = {m.ref: m.message_id for m in context.messages}
     texts = {m.ref: m.text for m in context.messages}
+    own_words = [*texts.values(), *_saved_words(context.profile)]
     for where, text in (("reply", output.reply), ("next_question", question or "")):
-        if model_dash(text, texts.values()):
+        if model_dash(text, own_words):
             problems.append(f"{where}: {DASH_PROBLEM}")
     problems += _inference_problems(
         output.model_copy(update={"proposed_updates": kept}), list(texts.values())
@@ -457,7 +471,7 @@ def check_turn(
         if not _bounded(update.reason, MAX_REASON):
             problems.append(f"{name}: reason 1-{MAX_REASON} characters")
         values = (update.text or "", *(update.items or []))
-        if any(model_dash(text, texts.values()) for text in (update.reason, *values)):
+        if any(model_dash(text, own_words) for text in (update.reason, *values)):
             problems.append(f"{name}: {DASH_PROBLEM}")
         codes = [text for text in values if _is_state(text)]
         if codes:

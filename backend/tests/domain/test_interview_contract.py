@@ -851,6 +851,68 @@ def test_a_dash_the_person_wrote_is_theirs_and_is_quoted_as_they_wrote_it() -> N
     ]
 
 
+def holding(ctx: TurnInput, **answers: list[Any]) -> TurnInput:
+    """The turn with these answers saved: typed in What we know, or accepted on an earlier card
+    from a message older than the ones the turn sends."""
+    saved = apply_profile_input(
+        empty_profile(),
+        ProfileInput.model_validate(
+            {
+                **{name: {"state": "unasked"} for name in FIELD_NAMES},
+                **{name: {"state": "provided", "value": items} for name, items in answers.items()},
+            }
+        ),
+        uuid.uuid4(),
+    )
+    return ctx.model_copy(update={"profile": context_profile(saved)})
+
+
+# Review of slice E, important 1: the person's saved answers are their words too, so a list
+# kept word for word, as the instructions ask, is never refused for their own dash.
+@pytest.mark.req("PROF-02")
+def test_a_dash_in_a_saved_answer_is_the_persons_and_a_kept_item_keeps_it() -> None:
+    saved = f"helping at Brownies {EM_DASH} mostly crafts"
+    course = f"BTEC {EN_DASH} engineering"
+    ctx = holding(
+        context("I also love fixing machines."),
+        enjoyed_tasks=[saved],
+        qualifications=[{"name": course, "status": "achieved"}],
+    )
+
+    proposal, found = check_turn(
+        output(
+            update("enjoyed_tasks", items=[saved, "fixing machines"]),
+            update("qualifications", items=[f"achieved: {course}"], basis="inferred"),
+        ),
+        ctx,
+        ProposalOrigin.MODEL,
+    )
+
+    assert found == []
+    assert proposal is not None
+    assert proposal.changes[0].value == [saved, "fixing machines"]
+    assert proposal.changes[1].value == [
+        QualificationAnswer(name=course, status=QualificationStatus.ACHIEVED)
+    ]
+    # Their saved dash is no licence for Muse's own.
+    own = output(update("enjoyed_tasks", items=[saved, f"fixing {EM_DASH} machines"]))
+    assert problems(own, ctx) == [
+        "enjoyed_tasks: no em dash or spaced en dash; use a comma, colon or full stop"
+    ]
+
+
+@pytest.mark.req("PROF-02")
+def test_a_reply_naming_a_saved_title_keeps_its_dash_and_muses_own_prose_never_has_one() -> None:
+    title = f"Teaching assistant {EN_DASH} SEN"
+    ctx = holding(context("I could study six hours a week."), target_titles=[title])
+
+    named = output(reply=f"{title} is a clear aim.", next_question=f"Is {title} still your aim?")
+    assert problems(named, ctx) == []
+    assert problems(output(reply=f"{title} is a clear aim {EN_DASH} thanks."), ctx) == [
+        "reply: no em dash or spaced en dash; use a comma, colon or full stop"
+    ]
+
+
 @pytest.mark.req("PROF-02")
 def test_the_instructions_say_never_to_write_an_em_dash() -> None:
     assert (
