@@ -465,3 +465,12 @@ Round 2, the same day (ADR 0009's round 2 line): the candidates are Muse's picks
 every other page the search returned (up to 40, never a page of results for the title); the
 prompt is `role-search-3`, at least four searches. The reading tries them in order until 20 are
 read, and a page no longer there (404 or 410) is never a page without the title.
+
+## Amendment line, Task 6g slice A (2026-11-03): the role's record gives the person's level
+
+The two horizons (ADR 0007's amendment of today) read the person's reference level from the
+role's record (decision 3) and nothing else: the ESCO occupation it names, else the ISCO-08
+groups the UK job-title index codes its title to, when they are at one level. A title in the
+person's own words names neither, so their level is unknown and ISCO's bands place the work;
+after "None of these is my job" the title's ONS groups still give it. No title is matched,
+stored or resolved differently.
