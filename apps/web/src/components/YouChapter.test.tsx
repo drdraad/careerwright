@@ -861,6 +861,41 @@ describe("[MODEL-03] the reply streams as provisional and the checked reply repl
     // Said once, at the start: not under every question (session 2: "too much helper text").
     expect(screen.queryByText(/or say Skip, Unknown or Prefer not to say/)).toBeNull();
   });
+
+  it("takes an answered question away while its answer is replied to", async () => {
+    // Task W2F slice E (the product owner's re-test): Muse's pay question stayed on screen
+    // after the person had answered it, while the new reply was on its way.
+    const decided = { ...turn("complete", proposal), decision: {} as TurnOut["decision"] };
+    const answering = {
+      ...turn("running"),
+      turn_id: "t2",
+      message_id: "m2",
+      message: "Synthetic: about 6 hours.",
+      run: { ...turn("running").run, run_id: "t2" },
+    };
+    fakeApi(
+      routes({ preferences: prefs("unsure"), turns: [decided, answering] }, [
+        {
+          method: "GET",
+          path: /\/turns\/t2\/reply$/,
+          answer: {
+            turn_id: "t2",
+            completeness: "streaming",
+            seq: 1,
+            text: "Thanks, six hours",
+            updated_at: null,
+          },
+        },
+      ]),
+    );
+    renderYou();
+
+    expect(await screen.findByText("Thanks, six hours")).toBeVisible();
+    expect(screen.getByText("Synthetic: about 6 hours.")).toBeVisible();
+    expect(
+      screen.queryByRole("heading", { name: "How many hours a week could you give to learning?" }),
+    ).toBeNull();
+  });
 });
 
 describe("[STATE-06][PROF-04] the review tray saves only what the person chose and confirmed", () => {
