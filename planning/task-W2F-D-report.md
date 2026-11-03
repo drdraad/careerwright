@@ -364,3 +364,106 @@ Commit `a63c812` (pathspec, main tree).
 - **Integration:** not re-run. The change is pure code inside `check_search`, covered by the
   domain test. The controller's acceptance covers the rest.
 - **Not changed:** everything else in the slice, including the shared reservation.
+
+## Round 2 report (implementer, 3 November 2026): read what the search found
+
+The product owner's live try: Muse ran 2 searches, kept 2 grounded pages, and both returned
+404, so the result was "stopped before it could read enough pages to say".
+
+Commits (pathspec, main tree): `424082f` (code, tests, migration 0048, generated client, web)
+and `2bcd739` (ADR 0009 and 0015 round 2 lines, runbook, register DIV1-15; last).
+
+### What changed
+
+1. **Read what the search found** (`search.check_search`, `_other_returned_pages`).
+   - Role candidates are Muse's picks first, then every other page address the native search
+     tool returned, in its own order. `searched()` now returns its sources as an ordered,
+     de-duplicated list instead of a set.
+   - Every candidate goes through the same checks: `check_url`, the manifest (refused hosts
+     dropped), never a site's home page, never a page of search results for the title.
+     There are up to 40 in all (`search.ROLE_CANDIDATES`).
+   - Muse's list is a ranking hint, never the limit. Only Muse's own picks are listed as
+     `excluded`; returned pages that fail a check are just not taken.
+   - With no address returned, nothing is grounded and nothing is read
+     (`test_when_the_search_tool_returns_no_page_nothing_is_read`). The research shows
+     `no_pages`: `all_excluded` if Muse picked something, `search_returned_nothing` if not.
+     It never shows "not yet found".
+   - **Search-results page, where code can tell:** a page whose query has a value holding the
+     title's words (`?q=Biodiversity+net+gain+officer`, `?keywords=...-...`, encoded, any case).
+     Such a page repeats the search's own words, so the title would be on it whatever it
+     lists. This rule (`role_page_refusal`, reason `search_results_page`) covers Muse's picks
+     and the returned pages alike. A posting whose address names the title is still read.
+     Listings without the title in the query can't be told apart by code; the prompt asks
+     Muse not to return them.
+2. **Prompt `role-search-3`:** at least four different searches before answering (up to
+   eight): the exact title in quotes with "job" and "England"; with "role profile" or
+   "careers"; with "professional body" or "gov.uk"; the title alone. The best pages first,
+   since Careerwright also tries the rest. The prompt is at most 2,209 bytes, within the
+   2,500 bound, so the reservation is unchanged. `max_tool_calls` stays 8.
+3. **Expired pages, and reading on to the next.**
+   - A page whose site answered 404 or 410 is `gone` (`PageView.gone`, `RolePageOut.gone`).
+     The web says "No longer there" for it, never "Doesn't use the title" or "Not read".
+     It was already never counted as a page without the title (no check is recorded).
+   - The reading's targets are all the candidates (up to 40; migration 0048 lets
+     `acquisition_targets.position` hold 0 to 39). It tries them in order.
+   - In `acquisition.acquire_target`, once 20 role pages are read (`MAX_ROLE_PAGES`), each
+     remaining target is set `not_needed` (new status; migration 0048 adds it, and only for a
+     role target) and never fetched. `_pages` leaves them out: never read, never unread.
+     `publish_acquisition` doesn't count them as failed.
+   - **How "stopped before it could read enough pages to say" is decided:** `research_view`
+     returns `reading_stopped` when the reading settled without `found` and its run is not
+     `complete`. That happens when the person stopped it (`cancelled`), access was revoked,
+     or `publish_acquisition` failed it (`retrieval_failed` or `source_blocked`) because no
+     target was read. Every candidate is now a target and every target is tried, so a reading
+     fails only after trying all its candidates; one with readable candidates left never ends
+     that way.
+   - What remains: if every candidate is tried and none can be read, the words are still
+     "Careerwright stopped before it could read enough pages to say". That case is now
+     unlikely (up to 40 candidates), but the words could be more exact; for the final list.
+4. **Recorded per research:** `GET .../role-research/{id}` now states `sources_returned`
+   (distinct pages the search returned), `candidates` (kept to try), `pages_read` and
+   `pages_gone`. Reading straight from the live database:
+   - `acquisition_targets` (one row per candidate tried or `not_needed`) and
+     `source_attempts` (`status`, `http_status` 404/410) give candidates, read and gone.
+   - Sources returned is only in the sealed proposal, so read it from the API.
+   - `make live-role-research` reads the same way (`read_until_enough`) and prints `read` and
+     `gone` beside `unread`. Its ledger notes already hold `sources_seen` and `candidates`.
+
+### Checks
+
+- **Domain TDD.** RED 1 at import (`ROLE_CANDIDATES`). RED 2 with the constant only:
+  7 failed, 58 passed (picks then sources, results pages ×3, 40 kept, every page tried in
+  order, the prompt). GREEN: role research, source search, live role research and live smoke
+  tests, 121 passed, then 122 with the tool test.
+  - `test_when_the_search_tool_returns_no_page_nothing_is_read` passed on the old code too:
+    it states existing behaviour, as asked.
+- **The tool's `read_until_enough` test** was written after the helper, not run red first.
+- **Integration tests** were written before the code but first run after it. Under the lock:
+  - `pytest -m integration tests/integration/test_role_research.py tests/integration/test_acquisition.py`
+    plus three `test_migrations.py` tests (fresh to head, populated to head, 0047): 55
+    passed, 1 failed.
+  - The failure was my new stop-at-20 test asserting `found`, but its 22 identical pages fold
+    to one source (copies of one advert count once). I changed it to assert the reading (run
+    complete, 20 read, 1 gone, 21 pages listed, the last two sites never asked for).
+  - Re-run: `test_role_research.py` 14 passed. The lock was released each time.
+- **Web.** RED: `vitest run src/components/RoleResearch.test.tsx` gave 1 failed ("says a page
+  is no longer there"). GREEN: 12 passed.
+- **`make check`** on the final code: exit 0. Pytest 2155 passed, 123 skipped; Vitest 495
+  passed; ruff, mypy, client drift, Biome and tsc clean.
+- No live calls. Acceptance not run (the controller's).
+
+### Concerns
+
+1. **Pages read may be off topic.** The returned pages Muse didn't pick are read in the
+   search's order, not checked as being about the role: Careerwright reads up to 20 of them
+   for the exact title. The found rule is unchanged (exact title, two independent sources or
+   one official page). The results-page rule guards against a page that only echoes the
+   query.
+2. **A reading can take longer.** It tries up to 40 pages. A page no longer there is one
+   quick try (404 and 410 aren't retried). If every page timed out three times it would take
+   about 54 minutes, and never more than about three hours (the worker's 90 seconds a try).
+   It's usually a minute or two, and the person can stop it.
+3. **Sources returned is readable only through the API**, since the proposal is sealed.
+4. **Unread searches.** Queries recorded on the proposal still read only a search action's
+   `query`, not a `queries` list. "At least four searches" may show fewer queries than Meta
+   ran; the billed count (`web_search_queries`) is Meta's own.
