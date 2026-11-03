@@ -8,12 +8,14 @@ from typing import Any
 
 import pytest
 
+from careerwright.profile.dashes import DASH_RULE, EM_DASH, EN_DASH
 from careerwright.profile.discovery import (
     EVIDENCE_FIELDS,
     INSTRUCTIONS,
     MAX_HYPOTHESES,
     MAX_PROMPT_BYTES,
     MAX_QUERIES,
+    PROMPT_VERSION,
     SCHEMA_ALLOWANCE_TOKENS,
     DiscoveryInput,
     DiscoveryOutput,
@@ -296,6 +298,26 @@ def test_the_prompt_and_schema_fit_the_bounds_the_reservation_assumes() -> None:
     for keyword in ("minLength", "maxLength", "maxItems", "minItems", "pattern", "format"):
         assert keyword not in schema
     assert "never use it to exclude" in INSTRUCTIONS
+
+
+# Task W2F slice E (the product owner, 3 November 2026: "Em-dashes are outlawed!"): a query
+# and a title idea are shown to the person in the model's words.
+@pytest.mark.req("DIV1-01")
+def test_a_query_or_title_idea_with_an_em_dash_is_refused_unless_it_is_the_person_s_own() -> None:
+    role = f"Mechanic {EM_DASH} road bikes"
+    own = document(current_role=role, enjoyed_tasks=["working outdoors"])
+    dashed = output(
+        query(f"repair bicycles {EM_DASH} road", "tasks", "working outdoors"),
+        query(role, "transferable", role),  # the person's own title, their dash
+        hypotheses=[{"title": f"cycle courier {EN_DASH} city", "based_on": ["working outdoors"]}],
+    )
+
+    assert problems(dashed, context(own)) == [
+        "query 1: no em dash or spaced en dash; use a comma, colon or full stop",
+        "hypothesis 1: no em dash or spaced en dash; use a comma, colon or full stop",
+    ]
+    assert PROMPT_VERSION == "discovery-queries-4"
+    assert DASH_RULE in INSTRUCTIONS
 
 
 @pytest.mark.req("MODEL-08")

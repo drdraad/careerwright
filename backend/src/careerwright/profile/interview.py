@@ -34,6 +34,7 @@ from careerwright.catalogue.places import ENGLISH_CITIES
 from careerwright.errors import CareerwrightError
 from careerwright.identity.model_registry import worst_case_cost_nano_usd
 from careerwright.money import Money
+from careerwright.profile.dashes import DASH_PROBLEM, DASH_RULE, model_dash
 from careerwright.profile.document import (
     FIELD_NAMES,
     FIELD_SPECS,
@@ -63,8 +64,10 @@ from careerwright.profile.safety import (
 # (Task W2F, session W2's findings): what the person doesn't enjoy (`disliked_tasks`), one
 # activity in the same words in each task answer, a thing taken back left out of the list, a
 # money limit hinted without a figure asked for in pounds next and never proposed, and with no
-# start chosen, never asking how to start.
-PROMPT_VERSION = "interview-turn-6"
+# start chosen, never asking how to start. Version 7 (Task W2F slice E, the product owner's
+# re-test): never an em dash or a spaced en dash, and "no_job_yet" is a state, never text (it
+# was proposed as a role's text and saved as a title); words cut to keep the size guard.
+PROMPT_VERSION = "interview-turn-7"
 INPUT_FORMAT: Literal["careerwright.interview-turn-input"] = "careerwright.interview-turn-input"
 MAX_MESSAGE = 2_000
 MAX_REPLY = 1_200
@@ -387,6 +390,16 @@ def _inference_problems(output: InterviewTurnOutput, person: list[str]) -> list[
     return problems
 
 
+_STATE_KEYS = frozenset(state.value.replace("_", "") for state in FieldState)
+
+
+def _is_state(text: str) -> bool:
+    """Whether a proposed text is an answer state's code, case and separators aside ("no_job_yet",
+    "No job yet", "Prefer-not-to-say"): a state is never a value (Task W2F slice E: a role
+    proposed as "no_job_yet" was saved as a title of that name)."""
+    return re.sub(r"[\W_]+", "", text.casefold()) in _STATE_KEYS
+
+
 def trips_support_screen(update: ModelUpdate) -> bool:
     """Whether a proposed change's words, its value or its reason, trip the support screen
     (`careerwright.profile.safety.has_risk_stem`). Such a change is never proposed, so a
@@ -428,6 +441,9 @@ def check_turn(
         problems.append("proposed_updates: at most one update per field")
     refs = {m.ref: m.message_id for m in context.messages}
     texts = {m.ref: m.text for m in context.messages}
+    for where, text in (("reply", output.reply), ("next_question", question or "")):
+        if model_dash(text, texts.values()):
+            problems.append(f"{where}: {DASH_PROBLEM}")
     problems += _inference_problems(
         output.model_copy(update={"proposed_updates": kept}), list(texts.values())
     )
@@ -440,6 +456,17 @@ def check_turn(
             continue
         if not _bounded(update.reason, MAX_REASON):
             problems.append(f"{name}: reason 1-{MAX_REASON} characters")
+        values = (update.text or "", *(update.items or []))
+        if any(model_dash(text, texts.values()) for text in (update.reason, *values)):
+            problems.append(f"{name}: {DASH_PROBLEM}")
+        codes = [text for text in values if _is_state(text)]
+        if codes:
+            problems += [
+                f'{name}: "{text.strip()}" is an answer state: give it as the state, with no '
+                "text or items"
+                for text in codes
+            ]
+            continue
         value = _value(update, problems)
         try:
             typed = input_type(name).model_validate(
@@ -495,41 +522,41 @@ def context_profile(document: ProfileDocument) -> dict[ProfileField, ContextFiel
 
 
 INSTRUCTIONS = f"""\
-You are the interviewer in Careerwright, a career-planning service for people in England.
+You are the interviewer in Careerwright, a career-planning service in England.
 Write a short, warm reply in British English, with no question in it. Ask at most one
 question, only in next_question: the one that most changes the next decision. Never ask
-again for something the profile already holds.
+again for what the profile already holds. {DASH_RULE}
 
-From the person's messages, propose updates to their profile fields. Propose only what a
-message states, or clearly implies; mark implications as "inferred". Every update cites the
-refs of the messages that support it (such as "m2"). Leave out fields the messages do not
-address. Use "unknown", "skipped" or "prefer_not_to_say" when the person says so, and for
-current_role only, "no_job_yet" when they say they haven't had a job yet (never a job title).
+From the person's messages, propose updates to their fields. Propose only what a message
+states, or clearly implies; mark implications as "inferred". Every update cites the refs of
+its supporting messages (such as "m2"). Leave out fields the messages don't address. Use
+the state "unknown", "skipped" or "prefer_not_to_say" when the person says so, and for
+current_role only, "no_job_yet" when they haven't had a job yet (a state, never text).
 
 Field formats: text fields take "text"; list fields take "items", the complete list after
 the update (keep the items the profile already holds that still apply; leave out anything
-the person takes back); weekly_study_hours is a number of hours per week as text, such as
-"6"; money is pounds as digits, such as "1500" (direct_spend_cap: the most they would spend
-on their next step in total; monthly_payment_cap: the most in any one month).
-minimum_salary: the lowest gross pay they would accept, as pounds and the period they gave,
+the person takes back); weekly_study_hours is hours per week as text, such as "6"; money is
+pounds as digits, such as "1500" (direct_spend_cap: the most they'd spend on their next
+step in total; monthly_payment_cap: the most in any one month).
+minimum_salary: the lowest gross pay they'd accept, as pounds and the period they gave,
 such as "28000 per year" or "12.50 per hour" (a year unless they say otherwise; never
 convert it). cities: only names from this list:
 {", ".join(place.label for place in ENGLISH_CITIES)}.
 enjoyed_tasks: what they enjoy; confident_tasks: what they believe they can do;
 evidenced_tasks: what they have done and can show; disliked_tasks: what they don't enjoy or
 find draining. Keep these four apart, and put one activity in the same words in each of
-them it belongs to. work_style: how they say they like to work (optional; never ask for it
-twice, accept a skip).
-work_status: what they are doing now, as text, one of working, in_education_or_training,
+them it belongs to. work_style: how they like to work (optional; ask at most once, accept
+a skip).
+work_status: what they're doing now, as text, one of working, in_education_or_training,
 looking_for_work, caring, other. qualifications: items such as "achieved: GCSE maths" or
-"expected: A-level biology" (expected while they are taking it or awaiting the result). Both
-are optional: ask for each at most once and accept a skip. Never ask their age.
+"expected: A-level biology" (expected while taking it or awaiting the result). Both are
+optional: ask for each at most once and accept a skip. Never ask their age.
 Someone may not have had a job yet: ask about school or college, volunteering, caring,
 clubs and hobbies; never treat no job as a gap.
 
 "entry" is how the person chose to start. "sure": they know their direction; confirm the
-target role and the level they aim for, then the practical limits, and do not explore
-interests or work style unless they raise them. "unsure": they want to explore; before
+target role and the level they aim for, then the practical limits; don't explore interests
+or work style unless they raise them. "unsure": they want to explore; before
 naming any career, ask about kinds of tasks they enjoy or find draining. null: not chosen
 yet; never ask how they want to start (Careerwright asks that itself): use what they wrote
 and ask what most changes the next decision.

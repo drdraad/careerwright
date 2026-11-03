@@ -10,9 +10,11 @@ from typing import Any
 import pytest
 
 from careerwright.money import Money
+from careerwright.profile.dashes import EM_DASH, EN_DASH
 from careerwright.profile.document import (
     FIELD_NAMES,
     HARD_CONSTRAINTS,
+    FieldState,
     PayPeriod,
     ProfileInput,
     QualificationAnswer,
@@ -27,6 +29,7 @@ from careerwright.profile.interview import (
     MAX_PROMPT_BYTES,
     PROMPT_VERSION,
     SCHEMA_ALLOWANCE_TOKENS,
+    ContextField,
     ContextMessage,
     InterviewTurnOutput,
     ProfileField,
@@ -416,7 +419,7 @@ def instructions_text() -> str:
 # Task W2F (session W2's findings 4 to 7 and Sam's first message): one new prompt version.
 @pytest.mark.req("REC1-04", "PROF-08")
 def test_the_version_moved_and_what_the_person_doesnt_enjoy_goes_in_its_own_answer() -> None:
-    assert PROMPT_VERSION == "interview-turn-6"
+    assert PROMPT_VERSION == "interview-turn-7"  # slice E moved it on
     assert "disliked_tasks: what they don't enjoy or find draining." in instructions_text()
     assert "Keep these four apart" in instructions_text()
 
@@ -611,7 +614,7 @@ def test_the_prompt_says_how_the_person_chose_to_start_and_to_be_spoken_to() -> 
     payload = json.loads(render_prompt(ctx).removeprefix(CONTEXT_MARKER))
 
     assert (payload["entry"], payload["mode"]) == ("sure", "gentle")
-    assert ctx.prompt_version == "interview-turn-6"
+    assert ctx.prompt_version == "interview-turn-7"
 
 
 @pytest.mark.req("PROF-09")
@@ -764,6 +767,104 @@ def test_the_output_schema_stays_within_strict_mode() -> None:
 
     for keyword in ("minLength", "maxLength", "maxItems", "minItems", "pattern", "format"):
         assert keyword not in schema
+
+
+def holding_no_job_yet(*texts: str) -> TurnInput:
+    """A turn after "I haven't had a job yet": the current role holds that answer."""
+    ctx = context(*texts)
+    profile = {**ctx.profile, ProfileField.CURRENT_ROLE: ContextField(state=FieldState.NO_JOB_YET)}
+    return ctx.model_copy(update={"profile": profile})
+
+
+# Task W2F slice E (the product owner's re-test, 3 November 2026): Muse proposed the role's
+# answer state as its text, and the saved role became a title called "no_job_yet".
+@pytest.mark.req("PROF-02", "STATE-11", "PROF-14")
+def test_an_answer_state_is_never_proposed_as_text_or_an_item() -> None:
+    ctx = holding_no_job_yet("I'm at school and I help out at a riding stable.")
+    echoed = output(update("current_role", text="no_job_yet", basis="inferred"))
+    spelt = output(
+        update("current_role", text="No job yet", basis="inferred"),
+        update("enjoyed_tasks", items=["helping out at a riding stable", "Prefer-not-to-say"]),
+        update("evidenced_tasks", items=["UNKNOWN"], basis="inferred"),
+    )
+
+    assert problems(echoed, ctx) == [
+        'current_role: "no_job_yet" is an answer state: give it as the state, with no text or items'
+    ]
+    assert problems(spelt, ctx) == [
+        'current_role: "No job yet" is an answer state: give it as the state, with no text or '
+        "items",
+        'enjoyed_tasks: "Prefer-not-to-say" is an answer state: give it as the state, with no '
+        "text or items",
+        'evidenced_tasks: "UNKNOWN" is an answer state: give it as the state, with no text or '
+        "items",
+    ]
+    # The state itself, and a value that only holds one of the words, are fine.
+    assert problems(output(update("current_role", state="no_job_yet")), ctx) == []
+    assert problems(output(update("current_role", text="Unknown Soldier tour guide")), ctx) == []
+
+
+# Task W2F slice E (the product owner, 3 November 2026): "Em-dashes are outlawed! Muse must
+# never use them in a response."
+@pytest.mark.req("PROF-02")
+def test_an_em_dash_or_a_spaced_en_dash_in_anything_the_person_reads_is_refused() -> None:
+    ctx = context("I fix bikes for friends - mostly road bikes.")
+    em, en = EM_DASH, EN_DASH
+
+    assert problems(output(reply=f"Thanks {em} that helps."), ctx) == [
+        "reply: no em dash or spaced en dash; use a comma, colon or full stop"
+    ]
+    assert problems(output(next_question=f"Where could you work {en} near home?"), ctx) == [
+        "next_question: no em dash or spaced en dash; use a comma, colon or full stop"
+    ]
+    reason = update("enjoyed_tasks", items=["fixing bikes"], reason=f"You said so{em}twice.")
+    assert problems(output(reason), ctx) == [
+        "enjoyed_tasks: no em dash or spaced en dash; use a comma, colon or full stop"
+    ]
+    item = update("enjoyed_tasks", items=[f"fixing bikes {em} mostly road bikes"])
+    assert problems(output(item), ctx) == [
+        "enjoyed_tasks: no em dash or spaced en dash; use a comma, colon or full stop"
+    ]
+    # A hyphen, and an en dash in a range, are not dashes used as punctuation.
+    assert problems(output(reply=f"Thanks, a 9{en}5 week is fine - noted."), ctx) == []
+
+
+@pytest.mark.req("PROF-02")
+def test_a_dash_the_person_wrote_is_theirs_and_is_quoted_as_they_wrote_it() -> None:
+    ctx = context(f"I fix bikes for friends {EM_DASH} mostly road bikes.")
+
+    assert (
+        problems(
+            output(
+                update(
+                    "enjoyed_tasks", items=[f"fix bikes for friends {EM_DASH} mostly road bikes"]
+                ),
+                reply=f"You said friends {EM_DASH} mostly road bikes. Thanks.",
+            ),
+            ctx,
+        )
+        == []
+    )
+    # Their dash elsewhere is no licence for Muse's own.
+    assert problems(output(reply=f"Thanks {EM_DASH} that helps."), ctx) == [
+        "reply: no em dash or spaced en dash; use a comma, colon or full stop"
+    ]
+
+
+@pytest.mark.req("PROF-02")
+def test_the_instructions_say_never_to_write_an_em_dash() -> None:
+    assert (
+        "Never write an em dash or a spaced en dash; use a comma, colon or full stop."
+        in instructions_text()
+    )
+
+
+@pytest.mark.req("STATE-11", "PROF-14")
+def test_the_instructions_say_an_answer_state_is_never_text() -> None:
+    assert PROMPT_VERSION == "interview-turn-7"
+    assert '"no_job_yet" when they haven\'t had a job yet (a state, never text)' in (
+        instructions_text()
+    )
 
 
 @pytest.mark.req("MODEL-08")
