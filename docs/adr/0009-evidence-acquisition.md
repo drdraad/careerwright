@@ -745,3 +745,36 @@ sites before saying found", then "Up to 20 pages. We need to do this properly."
   reserves role research's larger search, $0.031 on the test model and $0.161 on Spark an
   attempt. No run kind, workflow or step changed, so the DBOS `application_version` stays
   `careerwright-l0-1`.
+
+## Amendment line, Task W2F slice D round 2 (2026-11-03): read what the search found
+
+The product owner's live try after the line above: Muse ran 2 searches of the 8 allowed and
+kept 2 grounded pages, both expired postings (404), so the research read nothing and said it
+"stopped before it could read enough pages to say". The bottleneck was Muse's narrowing: the
+search returns many page addresses and Muse passed on few.
+- **Candidates are what the search found** (`search.check_search`, `ROLE_CANDIDATES` 40): Muse's
+  picks first, then every other page address the search tool returned, in its order, each
+  through the same checks (`check_url`, the manifest, never a site's home page, never a page
+  of search results for the title). Muse's list is a ranking hint, never the limit. With no
+  address returned, nothing is read ("no page Careerwright could read").
+- **A page of search results for the title** is one whose query holds the title's words
+  (`?q=...`, `?keywords=...`): it repeats the search's own words, so the title would be on it
+  whatever it lists. That is the only listing code can tell; the prompt asks Muse for no
+  others.
+- **The prompt** (`role-search-3`) asks for at least four different searches before answering
+  (the exact title in quotes with "job" and "England"; with "role profile" or "careers"; with
+  "professional body" or "gov.uk"; the title alone), at most eight, the best pages first.
+- **The reading goes on until 20 are read.** Its targets are all the candidates (up to 40;
+  migration 0048 lets `acquisition_targets.position` hold 0 to 39). It tries them in order, past
+  any page it can't read. Once 20 are read, the rest are marked `not_needed` and never fetched;
+  they are no page of the reading. A page whose site answers 404 or 410 is "no longer there"
+  (`gone`), never a page without the title. "Stopped before it could read enough pages to say"
+  (`reading_stopped`) is a reading that failed or was cancelled. A reading fails only when it
+  read no page after trying every candidate, so a reading with candidates left never ends that
+  way.
+- **Recorded for each research** (`GET .../role-research/{id}`): `sources_returned`, the
+  `candidates` kept, `pages_read` and `pages_gone`.
+- **Its time** is still bounded: at most 40 tries. A page no longer there takes one quick try,
+  with no retry. Up to about 54 minutes if every page timed out three times, never more than
+  about three hours (the worker's 90 seconds a try). Most pages take a second or two, and the
+  person can stop it.

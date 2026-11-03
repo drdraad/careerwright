@@ -461,3 +461,7 @@ The Task 6e line's search and reading change (the product owner's yes, 3 Novembe
 and at most eight tool calls, its own bounds and no longer the job search's; the reading takes
 up to 20 of its candidates, only pages the search really returned and never a site's home page.
 With none, the search found no page Careerwright could read. Decision 2's rule is unchanged.
+Round 2, the same day (ADR 0009's round 2 line): the candidates are Muse's picks and then
+every other page the search returned (up to 40, never a page of results for the title); the
+prompt is `role-search-3`, at least four searches. The reading tries them in order until 20 are
+read, and a page no longer there (404 or 410) is never a page without the title.
