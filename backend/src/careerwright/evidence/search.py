@@ -288,8 +288,13 @@ def sealed_search_input(raw: bytes) -> SearchInput | RoleSearchInput:
     return SearchInput.model_validate_json(raw)
 
 
-def _normal(url: str) -> str:
-    return url.strip().rstrip("/").lower()
+def _grounding_key(url: str) -> str:
+    """One page's address however it is written: the fetch checks' canonical form (scheme
+    and host case, the default port, the fragment dropped), then without a trailing "/" and in
+    one case. An address the checks refuse keeps its own text: no checked candidate matches
+    it."""
+    checked = check_url(url.strip())
+    return (checked.url if isinstance(checked, CheckedUrl) else url).strip().rstrip("/").lower()
 
 
 def is_site_root(url: str) -> bool:
@@ -310,7 +315,7 @@ def check_search(
     kept: list[SearchCandidate] = []
     excluded: list[SearchExcluded] = []
     seen: set[str] = set()
-    grounded_set = {_normal(s) for s in sources}
+    grounded_set = {_grounding_key(s) for s in sources}
     role = isinstance(context, RoleSearchInput)
     for candidate in output.candidates:
         url = candidate.url.strip()
@@ -332,7 +337,7 @@ def check_search(
             continue
         if checked.url in seen:
             continue
-        grounded = _normal(checked.url) in grounded_set or _normal(url) in grounded_set
+        grounded = _grounding_key(checked.url) in grounded_set
         if role and not grounded:
             excluded.append(
                 SearchExcluded(url=checked.url, reason=ExclusionReason.NOT_RETURNED_BY_SEARCH)
