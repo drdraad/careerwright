@@ -32,8 +32,9 @@
   wording (`discovery-queries-3`, untested live).
 - Date: 2026-10-28
 - Amended: 2026-10-31, the product owner's approval of the audit (the last section):
-  decisions 4, 5, 13 and 14 for the role space (ADR 0015); 2026-11-03, Task W2F slice E (the
-  last section): no em dash in model text, and the review card with half the words.
+  decisions 4, 5, 13 and 14 for the role space (ADR 0015); 2026-11-03, Task W2F slice E (its
+  section): no em dash in model text, and the review card with half the words; 2026-11-03,
+  decision 5 for the two horizons, Next step and Aim higher (Task 6g).
 - Requirements: REC1-01..11, DIV1-02, DIV1-04..12, STATE-05, STATE-06, STATE-08, PROF-04,
   PROF-07..09, MODEL-03, MODEL-07, TEST1-10; spec sections 3, 4 and 16; ADR 0006; ADR 0008
   decision 4
@@ -1155,3 +1156,57 @@ space; this ADR changes as follows.
   newest message is never scrolled above the top, so the reply reads from its start.
   Scrolling up stops it; coming back to the end resumes it; opening the chapter never
   scrolls. Under reduced motion or calm mode it jumps instead of gliding; focus never moves.
+
+## Amendment, 2026-11-03 (the product owner's two horizons; Task 6g slice A)
+
+The product owner's re-test (3 November 2026) found many suggestions "quite basic ... not very
+aspirational or inspirational" and the "Directions to consider" group (the less familiar
+direction, headed so when the person's work wasn't known) very odd, and asked to "distinguish
+between immediate next job ... and ideal job". They said yes the same day to two horizons
+(`planning/two-horizons-design.md`, approach C; this is its first slice, code only). Spec
+section 22 records the change to section 4's first slate. Decision 5 changes as follows; the
+pool, retrieval, relevance, directions, floor, family limit and controls are unchanged.
+
+- **A job group's usual level** (`careerwright.catalogue.skill_levels`): ISCO-08's usual skill
+  level for each of its 43 sub-major groups, pinned, and checked against the pinned ESCO
+  release's own group descriptions (`tests/integration/test_skill_levels.py`): 4 for managers
+  except group 14 at 3, 4 for professionals, 3 for technicians, 2 for major groups 4 to 8, 1
+  for elementary work, and 4, 2 and 1 for the armed forces. A group's level, never a person's,
+  never pay or status.
+- **The person's reference level** (`careerwright.profile.horizons`), from their role alone:
+  the ESCO occupation it names (their own, or the closest they chose), else the ISCO-08 groups
+  the UK job-title index codes its title to when all are at one level. Otherwise unknown,
+  never a number: no job yet, a skipped role, a title in their own words, a title several
+  occupations hold with none chosen, or groups at different levels. Targets never set it.
+  **Ruling (Task 6g):** after "None of these is my job" the title's ONS groups still give the
+  level: the person declined ESCO's occupations, not ONS's coding of their title.
+- **Selection, in two sets.** Next step is work at or below the reference level, Aim higher
+  work above it (for level 4, level-4 work in another major group); with the reference
+  unknown, ISCO's bands decide (1 and 2 Next step, 3 and 4 Aim higher). Each set is chosen by
+  the same reranker, up to three, Next step first. The direction balances are per set: Next
+  step two close and one transferable, with no slot kept for something different; Aim higher
+  one of each. "Closer to what I do": Next step three close, Aim higher two close and one
+  transferable. "Less familiar": Next step one of each, Aim higher one transferable and two
+  less familiar. "Broader" and "More depth" keep the balanced sets. A set short of three says
+  so for that set (`few_matched` names it; the world's first scatter's has none). The world's
+  first scatter (the origin's destinations) stays one set of six with the 2/2/2 balance; each
+  destination carries its set as a fact for the near and far lines, a later slice.
+- **Facts and words** (ruling R11). Each suggestion carries `horizon` and `skill_level`, and the
+  slate its `reference` (basis and level, null when unknown). The web heads the slate "Next
+  step" and "Aim higher", never by direction, so nothing is headed "Directions to consider" or
+  "Close to what you do now" for anyone (this replaces the 2026-11-01 amendment's close-group
+  heading and its note for unknown work). An Aim higher card's kind-of-work line adds what
+  Careerwright checked about its job group's usual training ("Most work in this job group
+  usually needs a degree or equivalent training."); a Next step card says nothing of its
+  training, so no work is called basic. How the sets were placed is one note under "How
+  Careerwright searched". Headings, lines and actions per card are as few as before.
+- **Evaluation.** Sam (DSC-22, his title in his own words) and Maya (DSC-21, no job yet,
+  A-levels expected) show both sets as the rules say on the full release, checked by an
+  independent level oracle (`horizons_by_level`); DSC-21 now gives offline the searches a model
+  might propose, since her answers as searches find no work. The recorded slates before Task 6d
+  are now compared for what the searches found, not what the slate chose from it.
+- **Provisional (R6), for the product owner's live look at Maya and Sam:** the per-set balances
+  above, three per set, the bands' line between 2 and 3, the level-4 rule and the training
+  words. Approach A re-sorts the same pool, so Sam's Aim higher can still hold odd work (an
+  equine dental technician, reached through "assist customers"); slice B (Muse's own Aim
+  higher ideas, each checked by code) is the design's answer.
