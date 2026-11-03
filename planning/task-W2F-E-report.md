@@ -609,3 +609,40 @@ Walked in Storybook at 1280 and 390 px, and in the tests:
    page (`YouChapter.tsx`, the support panel's dismiss).
 
 Generated or vendored paths to skip: none.
+
+## Acceptance run 15: the failed journey step (main tree)
+
+**What failed:** `e2e/conversation.spec.ts:100` waited for focus on "Accept current role" once the
+card arrived, and it never came.
+
+**Why: the step named the wrong button. Focus was not lost.**
+- The code moves focus to the card's first choice: the first change's Accept or Confirm.
+- In this journey the demo proposes the work areas first. Its card, read from run 15's trace:
+  work areas, weekly study hours, current role, then tasks you enjoy. So the first choice is
+  "Confirm work areas as a limit", not "Accept current role". I assumed the role came first.
+- Three more checks agree:
+  - In the same run, the keyboard journey passed with the same check. Its card has current
+    role first, so "Accept current role" is right there.
+  - I replayed the order with a mouse in real Chromium (a throwaway Storybook story and
+    script, not committed): click Send, then the card arrives. The browser logged focus
+    leaving Send and arriving on the card's first choice.
+  - In Next's React, a form's ref is let go before the form leaves the page, so the check
+    still sees focus in the reply field or on Send. Read in
+    `next/dist/compiled/react-dom/cjs/react-dom-client.production.js`, where it deletes a
+    page element.
+
+**Change:** one journey step. It now finds the card's first choice, checks it is named
+"Confirm work areas as a limit", and checks that it has focus. No app code changed.
+
+**Not done, and why:** the dispatch asked for a "sent from the reply box" flag and a Vitest
+test that fails first. No defect is there for that test to catch, so I added neither. A
+flag would add code for a failure that does not happen. If you want the flag anyway as a
+safety net (focus moves to the card only when it was on the page), say so and I will add it.
+
+**Checks:**
+- `pnpm exec playwright test e2e/conversation.spec.ts`, under the lock in one guarded
+  command: 12 of 12 passed (1.1 min), including the corrected step. The run built and
+  started its own test stack, as the spec's set-up does. The lock was released.
+- `make check` in the main tree: all green (backend 2166 passed, 123 skipped; generated client
+  matches; Biome clean; `tsc` clean, e2e included; Vitest 46 files, 504 tests).
+- No live call ($0). No web request.
