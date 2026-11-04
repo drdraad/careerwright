@@ -61,6 +61,7 @@ def test_each_target_s_pack_options_are_served_with_their_labels(api: ApiClient,
     fee = next(f for f in c04["facts"] if f["field"] == "fee_total")
     assert fee["value"] == {"currency": "GBP", "minor_units": 299500}
     assert fee["cited"]["claim_id"] == "C04.fee_total"
+    assert fee["cited"]["source_url"].startswith("https://")
     [whole] = c04["payment_plans"][0]["payments"]
     assert whole["amount"] == {"currency": "GBP", "minor_units": 299500}  # Money, never bare
     assert c04["start"] is None  # unknown, never a default
@@ -80,3 +81,40 @@ def test_another_person_sees_none_of_it(api: ApiClient, ada: str, ben: str) -> N
     response = api.get(f"/v1/workspaces/{workspace_id}/planning/options", ben)
 
     assert (response.status_code, response.json()["error"]["code"]) == (404, "NOT_FOUND")
+
+
+def test_options_show_the_persons_figures_used_by_route_search(api: ApiClient, ada: str) -> None:
+    workspace_id = workspace_with_targets(api, ada, DATA)
+    c04 = next(
+        offering
+        for offering in options(api, ada, workspace_id)["targets"][0]["catalogue"]["offerings"]
+        if offering["offering_id"] == "offering:C04"
+    )
+    assert c04["start"] is None
+    response = api.write(
+        "PUT",
+        f"/v1/workspaces/{workspace_id}/planning/inputs",
+        ada,
+        {
+            "expected_version": 0,
+            "inputs": {
+                "offering_figures": [
+                    {
+                        "offering_id": "offering:C04",
+                        "start": {"on": "2027-09-01", "basis": "own_figure"},
+                        "weekly_hours": 9,
+                    }
+                ]
+            },
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    updated = next(
+        offering
+        for offering in options(api, ada, workspace_id)["targets"][0]["catalogue"]["offerings"]
+        if offering["offering_id"] == "offering:C04"
+    )
+    assert updated["start"] == "2027-09-01"
+    assert updated["weekly_hours"] == 9
+    assert {"start_date", "weekly_hours"}.issubset(updated["supplied"])

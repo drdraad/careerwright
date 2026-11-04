@@ -54,6 +54,7 @@ class TargetRow:
     refusal: UrlRefusal | None = None  # why a submitted URL was refused
     refused_host: str | None = None  # its host as plain text, never a link
     role_title: str | None = None  # role research: the title checked on the page (Task 6e)
+    option_research_id: uuid.UUID | None = None  # option research: proposed workspace records
 
 
 @dataclass(frozen=True)
@@ -152,12 +153,14 @@ def insert_target(
     refusal: UrlRefusal | None = None,
     refused_host: str | None = None,
     role_title: str | None = None,
+    option_research_id: uuid.UUID | None = None,
 ) -> None:
     tx.execute(
         sa.text(
             "INSERT INTO careerwright.acquisition_targets (run_id, workspace_id, position, route, "
-            "url, query, refusal, refused_host, role_title) VALUES (:run, :ws, :position, "
-            ":route, :url, CAST(:query AS jsonb), :refusal, :refused_host, :role_title)"
+            "url, query, refusal, refused_host, role_title, option_research_id) "
+            "VALUES (:run, :ws, :position, :route, :url, CAST(:query AS jsonb), :refusal, "
+            ":refused_host, :role_title, :option_research_id)"
         ),
         {
             "run": run_id,
@@ -169,6 +172,7 @@ def insert_target(
             "refusal": refusal.value if refusal else None,
             "refused_host": refused_host,
             "role_title": role_title,
+            "option_research_id": option_research_id,
         },
     )
 
@@ -177,7 +181,8 @@ def targets(tx: Tx, run_id: uuid.UUID) -> list[TargetRow]:
     rows = tx.execute(
         sa.text(
             "SELECT run_id, position, route, url, query, status, refusal, refused_host, "
-            "role_title FROM careerwright.acquisition_targets WHERE run_id = :run "
+            "role_title, option_research_id FROM careerwright.acquisition_targets "
+            "WHERE run_id = :run "
             "ORDER BY position"
         ),
         {"run": run_id},
@@ -193,6 +198,7 @@ def targets(tx: Tx, run_id: uuid.UUID) -> list[TargetRow]:
             UrlRefusal(r["refusal"]) if r["refusal"] else None,
             r["refused_host"],
             r["role_title"],
+            r["option_research_id"],
         )
         for r in rows
     ]

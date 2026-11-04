@@ -30,6 +30,7 @@ dev = [
     "mypy==2.4.0",
     "pytest==9.2.0",
     "hypothesis==6.170.12",
+    "icalendar==7.3.0",
 ]
 
 [build-system]

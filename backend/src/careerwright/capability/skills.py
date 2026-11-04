@@ -23,6 +23,9 @@ Facts and codes, never sentences (ruling R11): the web words every code.
   posting's wording of it. Expected is never met; achieved is the person's own statement,
   so for a protected gate it stays unresolved until they verify it at its source (ADR 0012
   decision 4). Nothing here finds a person ineligible, and no entry fact feeds readiness.
+  The parts the person chose in their own example adverts carry entry facts by the same rule:
+  an advert's line is never a protected gate, so achieved there is
+  `achieved_stated`.
 """
 
 import uuid
@@ -34,6 +37,14 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from careerwright.capability.adverts import SelectedSpan
+from careerwright.capability.evidence import (
+    Answer,
+    Holding,
+    Method,
+    RequirementStatement,
+    SkillEvidence,
+    latest_statement,
+)
 from careerwright.capability.matrix import (
     GateInfo,
     Importance,
@@ -110,6 +121,15 @@ class EscoListedSkill(StrictModel):
     not_part_of_job: bool
 
 
+class SavedSkillAnswer(StrictModel):
+    """The person's latest self-report against this row's rubric, for a later correction."""
+
+    answer: Answer
+    self_assessed_level: int | None
+    example: str | None
+    last_done: str | None
+
+
 class Requirement(StrictModel):
     """A required row of the target's matrix: what the target asks."""
 
@@ -127,6 +147,17 @@ class Requirement(StrictModel):
     as_of: date | None  # the latest retrieval date of the pack records it cites
     employer_specific: bool
     entry_facts: list[EntryFact]
+    latest_holding: Holding | None
+    source_urls: list[str]
+    rubric_anchors: dict[int, str]
+    latest_skill: SavedSkillAnswer | None
+
+
+class ChosenPart(SelectedSpan):
+    """A part the person chose in one of their own example adverts, with the qualifications
+    of theirs that name it."""
+
+    entry_facts: list[EntryFact]
 
 
 class AdvertExample(StrictModel):
@@ -136,7 +167,7 @@ class AdvertExample(StrictModel):
     title: str | None
     employer: str | None
     text: str  # as it was kept, third parties' contact details removed
-    spans: list[SelectedSpan]  # the person's selection, in text order; empty: none chosen
+    spans: list[ChosenPart]  # the person's selection, in text order; empty: none chosen
 
 
 class TargetSkills(StrictModel):
@@ -208,21 +239,25 @@ def requirement_texts(row: MatrixRow) -> list[str]:
     return texts
 
 
-def entry_facts(
-    row: MatrixRow, qualifications: Sequence[PersonQualification], keys: Mapping[str, str]
+def _named_by(
+    texts: Sequence[str],
+    qualifications: Sequence[PersonQualification],
+    keys: Mapping[str, str],
+    *,
+    protected: bool,
 ) -> list[EntryFact]:
-    """The qualifications that name this requirement, each with its standing. `keys` holds
-    every text as a concept."""
+    """The qualifications whose words name one of `texts`, each with its standing. `keys`
+    holds every text as a concept."""
     if not qualifications:
         return []
-    requirement_keys = [keys[t] for t in requirement_texts(row)]
+    requirement_keys = [keys[t] for t in texts]
     found: list[EntryFact] = []
     for q in qualifications:
         if not names(keys[q.name], requirement_keys):
             continue
         if q.status is QualificationStatus.EXPECTED:
             standing = EntryStanding.EXPECTED_NOT_MET
-        elif row.gate is not None:
+        elif protected:
             standing = EntryStanding.ACHIEVED_UNVERIFIED
         else:
             standing = EntryStanding.ACHIEVED_STATED
@@ -230,8 +265,59 @@ def entry_facts(
     return found
 
 
+def entry_facts(
+    row: MatrixRow, qualifications: Sequence[PersonQualification], keys: Mapping[str, str]
+) -> list[EntryFact]:
+    """The qualifications that name this requirement, each with its standing."""
+    return _named_by(requirement_texts(row), qualifications, keys, protected=row.gate is not None)
+
+
+def chosen_parts(
+    spans: Sequence[SelectedSpan],
+    qualifications: Sequence[PersonQualification],
+    keys: Mapping[str, str],
+) -> list[ChosenPart]:
+    """Each part the person chose in an advert, with the qualifications that name it. An
+    advert's own line is never a protected gate."""
+    return [
+        ChosenPart(
+            **span.model_dump(),
+            entry_facts=_named_by([span.excerpt], qualifications, keys, protected=False),
+        )
+        for span in spans
+    ]
+
+
+def _saved_skill(row: MatrixRow, evidence: Sequence[SkillEvidence]) -> SavedSkillAnswer | None:
+    if row.rubric is None:
+        return None
+    reports = sorted(
+        (
+            item
+            for item in evidence
+            if item.subject == row.subject
+            and item.rubric_version == row.rubric.version_id
+            and item.method is Method.SELF_REPORT
+        ),
+        key=lambda item: item.recorded_at,
+    )
+    if not reports:
+        return None
+    latest = reports[-1]
+    return SavedSkillAnswer(
+        answer=latest.answer,
+        self_assessed_level=latest.self_assessed_level,
+        example=latest.example,
+        last_done=latest.last_done,
+    )
+
+
 def requirements(
-    matrix: Matrix, qualifications: Sequence[PersonQualification], keys: Mapping[str, str]
+    matrix: Matrix,
+    qualifications: Sequence[PersonQualification],
+    keys: Mapping[str, str],
+    statements: Sequence[RequirementStatement] = (),
+    evidence: Sequence[SkillEvidence] = (),
 ) -> list[Requirement]:
     return [
         Requirement(
@@ -249,6 +335,18 @@ def requirements(
             as_of=max((c.as_of for c in r.citations), default=None),
             employer_specific=r.employer_specific,
             entry_facts=entry_facts(r, qualifications, keys),
+            latest_holding=(
+                s.holding if (s := latest_statement(r.subject, list(statements))) else None
+            ),
+            source_urls=list(
+                dict.fromkeys(
+                    c.claim.url
+                    for c in r.citations
+                    if c.claim.url.startswith(("https://", "http://"))
+                )
+            ),
+            rubric_anchors=dict(r.rubric.anchors) if r.rubric else {},
+            latest_skill=_saved_skill(r, evidence),
         )
         for r in matrix.rows
         if r.required
@@ -290,6 +388,8 @@ def target_skills(
     examples: Sequence[AdvertExample],
     qualifications: Sequence[PersonQualification],
     keys: Mapping[str, str],
+    statements: Sequence[RequirementStatement] = (),
+    evidence: Sequence[SkillEvidence] = (),
 ) -> TargetSkills:
     """One target's Skills facts. `assessment` is the capability model's current result for
     this matrix; it is shown only when the target is assessed."""
@@ -315,7 +415,7 @@ def target_skills(
         details_version=details_version,
         esco_listed=esco_listed(matrix, marks),
         examples=list(examples),
-        requirements=requirements(matrix, qualifications, keys),
+        requirements=requirements(matrix, qualifications, keys, statements, evidence),
         assessment_state=state,
         not_assessed_reason=reason,
         readiness=assessment if state is SkillsAssessmentState.ASSESSED else None,

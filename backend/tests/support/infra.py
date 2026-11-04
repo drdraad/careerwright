@@ -180,7 +180,7 @@ def start_infra(home: Path) -> Infra:
     ensure_local_home(home)
     stack = Stack(project=TEST_PROJECT, home=home, ports=TEST_PORTS, live=False)
     stack.down()  # a previous interrupted run must not leak state into this one
-    stack.build()
+    stack.compose("build", "--quiet", "auth", "edge", timeout=1800)
     stack.up("postgres", "auth", "edge")
     return Infra(stack=stack, home=home)
 

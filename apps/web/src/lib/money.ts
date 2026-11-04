@@ -3,7 +3,9 @@
 //
 // The minor-unit exponent is currency metadata. L0 is GBP only, so the table has one row; the
 // arithmetic below is integer-only (quotient and remainder of whole numbers), never float.
-import type { Money } from "@/generated/api";
+import type { Money, SignedMoney } from "@/generated/api";
+
+export type { SignedMoney };
 
 type Currency = Money["currency"];
 
@@ -23,13 +25,10 @@ export function formatMoney(money: Money): string {
 }
 
 /**
- * Economic values (spec section 18): signed, because a route can cost less than the baseline.
- * The API has no SignedMoney yet (it arrives with the monthly compiler, T11); until then the
- * fixture adapter uses this local shape, to be replaced by the generated type.
+ * Economic values (spec section 18) are the generated `SignedMoney`: signed, because a route
+ * can cost less than the baseline. "−£500" for a negative amount (a true minus sign),
+ * otherwise as `formatMoney`.
  */
-export type SignedMoney = { minor_units: number; currency: Currency };
-
-/** "−£500" for a negative amount (a true minus sign), otherwise as `formatMoney`. */
 export function formatSignedMoney(money: SignedMoney): string {
   const magnitude = formatMoney({
     minor_units: Math.abs(money.minor_units),

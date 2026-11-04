@@ -26,7 +26,6 @@
 import { type Ref, useEffect, useId, useRef, useState } from "react";
 import type {
   DiscoveryOut,
-  Emphasis,
   ErrorCode,
   NotIncludedOut,
   ProfileOut,
@@ -60,7 +59,6 @@ import {
   ANSWER_SOURCE,
   aiFilterWords,
   aimHigherTraining,
-  EMPHASIS,
   ERROR_STATEMENT,
   ESCO_NAMED,
   FAILURE_CLASS,
@@ -259,29 +257,17 @@ function WrittenNote({ state }: { state: WrittenState }) {
       </p>
     );
   }
-  return (
-    <div className="written-why">
-      {state.why.claims.map((claim) => (
-        <div key={claim.text} className="grid gap-4">
-          <p>{claim.text}</p>
-          <ul className="quotations">
-            {claim.quotations.map((quotation) => (
-              <li key={`${quotation.source}:${quotation.text}`}>
-                <span className="quote-source">
-                  {quotation.source === "answer"
-                    ? "You said"
-                    : RECORD_PART[quotation.record_part ?? "description"]}
-                  :
-                </span>{" "}
-                “{quotation.text}”
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
-      <p className="small muted">{WRITTEN_BY[state.origin]}</p>
-    </div>
-  );
+  return <p>{state.why.claims[0]?.text}</p>;
+}
+
+/** The complete ESCO description stays available after its short first line. */
+function workdayPreview(text: string): string {
+  const first = text.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? text;
+  if (first.length <= 140) return first;
+  return `${first
+    .slice(0, 140)
+    .replace(/\s+\S*$/, "")
+    .trimEnd()}…`;
 }
 
 /** How many of the skills a suggestion was joined by are named on its card; the rest are one
@@ -424,6 +410,8 @@ function SuggestionCard({
   const already = targets.some((t) => t.concept_id === suggestion.concept_id);
   const full = targets.length >= listLimit("target_titles");
   const words = suggestionWords(suggestion);
+  const workday = workdayPreview(suggestion.workday);
+  const reasons = suggestion.reasons.map(suggestionReason);
   const kindOfWork = SUGGESTION_WORDS.kindOfWork(suggestion.family.label);
   const body = useId();
   const saved = useRef<HTMLHeadingElement>(null);
@@ -512,39 +500,73 @@ function SuggestionCard({
           </div>
           <div className="grid gap-4">
             <p className="section-title">{SUGGESTION_WORDS.whatTheWorkIs}</p>
-            {suggestion.workday !== "" && <p>{suggestion.workday}</p>}
-            <p className="small muted">{kindOfWork}</p>
+            {workday !== "" && <p>{workday}</p>}
           </div>
           <div className="grid gap-8">
             <p className="section-title">Why this could suit you</p>
             <WrittenNote state={written} />
-            <div className="grid gap-4">
-              {written.kind !== "none" && <p className="small muted">How Careerwright found it</p>}
-              <ul className="plain-list">
-                {suggestion.reasons.map(suggestionReason).map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
-              <JoinedBy skills={suggestion.shared_skills} />
+            {written.kind !== "written" && reasons[0] && <p>{reasons[0]}</p>}
+          </div>
+          <details className="details">
+            <summary>More about this role</summary>
+            <div className="grid gap-12 pt-12">
+              {suggestion.workday !== workday && <p>{suggestion.workday}</p>}
+              <p className="small muted">{kindOfWork}</p>
+              {written.kind === "written" && (
+                <div className="written-why">
+                  {written.why.claims.map((claim, index) => (
+                    <div key={claim.text} className="grid gap-4">
+                      {index > 0 && <p>{claim.text}</p>}
+                      <ul className="quotations">
+                        {claim.quotations.map((quotation) => (
+                          <li key={`${quotation.source}:${quotation.text}`}>
+                            <span className="quote-source">
+                              {quotation.source === "answer"
+                                ? "You said"
+                                : RECORD_PART[quotation.record_part ?? "description"]}
+                              :
+                            </span>{" "}
+                            “{quotation.text}”
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                  <p className="small muted">{WRITTEN_BY[written.origin]}</p>
+                </div>
+              )}
+              {(written.kind === "written" ||
+                reasons.length > 1 ||
+                suggestion.shared_skills.length > 0) && (
+                <div className="grid gap-4">
+                  <p className="small muted">How Careerwright found it</p>
+                  <ul className="plain-list">
+                    {(written.kind === "written" ? reasons : reasons.slice(1)).map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                  <JoinedBy skills={suggestion.shared_skills} />
+                </div>
+              )}
+              <div className="grid gap-4">
+                <p className="section-title">What might not suit you</p>
+                <ul className="plain-list">
+                  {[...words.mightNot, words.entryGate].map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="grid gap-4">
+                <p className="section-title">Try it before committing</p>
+                <ul className="plain-list">
+                  {words.tryIt.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+              <p className="small muted">{words.evidenceGap}</p>
             </div>
-          </div>
-          <div className="grid gap-4">
-            <p className="section-title">What might not suit you</p>
-            <ul className="plain-list">
-              {[...words.mightNot, words.entryGate].map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          </div>
-          <div className="grid gap-4">
-            <p className="section-title">Try it before committing</p>
-            <ul className="plain-list">
-              {words.tryIt.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          </div>
-          <p className="small muted">{words.evidenceGap}</p>
+          </details>
         </div>
       )}
     </article>
@@ -818,6 +840,8 @@ function Slate({
   choosePrimary,
   onSuggestAgain,
   suggestBlocked,
+  onEditAnswers,
+  onNameRole,
 }: {
   workspaceId: string;
   profile: ProfileOut;
@@ -832,17 +856,10 @@ function Slate({
   /** A new discovery: a new set of suggestions, with a note of its own. */
   onSuggestAgain(): void;
   suggestBlocked?: string | undefined;
+  onEditAnswers?: () => void;
+  onNameRole?: () => void;
 }) {
   const [controls, setControls] = useState<SlateControls>(NO_CONTROLS);
-  const role = profile.document.current_role.state;
-  // Careerwright knows the person's work only from a role they gave (Task 6f): without one,
-  // nothing is close to what they do now, and "Closer to what I do" isn't offered. Chosen
-  // before the role stopped being known, it goes back to Balanced: no hidden view stays
-  // applied (Task 6f review M3).
-  const workKnown = role === "provided";
-  if (!workKnown && controls.emphasis === "practical") {
-    setControls((current) => ({ ...current, emphasis: NO_CONTROLS.emphasis }));
-  }
   // The suggestion shown in full; by default the first one listed.
   const [opened, setOpened] = useState<string | null>(null);
   // The suggestion just made a target: focus goes to the words that say it is saved.
@@ -891,9 +908,6 @@ function Slate({
     );
   }
   const data = slate.data;
-  const emphases = (Object.keys(EMPHASIS) as Emphasis[]).filter(
-    (emphasis) => workKnown || emphasis !== "practical",
-  );
   const excluded = controls.excludeConcepts.length + controls.excludeFamilies.length;
   // Only a search that reached work found the pool: one too general to find work on its own
   // only added weight, and one that reached nothing found none.
@@ -923,19 +937,6 @@ function Slate({
       <p className="sr-only" role="status">
         {NOTE_ANNOUNCEMENT[note.kind]}
       </p>
-      <fieldset className="segmented">
-        <legend className="sr-only">Which directions to show</legend>
-        {emphases.map((emphasis) => (
-          <Button
-            key={emphasis}
-            variant="secondary"
-            aria-pressed={controls.emphasis === emphasis}
-            onClick={() => setControls((current) => ({ ...current, emphasis }))}
-          >
-            {EMPHASIS[emphasis]}
-          </Button>
-        ))}
-      </fieldset>
       <p className="small muted">
         {listed.length} of up to {data.target_size}, from {data.pool_size} occupations found by{" "}
         {finding} {finding === 1 ? "search" : "searches"} of ESCO
@@ -958,6 +959,35 @@ function Slate({
           ...(listed.length > 0 ? [REFERENCE_BASIS[data.reference.basis]] : []),
         ]}
       />
+      {listed.length === 0 && excluded === 0 && titleIdeasListed(data.title_ideas).length === 0 && (
+        <section className="card grid gap-8" aria-label="No directions found">
+          <h3 className="section-title">No directions found from these answers</h3>
+          <p>
+            What did you actually do in the activity you described? Add one concrete task, then
+            suggest again. You can also name a role you want to investigate.
+          </p>
+          {discovery.proposal?.origin === "fixture" && (
+            <p className="small muted">
+              This synthetic demo searches your words in ESCO skill names. It cannot infer a role
+              from an activity.
+            </p>
+          )}
+          {(onEditAnswers !== undefined || onNameRole !== undefined) && (
+            <div className="flex flex-wrap gap-8">
+              {onEditAnswers !== undefined && (
+                <Button variant="primary" onClick={onEditAnswers}>
+                  Add a concrete task
+                </Button>
+              )}
+              {onNameRole !== undefined && (
+                <Button variant="secondary" onClick={onNameRole}>
+                  Name a role
+                </Button>
+              )}
+            </div>
+          )}
+        </section>
+      )}
       {note.kind === "unavailable" && (
         <NoteRecovery
           state={note}
@@ -983,10 +1013,31 @@ function Slate({
         if (group.length === 0) return null;
         const training = horizon === "aim_higher" ? aimHigherTraining(levels(group)) : null;
         return (
-          <section key={horizon} className="suggestions" aria-labelledby={`set-${horizon}`}>
-            <h3 id={`set-${horizon}`} className="section-title">
+          <section
+            key={horizon}
+            className="suggestions"
+            aria-labelledby={`set-${horizon}`}
+            style={
+              horizon === "aim_higher"
+                ? {
+                    borderTop: "1px solid var(--line-reading-hairline)",
+                    paddingTop: "var(--space-24)",
+                  }
+                : undefined
+            }
+          >
+            <h3 id={`set-${horizon}`} className="display text-25">
               {HORIZON[horizon]}
             </h3>
+            <p className="small muted">
+              {data.reference.basis === "unknown"
+                ? horizon === "next_step"
+                  ? "These job groups usually need less study than Aim higher."
+                  : "These job groups usually need study after A-levels or similar."
+                : horizon === "next_step"
+                  ? "The usual training is at or below the level for your current role."
+                  : "The usual training is above that level, or in another professional field."}
+            </p>
             {training !== null && <p className="small muted">{training}</p>}
             {group.map(({ key, suggestion, idea }) =>
               idea !== undefined ? (
@@ -1158,6 +1209,8 @@ export function Directions({
   shown = true,
   submit: shared,
   headingRef,
+  onEditAnswers,
+  onNameRole,
 }: {
   workspaceId: string;
   profile: ProfileOut;
@@ -1171,6 +1224,8 @@ export function Directions({
   submit?: ReturnType<typeof useSubmitDiscovery>;
   /** Where focus lands when the person is brought here ("Help me explore instead"). */
   headingRef?: Ref<HTMLHeadingElement>;
+  onEditAnswers?: () => void;
+  onNameRole?: () => void;
 }) {
   const own = useSubmitDiscovery(workspaceId);
   const submit = shared ?? own;
@@ -1238,6 +1293,8 @@ export function Directions({
           choosePrimary={!stale}
           onSuggestAgain={start}
           suggestBlocked={blocked}
+          onEditAnswers={onEditAnswers}
+          onNameRole={onNameRole}
         />
       )}
     </section>

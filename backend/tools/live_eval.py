@@ -14,8 +14,7 @@ per run (two requests at most: the call and one validation repair), so the produ
 reservation refuses any retry at cost.
 
 Caps, checked before the stack starts, under the ledger's exclusive lock:
-- per invocation: at most `MAX_LIVE_CASES` cases, no production model, and a worst-case cost
-  cap;
+- per invocation: at most `MAX_LIVE_CASES` cases and a worst-case cost cap;
 - per budget scope (`live-eval`), cumulatively over the ledger: provider requests,
   production requests (none by default) and worst-case cost (`CAREERWRIGHT_LIVE_EVAL_*`).
 Afterwards the worker is stopped and every attempt of every case workspace is ledgered in
@@ -28,7 +27,7 @@ every container log and the API's responses are scanned for the key.
 2026-10-31) runs the cases on `muse-wonder-1.0` as the production model, still on synthetic
 workspaces and cases only (Wonder is a Standard-mode model), under its own per-invocation cap
 (`WONDER_MAX_COST_NANO_USD`) and in the scope `wonder-qualification`, which
-`make live-smoke WONDER=1` shares: $0.50 in all, every request a production request.
+`make live-smoke WONDER=1` shares: $5 in all, every request a production request.
 
 Run from `backend/`: `uv run --locked python -m tools.live_eval [--cases INT-01,DSC-01]
 [--wonder]`.
@@ -83,11 +82,9 @@ MAX_COST_NANO_USD = 50_000_000  # $0.05 worst case per invocation
 # own scope (`CAREERWRIGHT_LIVE_EVAL_SCOPE`).
 SCOPE_MAX_CALLS = 9
 SCOPE_MAX_COST_NANO_USD = 50_000_000
-# Per invocation with `--wonder` (Muse Wonder, the production model, in the shared scope
-# `wonder-qualification`): two interview cases ($0.176 worst case each on Wonder), or one
-# discovery case ($0.292 since Task 6g slice B's fix round); an explanation case ($0.584) is
-# refused.
-WONDER_MAX_COST_NANO_USD = 400_000_000
+# A production evaluation can contain several bounded cases while the shared scope still
+# caps cumulative requests and reserved cost.
+WONDER_MAX_COST_NANO_USD = 2_000_000_000
 RESULTS_PATH = REPO_ROOT / "docs" / "evidence" / "live-eval.md"
 EVAL_INTERVIEW = SmokeKind(
     "eval_interview",

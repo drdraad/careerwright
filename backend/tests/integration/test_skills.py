@@ -233,6 +233,53 @@ def test_the_person_chooses_spans_in_their_own_example_with_a_version_and_a_key(
     assert target(skills(api, ada, workspace_id), DATA)["examples"][0]["spans"] == []
 
 
+@pytest.mark.req("PROF-13", "MAP1-01")
+def test_a_part_chosen_in_an_advert_sits_beside_the_qualifications_that_name_it(
+    api: ApiClient, ada: str
+) -> None:
+    workspace_id = str(api.create_workspace(ada)["workspace_id"])
+    put = api.write(
+        "PUT",
+        f"/v1/workspaces/{workspace_id}/profile",
+        ada,
+        {
+            "expected_version": 0,
+            "profile": profile_with(
+                cities=["Manchester"],
+                target_titles=[DATA],
+                qualifications=[
+                    {"name": "Power BI", "status": "expected"},
+                    {"name": "SQL", "status": "achieved"},
+                ],
+            ),
+        },
+    )
+    assert put.status_code == 201, put.text
+    job_id = paste(api, ada, workspace_id, DATA)
+
+    chosen = select(
+        api,
+        ada,
+        workspace_id,
+        0,
+        job_id,
+        [span_of("write SQL to find duplicate"), span_of("Experience with Power BI")],
+    )
+    [example] = target(skills(api, ada, workspace_id), DATA)["examples"]
+
+    assert chosen.status_code == 201, chosen.text
+    assert [(s["excerpt"], s["entry_facts"]) for s in example["spans"]] == [
+        (
+            "write SQL to find duplicate",
+            [{"qualification": "SQL", "status": "achieved", "standing": "achieved_stated"}],
+        ),
+        (
+            "Experience with Power BI",
+            [{"qualification": "Power BI", "status": "expected", "standing": "expected_not_met"}],
+        ),
+    ]
+
+
 @pytest.mark.req("SEC-01", "SEC-02")
 def test_another_person_sees_and_chooses_none_of_it_and_the_choices_are_append_only(
     api: ApiClient, ada: str, ben: str, infra: Infra

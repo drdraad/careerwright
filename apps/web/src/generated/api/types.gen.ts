@@ -44,6 +44,21 @@ export type AbstractAction = {
 };
 
 /**
+ * AccountingPayment
+ */
+export type AccountingPayment = {
+    /**
+     * Variant Id
+     */
+    variant_id: string;
+    /**
+     * Due
+     */
+    due: string;
+    amount: Money;
+};
+
+/**
  * AcquisitionOut
  */
 export type AcquisitionOut = {
@@ -205,7 +220,7 @@ export type AdvertExample = {
     /**
      * Spans
      */
-    spans: Array<SelectedSpan>;
+    spans: Array<ChosenPart>;
 };
 
 /**
@@ -1139,6 +1154,10 @@ export type CatalogueLabel = {
      * Synthetic
      */
     synthetic: boolean;
+    /**
+     * Research Fingerprint
+     */
+    research_fingerprint?: string | null;
 };
 
 /**
@@ -1178,6 +1197,24 @@ export type Changed = {
      * The profile (its limits among it) has a newer version.
      */
     profile: boolean;
+    /**
+     * Capability
+     *
+     * The person's skill evidence has a newer version.
+     */
+    capability: boolean;
+    /**
+     * Target Matrix
+     *
+     * The target matrix or definition has changed.
+     */
+    target_matrix: boolean;
+    /**
+     * Option Pack
+     *
+     * The available options or their research have changed.
+     */
+    option_pack: boolean;
 };
 
 /**
@@ -1250,6 +1287,36 @@ export type ChooseClosest = {
 };
 
 /**
+ * ChoosePlan
+ */
+export type ChoosePlan = {
+    /**
+     * Expected Version
+     */
+    expected_version: number;
+    /**
+     * Solve Run Id
+     */
+    solve_run_id: string;
+    /**
+     * Schedule Index
+     */
+    schedule_index: number;
+    /**
+     * Assumptions Confirmed
+     *
+     * The person reviewed the route's consequential assumptions. This does not apply, enrol or resign.
+     */
+    assumptions_confirmed: true;
+    /**
+     * Full Horizon Accounting Acknowledged
+     *
+     * Required when completed steps exist: this solve has not recalculated sunk costs.
+     */
+    full_horizon_accounting_acknowledged?: boolean;
+};
+
+/**
  * ChooseRole
  *
  * The first answer: the ESCO occupation the person does now, or did last.
@@ -1301,6 +1368,35 @@ export type ChooseTarget = {
 };
 
 /**
+ * ChosenPart
+ *
+ * A part the person chose in one of their own example adverts, with the qualifications
+ * of theirs that name it.
+ */
+export type ChosenPart = {
+    /**
+     * Start
+     *
+     * Inclusive, in UTF-16 code units of the text.
+     */
+    start: number;
+    /**
+     * End
+     *
+     * Exclusive, in UTF-16 code units of the text.
+     */
+    end: number;
+    /**
+     * Excerpt
+     */
+    excerpt: string;
+    /**
+     * Entry Facts
+     */
+    entry_facts: Array<EntryFact>;
+};
+
+/**
  * Citation
  *
  * Where a value came from. A source value names its claim, span and exact excerpt.
@@ -1319,6 +1415,10 @@ export type Citation = {
      * Source Hash
      */
     source_hash?: string | null;
+    /**
+     * Source Url
+     */
+    source_url?: string | null;
     /**
      * Locator
      */
@@ -1614,6 +1714,8 @@ export type ComparisonBasis = {
      * Synthetic
      */
     synthetic: boolean;
+    opening_cash?: Money | null;
+    replan?: ReplanAccounting | null;
 };
 
 /**
@@ -2866,7 +2968,8 @@ export const ExclusionReason = {
     OVER_THE_LIMIT: 'over_the_limit',
     SITE_ROOT: 'site_root',
     NOT_RETURNED_BY_SEARCH: 'not_returned_by_search',
-    SEARCH_RESULTS_PAGE: 'search_results_page'
+    SEARCH_RESULTS_PAGE: 'search_results_page',
+    RIGHTS_REVIEW_REQUIRED: 'rights_review_required'
 } as const;
 
 /**
@@ -5527,6 +5630,146 @@ export type OptionFacts = {
 };
 
 /**
+ * OptionResearchCoverage
+ */
+export const OptionResearchCoverage = {
+    COMPLETE: 'complete',
+    PARTIAL: 'partial',
+    STOPPED: 'stopped',
+    NONE_READ: 'none_read'
+} as const;
+
+/**
+ * OptionResearchCoverage
+ */
+export type OptionResearchCoverage = typeof OptionResearchCoverage[keyof typeof OptionResearchCoverage];
+
+/**
+ * OptionResearchEstimateOut
+ */
+export type OptionResearchEstimateOut = {
+    /**
+     * Model Id
+     */
+    model_id: string;
+    model_mode: ModelMode;
+    /**
+     * Search Maximum Nano Usd
+     */
+    search_maximum_nano_usd: number;
+    /**
+     * Pages Maximum Nano Usd
+     */
+    pages_maximum_nano_usd: number;
+    /**
+     * Combined Maximum Nano Usd
+     */
+    combined_maximum_nano_usd: number;
+    /**
+     * Hard Maximum Nano Usd
+     */
+    hard_maximum_nano_usd: number;
+    refused_scope: BudgetScope | null;
+};
+
+/**
+ * OptionResearchOut
+ */
+export type OptionResearchOut = {
+    /**
+     * Research Id
+     */
+    research_id: string;
+    /**
+     * Target
+     */
+    target: string;
+    /**
+     * City
+     */
+    city: string;
+    status: ResearchStatus;
+    coverage: OptionResearchCoverage;
+    search: RunOut;
+    reading: RunOut | null;
+    /**
+     * Candidates
+     */
+    candidates: number;
+    empty_reason: SearchEmptyReason | null;
+    /**
+     * Pages Attempted
+     */
+    pages_attempted: number;
+    /**
+     * Pages Read
+     */
+    pages_read: number;
+    /**
+     * Pages Blocked
+     */
+    pages_blocked: number;
+    /**
+     * Pages Failed
+     */
+    pages_failed: number;
+    /**
+     * Failure Reason
+     */
+    failure_reason: string | null;
+    /**
+     * Records
+     */
+    records: Array<OptionResearchRecordOut>;
+};
+
+/**
+ * OptionResearchRecordOut
+ */
+export type OptionResearchRecordOut = {
+    /**
+     * Record Id
+     */
+    record_id: string;
+    /**
+     * Kind
+     */
+    kind: 'course' | 'apprenticeship' | 'funding';
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Source Url
+     */
+    source_url: string;
+    /**
+     * Retrieved On
+     */
+    retrieved_on: string;
+    /**
+     * Expires On
+     */
+    expires_on: string;
+    /**
+     * Expired
+     */
+    expired: boolean;
+    /**
+     * Review State
+     */
+    review_state?: 'proposed';
+    /**
+     * Citations
+     *
+     * Each accepted field's source hash, verified offset and exact excerpt.
+     */
+    citations: {
+        [key: string]: Citation;
+    };
+};
+
+/**
  * OptionTextOut
  *
  * A pasted text as it was kept (third parties' contact details removed): spans of an
@@ -6359,6 +6602,346 @@ export type PlaceOut = {
 };
 
 /**
+ * PlanActivity
+ */
+export type PlanActivity = {
+    /**
+     * Kind
+     */
+    kind: 'step_completed' | 'step_retracted' | 'commitment_accepted' | 'commitment_retracted' | 'rest' | 'resume' | 'review_rescheduled';
+    /**
+     * Variant Id
+     */
+    variant_id: string | null;
+    /**
+     * Until
+     */
+    until: string | null;
+    /**
+     * Recorded At
+     */
+    recorded_at: string;
+    /**
+     * Step Title
+     *
+     * The step's title when this report was made; null for earlier records.
+     */
+    step_title?: string | null;
+};
+
+/**
+ * PlanChanges
+ *
+ * Conservative invalidation: a changed source may affect any unfinished route step.
+ */
+export type PlanChanges = {
+    /**
+     * Plan Version
+     */
+    plan_version: number;
+    /**
+     * Profile
+     */
+    profile: boolean;
+    /**
+     * Planning Inputs
+     */
+    planning_inputs: boolean;
+    /**
+     * Capability
+     */
+    capability: boolean;
+    /**
+     * Target Matrix
+     */
+    target_matrix: boolean;
+    /**
+     * Option Pack
+     */
+    option_pack: boolean;
+    /**
+     * Possibly Affected Steps
+     */
+    possibly_affected_steps: Array<string>;
+    /**
+     * New Solve Needed
+     */
+    new_solve_needed: boolean;
+};
+
+/**
+ * PlanDifference
+ */
+export type PlanDifference = {
+    /**
+     * Added Steps
+     */
+    added_steps: Array<string>;
+    /**
+     * Removed Steps
+     */
+    removed_steps: Array<string>;
+    /**
+     * Changed Steps
+     */
+    changed_steps: Array<string>;
+    /**
+     * Old Readiness Month
+     */
+    old_readiness_month: string;
+    /**
+     * New Readiness Month
+     */
+    new_readiness_month: string;
+    old_direct_cost: Money;
+    new_direct_cost: Money;
+    old_economic_cost: SignedMoney | null;
+    new_economic_cost: SignedMoney | null;
+    /**
+     * Same Accounting Basis
+     */
+    same_accounting_basis: boolean;
+    old_basis: ComparisonBasis;
+    new_basis: ComparisonBasis;
+    /**
+     * Remaining Horizon Recalculated
+     */
+    remaining_horizon_recalculated?: boolean;
+};
+
+/**
+ * PlanEvent
+ */
+export type PlanEvent = {
+    /**
+     * Key
+     */
+    key: string;
+    /**
+     * Kind
+     */
+    kind: 'start' | 'finish' | 'application_deadline' | 'review';
+    /**
+     * Variant Id
+     */
+    variant_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * On
+     */
+    on: string;
+    /**
+     * Conditional
+     */
+    conditional: boolean;
+    /**
+     * Proposed
+     */
+    proposed?: true;
+};
+
+/**
+ * PlanHistoryItem
+ */
+export type PlanHistoryItem = {
+    /**
+     * Version
+     */
+    version: number;
+    /**
+     * Plan Id
+     */
+    plan_id: string;
+    /**
+     * Target Title
+     */
+    target_title: string;
+    /**
+     * Selected At
+     */
+    selected_at: string;
+    /**
+     * Last Activity At
+     */
+    last_activity_at: string | null;
+    /**
+     * Solve Run Id
+     */
+    solve_run_id: string;
+    /**
+     * Schedule Index
+     */
+    schedule_index: number;
+    /**
+     * Completed Steps
+     */
+    completed_steps: number;
+};
+
+/**
+ * PlanProgress
+ *
+ * Planning activity is self-reported, never new skill or credential evidence.
+ */
+export type PlanProgress = {
+    /**
+     * Completed Steps
+     */
+    completed_steps?: Array<string>;
+    /**
+     * Rest Until
+     */
+    rest_until?: string | null;
+    /**
+     * Review On
+     */
+    review_on?: string | null;
+    /**
+     * Activity
+     */
+    activity?: Array<PlanActivity>;
+};
+
+/**
+ * PlanRevisionPreview
+ *
+ * A read-only proposal. Accepting it is a separate expected-version plan write.
+ */
+export type PlanRevisionPreview = {
+    /**
+     * From Version
+     */
+    from_version: number;
+    /**
+     * Proposed Solve Run Id
+     */
+    proposed_solve_run_id: string;
+    /**
+     * Proposed Schedule Index
+     */
+    proposed_schedule_index: number;
+    proposed_route: RouteDetail;
+    proposed_search: PlanSearch;
+    difference: PlanDifference;
+    /**
+     * Completed Steps
+     */
+    completed_steps: Array<string>;
+};
+
+/**
+ * PlanSearch
+ */
+export type PlanSearch = {
+    coverage: SearchCoverage;
+    stop_reason: StopReason | null;
+    instance: InstanceSize;
+    limits: M0SearchLimits;
+};
+
+/**
+ * PlanSnapshot
+ */
+export type PlanSnapshot = {
+    /**
+     * Plan Id
+     */
+    plan_id: string;
+    /**
+     * Version
+     */
+    version: number;
+    /**
+     * Workspace Id
+     */
+    workspace_id: string;
+    /**
+     * Selected At
+     */
+    selected_at: string;
+    /**
+     * Selected By
+     */
+    selected_by: string;
+    /**
+     * Assumptions Confirmed
+     */
+    assumptions_confirmed?: true;
+    /**
+     * Commitments
+     *
+     * Accepted commitments on unchanged current steps; prior reports remain in activity.
+     */
+    commitments?: Array<string>;
+    /**
+     * Target Title
+     */
+    target_title: string;
+    source: PlanSource;
+    search: PlanSearch;
+    route: RouteDetail;
+    /**
+     * Events
+     */
+    events: Array<PlanEvent>;
+    next_action: PlanEvent | null;
+    progress?: PlanProgress;
+};
+
+/**
+ * PlanSource
+ */
+export type PlanSource = {
+    /**
+     * Solve Run Id
+     */
+    solve_run_id: string;
+    /**
+     * Solve Id
+     */
+    solve_id: string;
+    /**
+     * Schedule Index
+     */
+    schedule_index: number;
+    /**
+     * Profile Version
+     */
+    profile_version: number;
+    /**
+     * Inputs Version
+     */
+    inputs_version: number;
+    /**
+     * Capability Version
+     */
+    capability_version: number;
+    /**
+     * Input Version
+     */
+    input_version: string;
+    /**
+     * Matrix Version
+     */
+    matrix_version: string;
+    /**
+     * Definition Version
+     */
+    definition_version: string;
+    /**
+     * Algorithm Version
+     */
+    algorithm_version: string;
+    /**
+     * Pruning Version
+     */
+    pruning_version: string;
+};
+
+/**
  * PlanningInputsDocument
  *
  * A stored version's content.
@@ -6941,6 +7524,30 @@ export type ProfileWriteIn = {
      */
     expected_version: number;
     profile: ProfileInput;
+};
+
+/**
+ * ProgressUpdate
+ *
+ * A user's action report or pause; dates never rewrite the route's modelled timetable.
+ */
+export type ProgressUpdate = {
+    /**
+     * Expected Version
+     */
+    expected_version: number;
+    /**
+     * Kind
+     */
+    kind: 'step_completed' | 'step_retracted' | 'commitment_accepted' | 'commitment_retracted' | 'rest' | 'resume' | 'review_rescheduled';
+    /**
+     * Variant Id
+     */
+    variant_id?: string | null;
+    /**
+     * Until
+     */
+    until?: string | null;
 };
 
 /**
@@ -7966,6 +8573,92 @@ export type RenameWorkspaceIn = {
 };
 
 /**
+ * ReplanAccounting
+ */
+export type ReplanAccounting = {
+    /**
+     * From Plan Version
+     */
+    from_plan_version: number;
+    /**
+     * Completed Variants
+     */
+    completed_variants: Array<string>;
+    /**
+     * Excluded Variants
+     */
+    excluded_variants: Array<string>;
+    sunk_paid: Money;
+    /**
+     * Remaining Payments
+     */
+    remaining_payments: Array<AccountingPayment>;
+};
+
+/**
+ * ReplanPayment
+ */
+export type ReplanPayment = {
+    /**
+     * Variant Id
+     */
+    variant_id: string;
+    /**
+     * Due
+     */
+    due: string;
+    amount: Money;
+};
+
+/**
+ * ReplanRequest
+ *
+ * The person's confirmed actuals for the remaining part of a chosen plan.
+ */
+export type ReplanRequest = {
+    /**
+     * Expected Inputs Version
+     *
+     * The planning inputs version the person saw.
+     */
+    expected_inputs_version: number;
+    /**
+     * Target
+     *
+     * One of the profile's target titles.
+     */
+    target: string;
+    /**
+     * Planning Start
+     *
+     * The comparison's first month, as YYYY-MM: this month or later.
+     */
+    planning_start: string;
+    /**
+     * Horizon Months
+     */
+    horizon_months: number;
+    /**
+     * Expected Plan Version
+     */
+    expected_plan_version: number;
+    opening_cash: Money;
+    sunk_paid: Money;
+    /**
+     * Remaining Payments
+     */
+    remaining_payments: Array<ReplanPayment>;
+    /**
+     * All Remaining Payments Confirmed
+     */
+    all_remaining_payments_confirmed: true;
+    /**
+     * No Ongoing Steps Confirmed
+     */
+    no_ongoing_steps_confirmed: true;
+};
+
+/**
  * Requirement
  *
  * A required row of the target's matrix: what the target asks.
@@ -8015,6 +8708,18 @@ export type Requirement = {
      * Entry Facts
      */
     entry_facts: Array<EntryFact>;
+    latest_holding: Holding | null;
+    /**
+     * Source Urls
+     */
+    source_urls: Array<string>;
+    /**
+     * Rubric Anchors
+     */
+    rubric_anchors: {
+        [key: string]: string;
+    };
+    latest_skill: SavedSkillAnswer | null;
 };
 
 /**
@@ -8041,6 +8746,24 @@ export const ResearchState = {
  * does or doesn't exist, only what Careerwright checked.
  */
 export type ResearchState = typeof ResearchState[keyof typeof ResearchState];
+
+/**
+ * ResearchStatus
+ */
+export const ResearchStatus = {
+    SEARCHING: 'searching',
+    SEARCH_STOPPED: 'search_stopped',
+    NO_PAGES: 'no_pages',
+    READY_TO_READ: 'ready_to_read',
+    READING: 'reading',
+    COMPLETED: 'completed',
+    READING_STOPPED: 'reading_stopped'
+} as const;
+
+/**
+ * ResearchStatus
+ */
+export type ResearchStatus = typeof ResearchStatus[keyof typeof ResearchStatus];
 
 /**
  * Resolution
@@ -9078,6 +9801,27 @@ export const SalaryPeriod = {
 export type SalaryPeriod = typeof SalaryPeriod[keyof typeof SalaryPeriod];
 
 /**
+ * SavedSkillAnswer
+ *
+ * The person's latest self-report against this row's rubric, for a later correction.
+ */
+export type SavedSkillAnswer = {
+    answer: Answer;
+    /**
+     * Self Assessed Level
+     */
+    self_assessed_level: number | null;
+    /**
+     * Example
+     */
+    example: string | null;
+    /**
+     * Last Done
+     */
+    last_done: string | null;
+};
+
+/**
  * Scenario
  */
 export const Scenario = {
@@ -9505,7 +10249,11 @@ export type SearchProposal = {
  *
  * What a source search looks for (ADR 0009 decision 12, amendment).
  */
-export const SearchPurpose = { JOB_POSTINGS: 'job_postings', ROLE_RESEARCH: 'role_research' } as const;
+export const SearchPurpose = {
+    JOB_POSTINGS: 'job_postings',
+    ROLE_RESEARCH: 'role_research',
+    OPTION_RESEARCH: 'option_research'
+} as const;
 
 /**
  * SearchPurpose
@@ -9710,28 +10458,6 @@ export type SelectAdvertSpans = {
      * Spans
      */
     spans: Array<AdvertSpan>;
-};
-
-/**
- * SelectedSpan
- */
-export type SelectedSpan = {
-    /**
-     * Start
-     *
-     * Inclusive, in UTF-16 code units of the text.
-     */
-    start: number;
-    /**
-     * End
-     *
-     * Exclusive, in UTF-16 code units of the text.
-     */
-    end: number;
-    /**
-     * Excerpt
-     */
-    excerpt: string;
 };
 
 /**
@@ -10357,6 +11083,12 @@ export type SolveOut = {
      */
     code: 'SOLVE_LIMIT_REACHED' | 'NO_ROUTE_IN_BOUNDED_MODEL' | null;
     result: SearchResult | null;
+    /**
+     * Remaining Horizon Recalculated
+     *
+     * Null until complete; true only for a solve using confirmed remaining actuals.
+     */
+    remaining_horizon_recalculated?: boolean | null;
 };
 
 /**
@@ -10753,6 +11485,24 @@ export const StartBasis = { OWN_FIGURE: 'own_figure', STATED_INTAKE: 'stated_int
  * StartBasis
  */
 export type StartBasis = typeof StartBasis[keyof typeof StartBasis];
+
+/**
+ * StartOptionResearch
+ */
+export type StartOptionResearch = {
+    /**
+     * Expected Profile Version
+     */
+    expected_profile_version: number;
+    /**
+     * Target
+     */
+    target: string;
+    /**
+     * City
+     */
+    city: string;
+};
 
 /**
  * StartRoleResearch
@@ -13243,7 +13993,7 @@ export type WorkspaceExport = {
     /**
      * Format Version
      */
-    format_version?: 5;
+    format_version?: 6;
     /**
      * Exported At
      */
@@ -13290,6 +14040,12 @@ export type WorkspaceExport = {
      */
     discoveries: Array<DiscoveryOut>;
     interview_preferences: PreferencesOut;
+    /**
+     * Plans
+     *
+     * Chosen plan versions, oldest first.
+     */
+    plans: Array<PlanSnapshot>;
     spend: SpendOut;
 };
 
@@ -16231,6 +16987,202 @@ export type FavouriteJobResponses = {
 
 export type FavouriteJobResponse = FavouriteJobResponses[keyof FavouriteJobResponses];
 
+export type EstimateOptionResearchData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/option-research/estimate';
+};
+
+export type EstimateOptionResearchErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type EstimateOptionResearchError = EstimateOptionResearchErrors[keyof EstimateOptionResearchErrors];
+
+export type EstimateOptionResearchResponses = {
+    /**
+     * Successful Response
+     */
+    200: OptionResearchEstimateOut;
+};
+
+export type EstimateOptionResearchResponse = EstimateOptionResearchResponses[keyof EstimateOptionResearchResponses];
+
+export type ListOptionResearchData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/option-research';
+};
+
+export type ListOptionResearchErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type ListOptionResearchError = ListOptionResearchErrors[keyof ListOptionResearchErrors];
+
+export type ListOptionResearchResponses = {
+    /**
+     * Response List Option Research
+     *
+     * Successful Response
+     */
+    200: Array<OptionResearchOut>;
+};
+
+export type ListOptionResearchResponse = ListOptionResearchResponses[keyof ListOptionResearchResponses];
+
+export type StartOptionResearchData = {
+    body: StartOptionResearch;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/option-research';
+};
+
+export type StartOptionResearchErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type StartOptionResearchError = StartOptionResearchErrors[keyof StartOptionResearchErrors];
+
+export type StartOptionResearchResponses = {
+    /**
+     * Successful Response
+     */
+    202: OptionResearchOut;
+};
+
+export type StartOptionResearchResponse = StartOptionResearchResponses[keyof StartOptionResearchResponses];
+
+export type GetOptionResearchData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Research Id
+         */
+        research_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/option-research/{research_id}';
+};
+
+export type GetOptionResearchErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetOptionResearchError = GetOptionResearchErrors[keyof GetOptionResearchErrors];
+
+export type GetOptionResearchResponses = {
+    /**
+     * Successful Response
+     */
+    200: OptionResearchOut;
+};
+
+export type GetOptionResearchResponse = GetOptionResearchResponses[keyof GetOptionResearchResponses];
+
+export type ReadOptionPagesData = {
+    body?: never;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Research Id
+         */
+        research_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/option-research/{research_id}/reading';
+};
+
+export type ReadOptionPagesErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type ReadOptionPagesError = ReadOptionPagesErrors[keyof ReadOptionPagesErrors];
+
+export type ReadOptionPagesResponses = {
+    /**
+     * Successful Response
+     */
+    202: OptionResearchOut;
+};
+
+export type ReadOptionPagesResponse = ReadOptionPagesResponses[keyof ReadOptionPagesResponses];
+
 export type GetOccupationEvidenceData = {
     body?: never;
     path: {
@@ -16893,6 +17845,52 @@ export type RequestRouteSolveResponses = {
 
 export type RequestRouteSolveResponse = RequestRouteSolveResponses[keyof RequestRouteSolveResponses];
 
+export type RequestRemainingRouteSolveData = {
+    body: ReplanRequest;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/planning/solves/replan';
+};
+
+export type RequestRemainingRouteSolveErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type RequestRemainingRouteSolveError = RequestRemainingRouteSolveErrors[keyof RequestRemainingRouteSolveErrors];
+
+export type RequestRemainingRouteSolveResponses = {
+    /**
+     * The same solve is under way: joined.
+     */
+    200: SolveOut;
+    /**
+     * Successful Response
+     */
+    202: SolveOut;
+};
+
+export type RequestRemainingRouteSolveResponse = RequestRemainingRouteSolveResponses[keyof RequestRemainingRouteSolveResponses];
+
 export type GetRouteSolveData = {
     body?: never;
     path: {
@@ -16930,6 +17928,356 @@ export type GetRouteSolveResponses = {
 };
 
 export type GetRouteSolveResponse = GetRouteSolveResponses[keyof GetRouteSolveResponses];
+
+export type ChoosePlanData = {
+    body: ChoosePlan;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/planning/plans';
+};
+
+export type ChoosePlanErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type ChoosePlanError = ChoosePlanErrors[keyof ChoosePlanErrors];
+
+export type ChoosePlanResponses = {
+    /**
+     * Successful Response
+     */
+    201: PlanSnapshot;
+};
+
+export type ChoosePlanResponse = ChoosePlanResponses[keyof ChoosePlanResponses];
+
+export type GetCurrentPlanData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/planning/plans/current';
+};
+
+export type GetCurrentPlanErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetCurrentPlanError = GetCurrentPlanErrors[keyof GetCurrentPlanErrors];
+
+export type GetCurrentPlanResponses = {
+    /**
+     * Successful Response
+     */
+    200: PlanSnapshot;
+};
+
+export type GetCurrentPlanResponse = GetCurrentPlanResponses[keyof GetCurrentPlanResponses];
+
+export type ListPlanVersionsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/planning/plans/history';
+};
+
+export type ListPlanVersionsErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type ListPlanVersionsError = ListPlanVersionsErrors[keyof ListPlanVersionsErrors];
+
+export type ListPlanVersionsResponses = {
+    /**
+     * Response List Plan Versions
+     *
+     * Successful Response
+     */
+    200: Array<PlanHistoryItem>;
+};
+
+export type ListPlanVersionsResponse = ListPlanVersionsResponses[keyof ListPlanVersionsResponses];
+
+export type GetPlanChangesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/planning/plans/changes';
+};
+
+export type GetPlanChangesErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetPlanChangesError = GetPlanChangesErrors[keyof GetPlanChangesErrors];
+
+export type GetPlanChangesResponses = {
+    /**
+     * Successful Response
+     */
+    200: PlanChanges;
+};
+
+export type GetPlanChangesResponse = GetPlanChangesResponses[keyof GetPlanChangesResponses];
+
+export type PreviewPlanRevisionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query: {
+        /**
+         * Solve Run Id
+         */
+        solve_run_id: string;
+        /**
+         * Schedule Index
+         */
+        schedule_index: number;
+    };
+    url: '/v1/workspaces/{workspace_id}/planning/plans/revision-preview';
+};
+
+export type PreviewPlanRevisionErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type PreviewPlanRevisionError = PreviewPlanRevisionErrors[keyof PreviewPlanRevisionErrors];
+
+export type PreviewPlanRevisionResponses = {
+    /**
+     * Successful Response
+     */
+    200: PlanRevisionPreview;
+};
+
+export type PreviewPlanRevisionResponse = PreviewPlanRevisionResponses[keyof PreviewPlanRevisionResponses];
+
+export type RecordPlanProgressData = {
+    body: ProgressUpdate;
+    headers?: {
+        /**
+         * Idempotency-Key
+         *
+         * A UUID chosen by the client per intended change; retries reuse it.
+         */
+        'Idempotency-Key'?: string | null;
+    };
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/planning/plans/progress';
+};
+
+export type RecordPlanProgressErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type RecordPlanProgressError = RecordPlanProgressErrors[keyof RecordPlanProgressErrors];
+
+export type RecordPlanProgressResponses = {
+    /**
+     * Successful Response
+     */
+    201: PlanSnapshot;
+};
+
+export type RecordPlanProgressResponse = RecordPlanProgressResponses[keyof RecordPlanProgressResponses];
+
+export type GetPlanVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Version
+         */
+        version: number;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/planning/plans/{version}';
+};
+
+export type GetPlanVersionErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type GetPlanVersionError = GetPlanVersionErrors[keyof GetPlanVersionErrors];
+
+export type GetPlanVersionResponses = {
+    /**
+     * Successful Response
+     */
+    200: PlanSnapshot;
+};
+
+export type GetPlanVersionResponse = GetPlanVersionResponses[keyof GetPlanVersionResponses];
+
+export type ExportPlanJsonData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Version
+         */
+        version: number;
+    };
+    query?: {
+        /**
+         * Omit Financial Detail
+         */
+        omit_financial_detail?: boolean;
+        /**
+         * Omit Sensitive Detail
+         */
+        omit_sensitive_detail?: boolean;
+    };
+    url: '/v1/workspaces/{workspace_id}/planning/plans/{version}/export.json';
+};
+
+export type ExportPlanJsonErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type ExportPlanJsonError = ExportPlanJsonErrors[keyof ExportPlanJsonErrors];
+
+export type ExportPlanJsonResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type ExportPlanCalendarData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Version
+         */
+        version: number;
+    };
+    query?: never;
+    url: '/v1/workspaces/{workspace_id}/planning/plans/{version}/calendar.ics';
+};
+
+export type ExportPlanCalendarErrors = {
+    /**
+     * Typed error envelope
+     */
+    '4XX': ErrorEnvelope;
+    /**
+     * Typed error envelope
+     */
+    '5XX': ErrorEnvelope;
+};
+
+export type ExportPlanCalendarError = ExportPlanCalendarErrors[keyof ExportPlanCalendarErrors];
+
+export type ExportPlanCalendarResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
 
 export type GetRouteComparisonData = {
     body?: never;

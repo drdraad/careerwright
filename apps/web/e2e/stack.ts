@@ -7,7 +7,16 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const PROJECT = "careerwright-l0-webtest";
-export const PORTS = { web: 57600, api: 57700, auth: 57799, postgres: 57832 };
+const portBase = Number(process.env.CAREERWRIGHT_E2E_PORT_BASE ?? "57600");
+if (!Number.isInteger(portBase) || portBase < 1024 || portBase + 232 > 65535) {
+  throw new Error("CAREERWRIGHT_E2E_PORT_BASE must leave room for four local test ports");
+}
+export const PORTS = {
+  web: portBase,
+  api: portBase + 100,
+  auth: portBase + 199,
+  postgres: portBase + 232,
+};
 export const WEB_ORIGIN = `http://127.0.0.1:${PORTS.web}`;
 export const AUTH_ORIGIN = `http://127.0.0.1:${PORTS.auth}`;
 export const FIXTURE_WORKSPACE = "74fa4514-899d-5316-80fd-4161dc0dbda0";

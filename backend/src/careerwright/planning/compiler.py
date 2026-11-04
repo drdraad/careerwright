@@ -112,6 +112,24 @@ class ExistingDebt(StrictModel):
     cited: Citation
 
 
+class RemainingPayment(StrictModel):
+    """A confirmed old contractual payment still due, independent of new route choices."""
+
+    variant_id: str
+    due: date
+    amount_minor: Minor
+
+
+class ReplanBasis(StrictModel):
+    """Actuals and obligations declared for a new, shorter accounting window."""
+
+    from_plan_version: int = Field(ge=1)
+    completed_variants: list[str]
+    excluded_variants: list[str]
+    sunk_paid_minor: Minor
+    remaining_payments: list[RemainingPayment]
+
+
 class PlanningInputs(StrictModel):
     """The person's confirmed planning inputs for one comparison: one start, horizon,
     currency, baseline and continuation for every route (FIN1-12). Unknown is None, never 0."""
@@ -136,6 +154,7 @@ class PlanningInputs(StrictModel):
     weekly_availability_by_month: list[Hours] | None  # the minimum weekly hours in each month
     commitments: list[Commitment] = Field(default_factory=list)
     existing_debts: list[ExistingDebt] = Field(default_factory=list)
+    replan: ReplanBasis | None = None
     initial_gates: list[str] = Field(default_factory=list)  # verified in the initial state
     # How much later the delay scenario moves every conditional offer and award: declared once
     # for the comparison, so every route meets the same stress case (PLN-08).
@@ -235,6 +254,7 @@ class CompiledVariant(StrictModel):
     title: str | None = None
     provider: str | None = None
     as_of: date | None = None
+    sources: list[Citation] = Field(default_factory=list)
 
     @property
     def conditional_offer(self) -> bool:
@@ -391,6 +411,18 @@ def compile_input(
                 title=concept.title,
                 provider=concept.provider,
                 as_of=offering.as_of or concept.as_of,
+                sources=[
+                    cited
+                    for cited in (
+                        concept.cited,
+                        offering.cited,
+                        *(f.cited for f in concept.facts),
+                        *(f.cited for f in concept.entry_requirements),
+                        *(f.cited for f in offering.facts),
+                        *(f.cited for f in offering.eligibility_conditions),
+                    )
+                    if cited is not None
+                ],
             )
         )
     exclusions = {

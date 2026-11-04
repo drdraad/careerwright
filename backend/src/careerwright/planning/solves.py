@@ -16,9 +16,11 @@ then it is a new run.
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
+from typing import Literal
+from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from careerwright.capability.commands import CapabilityData, capability_view
 from careerwright.capability.evidence import Month as MonthText
@@ -32,12 +34,21 @@ from careerwright.identity.keyring import Keyring
 from careerwright.identity.records import Run, RunKind
 from careerwright.identity.runs import open_output, submit_keyless_run, visible_run
 from careerwright.identity.workspaces import visible_workspace
+from careerwright.money import Money
 from careerwright.planning import store
+from careerwright.planning.catalogue import Catalogue
 from careerwright.planning.checkpoint import expected_entry
 from careerwright.planning.commands import current_inputs, person_entry, target_catalogues
-from careerwright.planning.compiler import MonthlyInput, ReadinessBasis, compile_input
-from careerwright.planning.inputs import decided_outcomes, prepare
+from careerwright.planning.compiler import (
+    MonthlyInput,
+    ReadinessBasis,
+    RemainingPayment,
+    ReplanBasis,
+    compile_input,
+)
+from careerwright.planning.inputs import Prepared, decided_outcomes, prepare
 from careerwright.planning.months import MAX_HORIZON_MONTHS, Month
+from careerwright.planning.plan_records import PlanSnapshot
 from careerwright.planning.search import (
     ALGORITHM_VERSION,
     PRUNING_VERSION,
@@ -73,6 +84,32 @@ class SolveRequest(BaseModel):
     horizon_months: int = Field(ge=1, le=MAX_HORIZON_MONTHS)
 
 
+class ReplanPayment(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    variant_id: str
+    due: date
+    amount: Money
+
+
+class ReplanRequest(SolveRequest):
+    """The person's confirmed actuals for the remaining part of a chosen plan."""
+
+    expected_plan_version: int = Field(ge=1)
+    opening_cash: Money
+    sunk_paid: Money
+    remaining_payments: list[ReplanPayment]
+    all_remaining_payments_confirmed: Literal[True]
+    no_ongoing_steps_confirmed: Literal[True]
+
+    @model_validator(mode="after")
+    def unique_payments(self) -> "ReplanRequest":
+        keys = [(p.variant_id, p.due) for p in self.remaining_payments]
+        if len(keys) != len(set(keys)):
+            raise ValueError("combine payments for one step on the same date")
+        return self
+
+
 @dataclass(frozen=True)
 class SolveView:
     run: Run
@@ -93,6 +130,43 @@ def _refused(reason: str, **details: str) -> CareerwrightError:
     )
 
 
+def _completed_for_replan(previous: PlanSnapshot, payments: list[ReplanPayment]) -> list[str]:
+    """An unfinished committed step's work and outcomes cannot be dropped from a replan."""
+    completed = set(previous.progress.completed_steps)
+    if previous.route.basis.replan is not None:
+        completed.update(previous.route.basis.replan.completed_variants)
+    unfinished = next((v for v in previous.commitments if v not in completed), None)
+    if unfinished is None:
+        unfinished = next((p.variant_id for p in payments if p.variant_id not in completed), None)
+    if unfinished is not None:
+        raise _refused("ongoing_step_not_modelled", variant_id=unfinished)
+    return sorted(completed)
+
+
+def _excluded_for_replan(
+    previous: PlanSnapshot, completed: list[str], catalogue: Catalogue
+) -> list[str]:
+    """Completing a course also excludes its other modes and payment plans."""
+    excluded = set(completed)
+    if previous.route.basis.replan is not None:
+        excluded.update(previous.route.basis.replan.excluded_variants)
+    completed_concepts = {
+        step.concept_id for step in previous.route.steps if step.variant_id in excluded
+    }
+    concepts = {offering.offering_id: offering.concept_id for offering in catalogue.offerings}
+    completed_concepts.update(
+        concepts[variant.offering_id]
+        for variant in catalogue.variants
+        if variant.variant_id in excluded
+    )
+    excluded.update(
+        variant.variant_id
+        for variant in catalogue.variants
+        if concepts[variant.offering_id] in completed_concepts
+    )
+    return sorted(excluded)
+
+
 def request_solve(
     tx: Tx,
     actor: Actor,
@@ -108,6 +182,32 @@ def request_solve(
     # Locked first, as every planning write is: the snapshot reads one state of the inputs,
     # and two asks for the same solve are one.
     visible_workspace(tx, workspace_id, lock=True)
+    previous = None
+    completed: list[str] = []
+    if isinstance(request, ReplanRequest):
+        previous = store.plan(tx, workspace_id)
+        if previous is None:
+            raise _refused("no_chosen_plan")
+        if previous.version != request.expected_plan_version:
+            raise store.stale_version(previous.version)
+        if title_key(request.target) != title_key(previous.target_title):
+            raise _refused("replan_target_changed")
+        first = Month.parse(request.planning_start)
+        end = Month.parse(previous.route.basis.planning_start).plus(
+            previous.route.basis.horizon_months
+        )
+        if first < Month.parse(previous.route.basis.planning_start) or not first < end:
+            raise _refused("outside_remaining_horizon")
+        if request.horizon_months != end.months_after(first):
+            raise _refused("not_remaining_horizon")
+        prior_ids = {step.variant_id for step in previous.route.steps}
+        if previous.route.basis.replan is not None:
+            prior_ids.update(previous.route.basis.replan.excluded_variants)
+        if any(p.variant_id not in prior_ids for p in request.remaining_payments):
+            raise _refused("unknown_prior_commitment")
+        if any(Month.of(p.due) < first for p in request.remaining_payments):
+            raise _refused("payment_before_replan_start")
+        completed = _completed_for_replan(previous, request.remaining_payments)
     inputs = current_inputs(tx, workspace_id)
     if request.expected_inputs_version != inputs.version:
         raise store.stale_version(inputs.version)
@@ -125,7 +225,7 @@ def request_solve(
     if options.catalogue is None:
         raise _refused("no_options", note=options.note or "no_pack_target")
     start = Month.parse(request.planning_start)
-    if start < Month.of(now.date()):
+    if start < Month.of(now.astimezone(ZoneInfo("Europe/London")).date()):
         raise _refused("planning_start_past")
     profile = current_profile(tx, workspace_id).document
     qualifications, keys = person_entry(tx, profile, [options.catalogue])
@@ -139,6 +239,37 @@ def request_solve(
         version=inputs.version,
         expected_entry=expected_entry(options.catalogue, qualifications, keys),
     )
+    if previous is not None and isinstance(request, ReplanRequest):
+        excluded = _excluded_for_replan(previous, completed, prepared.catalogue)
+        remaining = [
+            RemainingPayment(
+                variant_id=p.variant_id,
+                due=p.due,
+                amount_minor=p.amount.minor_units,
+            )
+            for p in request.remaining_payments
+        ]
+        prepared = Prepared(
+            inputs=prepared.inputs.model_copy(
+                update={
+                    "opening_cash_minor": request.opening_cash.minor_units,
+                    "replan": ReplanBasis(
+                        from_plan_version=previous.version,
+                        completed_variants=completed,
+                        excluded_variants=excluded,
+                        sunk_paid_minor=request.sunk_paid.minor_units,
+                        remaining_payments=remaining,
+                    ),
+                }
+            ),
+            catalogue=prepared.catalogue.model_copy(
+                update={
+                    "variants": [
+                        v for v in prepared.catalogue.variants if v.variant_id not in excluded
+                    ]
+                }
+            ),
+        )
     basis = ReadinessBasis(
         matrix=matrix,
         evidence=view.evidence,

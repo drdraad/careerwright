@@ -181,7 +181,9 @@ const suggestion = (
       release: "esco-v1.2.1-en-csv",
     },
   ],
-  workday: `${title} work, as ESCO describes it: a synthetic description for this story.`,
+  // As long as a real one (the API sends up to 360 characters of ESCO's description), so the
+  // open card shows what it says first and what waits one step away.
+  workday: `${title} work, as ESCO describes it: a synthetic description for this story. It goes on, as ESCO's own descriptions do, to name the tasks, the tools and the places of the work, and the people it is done with, at the length the API sends, so the open card shows the rest one step away.`,
   reasons: [
     {
       reason: "searched_through_skill",

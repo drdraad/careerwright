@@ -141,11 +141,12 @@ test("[PROF-08][MODEL-03][STATE-06][PROF-04][REC1-07][REC1-11][STATE-05][BND1-11
   const first = directions.getByRole("article").first();
   await expect(first).toBeVisible({ timeout: 60_000 });
   await expect(first.getByText("Why this could suit you")).toBeVisible();
-  // The slate's one written note (S2.7), here the demo explainer's: labelled, its quotations
-  // checked, and above how Careerwright found the suggestion, which stays.
-  await expect(first.getByText(/Written by the demo explainer \(synthetic\)/)).toBeVisible({
+  // The note's quotations and how Careerwright found the suggestion wait one step away.
+  await expect(first.getByText(/Written by the demo explainer \(synthetic\)/)).toHaveCount(1, {
     timeout: 60_000,
   });
+  await first.getByText("More about this role").click();
+  await expect(first.getByText(/Written by the demo explainer \(synthetic\)/)).toBeVisible();
   await expect(first.getByText("You said:").first()).toBeVisible();
   await expect(first.getByText("How Careerwright found it")).toBeVisible();
   await expect(directions).not.toContainText(/\d\s?%/);

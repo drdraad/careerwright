@@ -203,7 +203,7 @@ class Ledger:
             "  live-smoke WONDER=1` and `make live-eval WONDER=1`, Task 3b): Muse Wonder on\n"
             "  synthetic input only, every request a production request: two in-process\n"
             "  calls (at most $0.20 an invocation), then at most six evaluation cases (at most\n"
-            "  $0.40 an invocation); at most 14 requests and $0.50 worst case in all, enforced\n"
+            "  $2 an invocation); at most 50 requests and $5 worst case in all, enforced\n"
             "  in `backend/tools/live_smoke.py` and `backend/tools/live_eval.py`.\n"
             "  `live-app-<date>` (`make session-ledger`, Task 3b): every model attempt in the\n"
             "  live stack's database (`make session` or `make dev`), by the UTC date it\n"

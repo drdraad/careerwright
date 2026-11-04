@@ -77,6 +77,17 @@ describe("[WLD-06][UI-07] the world's words are placed beside their lights", () 
     expect(spots.get("behind")).toBeNull();
   });
 
+  it("keeps a small gap when a name would otherwise touch a phone panel", () => {
+    const panel: Box = { x: 0, y: 350, w: 390, h: 494 };
+    const spot = layoutLabels(
+      [{ id: "you", at: at(180, 306), size: { w: 50, h: 30 }, side: "below" }],
+      [panel],
+      { w: 390, h: 844 },
+    ).get("you");
+    expect(spot).not.toBeNull();
+    if (spot) expect(spot.y + spot.h).toBeLessThanOrEqual(panel.y - 4);
+  });
+
   it("hides the name of a light that a panel covers: no name for a light the person cannot see", () => {
     const sheet: Box = { x: 0, y: 500, w: 390, h: 344 };
     const spots = layoutLabels(

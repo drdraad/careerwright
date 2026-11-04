@@ -5,8 +5,8 @@
   datasets (ASHE, the SOC 2020 coding index, the AI evidence; ADR 0010) from the datasets
   directory where not imported yet (idempotent; `make dev` and `make demo` run it).
 - `migrate [--revision R]`: application database only (tests use it to stop part-way).
-- `seed`: invited identities and the fixture workspace, created only if missing.
-- `reset-demo`: recreate the named fixture workspace; no other workspace is touched.
+- `seed`: invited identities and the five fixture workspaces, created only if missing.
+- `reset-demo`: recreate the five named fixture workspaces; no other workspace is touched.
 - `reseal`: master-key rotation step 2 (`make rotate-master-key` runs both steps):
   re-encrypt every sealed record (keys, run inputs, run outputs and partial replies) under
   the current key version.
@@ -41,17 +41,16 @@ from careerwright.identity.keyring import Keyring, RecordContext, SealedValue, l
 from careerwright.identity.records import EventKind
 from careerwright.identity.runs import input_context, output_context, partial_context
 from careerwright.logs import configure_logging
+from careerwright.planning import store as planning_store
 from careerwright.profile import store as profile_store
 from careerwright.profile.commands import cited_sources
 from careerwright.profile.records import SourceKind
 from careerwright.profile.targets import record_targets
 from careerwright.seed import (
-    FIXTURE_KEY,
     FIXTURE_OWNER,
-    FIXTURE_SOURCE_ID,
-    FIXTURE_WORKSPACE_ID,
-    FIXTURE_WORKSPACE_NAME,
+    FIXTURE_PERSONAS,
     INVITED_ACTORS,
+    FixturePersona,
     fixture_profile,
 )
 from careerwright.vocabulary import DataMode
@@ -162,61 +161,85 @@ def reseal(engine: sa.Engine, keyring: Keyring) -> dict[str, int]:
     return counts
 
 
-def _create_fixture_workspace(tx: Tx, settings: OpsSettings, *, last_event_seq: int) -> None:
-    fixture = fixture_profile(settings.fixtures_dir)
+def _create_fixture_workspace(
+    tx: Tx, settings: OpsSettings, persona: FixturePersona, *, last_event_seq: int
+) -> None:
+    fixture = fixture_profile(settings.fixtures_dir, persona)
     identity_store.insert_workspace(
         tx,
-        workspace_id=FIXTURE_WORKSPACE_ID,
+        workspace_id=persona.workspace_id,
         owner_actor_id=FIXTURE_OWNER.actor_id,
-        name=FIXTURE_WORKSPACE_NAME,
+        name=persona.workspace_name,
         data_mode=DataMode.DEMO,
         synthetic=True,
-        fixture_key=FIXTURE_KEY,
+        fixture_key=persona.key,
         last_event_seq=last_event_seq,
     )
     profile_store.insert_source(
         tx,
-        source_ref_id=FIXTURE_SOURCE_ID,
-        workspace_id=FIXTURE_WORKSPACE_ID,
+        source_ref_id=persona.source_id,
+        workspace_id=persona.workspace_id,
         kind=SourceKind.FIXTURE,
-        label="Synthetic fixture persona P01 (supplied M0 pack)",
+        label=f"Synthetic fixture persona {persona.key.upper()} (supplied M0 pack)",
         locator=fixture.persona_locator,
         content_sha256=fixture.persona_sha256,
         observed_at=fixture.observed_at,
     )
-    profile_store.insert_profile_version(tx, FIXTURE_WORKSPACE_ID, 1, fixture.document, None)
-    profile_store.link_sources(tx, FIXTURE_WORKSPACE_ID, 1, cited_sources(fixture.document))
+    profile_store.insert_profile_version(tx, persona.workspace_id, 1, fixture.document, None)
+    profile_store.link_sources(tx, persona.workspace_id, 1, cited_sources(fixture.document))
     created = EventKind.WORKSPACE_RESET if last_event_seq else EventKind.WORKSPACE_CREATED
-    identity_store.append_event(tx, FIXTURE_WORKSPACE_ID, created, str(FIXTURE_WORKSPACE_ID))
+    identity_store.append_event(tx, persona.workspace_id, created, str(persona.workspace_id))
     identity_store.append_event(
-        tx, FIXTURE_WORKSPACE_ID, EventKind.PROFILE_VERSION_CREATED, "1", detail={"version": 1}
+        tx, persona.workspace_id, EventKind.PROFILE_VERSION_CREATED, "1", detail={"version": 1}
     )
 
 
-def _record_fixture_targets(tx: Tx) -> None:
-    """The fixture workspace's targets, each stored with its record (migration 0034) if it has
-    none yet, decided against the held taxonomy and the committed pack."""
-    latest = profile_store.current_profile(tx, FIXTURE_WORKSPACE_ID)
+def _record_fixture_targets(tx: Tx, persona: FixturePersona) -> None:
+    """Store each persona's target records against the held taxonomy and committed pack."""
+    latest = profile_store.current_profile(tx, persona.workspace_id)
     if latest is not None:
         pack = pack_targets(committed_data())
-        record_targets(tx, None, FIXTURE_WORKSPACE_ID, latest.document, pack)
+        record_targets(tx, None, persona.workspace_id, latest.document, pack)
+
+
+def _record_fixture_planning(tx: Tx, settings: OpsSettings, persona: FixturePersona) -> None:
+    """Seed stated planning figures only if the persona has no planning version yet."""
+    if planning_store.current_inputs(tx, persona.workspace_id) is not None:
+        return
+    fixture = fixture_profile(settings.fixtures_dir, persona)
+    profile = profile_store.current_profile(tx, persona.workspace_id)
+    if profile is None or profile.document != fixture.document:
+        return  # an edited profile must not receive assumptions from the original persona
+    inputs = fixture.planning_inputs
+    if inputs is None:
+        return
+    planning_store.insert_inputs(tx, persona.workspace_id, 1, inputs, FIXTURE_OWNER.actor_id)
+    identity_store.append_event(
+        tx,
+        persona.workspace_id,
+        EventKind.PLANNING_INPUTS_UPDATED,
+        str(persona.workspace_id),
+        detail={"version": 1},
+    )
 
 
 def seed_fixture(engine: sa.Engine, settings: OpsSettings) -> None:
-    """The invited actors and the fixture workspace with its profile: what a seed wrote before
-    targets were stored (migration 0034). Idempotent."""
+    """The invited actors and persona profiles. Idempotent, preserving edited workspaces."""
     with engine.begin() as tx:
         for actor in INVITED_ACTORS:
             identity_store.upsert_actor(tx, actor.actor_id, actor.email, actor.display_name)
-        if identity_store.fixture_workspace(tx, FIXTURE_KEY) is None:
-            _create_fixture_workspace(tx, settings, last_event_seq=0)
+        for persona in FIXTURE_PERSONAS:
+            if identity_store.fixture_workspace(tx, persona.key) is None:
+                _create_fixture_workspace(tx, settings, persona, last_event_seq=0)
 
 
 def seed(engine: sa.Engine, settings: OpsSettings) -> None:
-    """`seed_fixture`, and the fixture's targets stored with their records. Idempotent."""
+    """Seed persona profiles and their target records. Idempotent."""
     seed_fixture(engine, settings)
     with engine.begin() as tx:
-        _record_fixture_targets(tx)
+        for persona in FIXTURE_PERSONAS:
+            _record_fixture_targets(tx, persona)
+            _record_fixture_planning(tx, settings, persona)
 
 
 def import_taxonomy(engine: sa.Engine, path: Path, pin: ReleasePin = ESCO_RELEASE) -> str:
@@ -252,12 +275,14 @@ def import_reference_data(
 
 def reset_demo(engine: sa.Engine, settings: OpsSettings) -> None:
     with engine.begin() as tx:
-        existing = identity_store.fixture_workspace(tx, FIXTURE_KEY)
-        # Event numbers continue, so a client resuming from Last-Event-ID sees the reset.
-        last_seq = existing[1] if existing else 0
-        identity_store.delete_fixture_workspace(tx, FIXTURE_KEY)
-        _create_fixture_workspace(tx, settings, last_event_seq=last_seq)
-        _record_fixture_targets(tx)
+        for persona in FIXTURE_PERSONAS:
+            existing = identity_store.fixture_workspace(tx, persona.key)
+            # Event numbers continue, so a client resuming from Last-Event-ID sees the reset.
+            last_seq = existing[1] if existing else 0
+            identity_store.delete_fixture_workspace(tx, persona.key)
+            _create_fixture_workspace(tx, settings, persona, last_event_seq=last_seq)
+            _record_fixture_targets(tx, persona)
+            _record_fixture_planning(tx, settings, persona)
 
 
 def main(argv: list[str] | None = None) -> None:

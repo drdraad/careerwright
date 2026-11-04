@@ -81,6 +81,31 @@ export const AbstractActionSchema = {
     title: 'AbstractAction'
 } as const;
 
+export const AccountingPaymentSchema = {
+    properties: {
+        variant_id: {
+            type: 'string',
+            title: 'Variant Id'
+        },
+        due: {
+            type: 'string',
+            format: 'date',
+            title: 'Due'
+        },
+        amount: {
+            $ref: '#/components/schemas/Money'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'variant_id',
+        'due',
+        'amount'
+    ],
+    title: 'AccountingPayment'
+} as const;
+
 export const AcquisitionOutSchema = {
     properties: {
         run: {
@@ -345,7 +370,7 @@ export const AdvertExampleSchema = {
         },
         spans: {
             items: {
-                $ref: '#/components/schemas/SelectedSpan'
+                $ref: '#/components/schemas/ChosenPart'
             },
             type: 'array',
             title: 'Spans'
@@ -1675,6 +1700,17 @@ export const CatalogueLabelSchema = {
         synthetic: {
             type: 'boolean',
             title: 'Synthetic'
+        },
+        research_fingerprint: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Research Fingerprint'
         }
     },
     additionalProperties: false,
@@ -1726,12 +1762,30 @@ export const ChangedSchema = {
             type: 'boolean',
             title: 'Profile',
             description: 'The profile (its limits among it) has a newer version.'
+        },
+        capability: {
+            type: 'boolean',
+            title: 'Capability',
+            description: 'The person\'s skill evidence has a newer version.'
+        },
+        target_matrix: {
+            type: 'boolean',
+            title: 'Target Matrix',
+            description: 'The target matrix or definition has changed.'
+        },
+        option_pack: {
+            type: 'boolean',
+            title: 'Option Pack',
+            description: 'The available options or their research have changed.'
         }
     },
     type: 'object',
     required: [
         'planning_inputs',
-        'profile'
+        'profile',
+        'capability',
+        'target_matrix',
+        'option_pack'
     ],
     title: 'Changed',
     description: 'What changed since the solve read its inputs (STATE-06): its routes are shown as they\nwere, beside this, until the person asks for a new solve. Nothing is invalidated here.'
@@ -1892,6 +1946,47 @@ export const ChooseClosestSchema = {
     description: 'The answer to "Which of these is closest?" for the person\'s current or last role.'
 } as const;
 
+export const ChoosePlanSchema = {
+    properties: {
+        expected_version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Expected Version'
+        },
+        solve_run_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Solve Run Id'
+        },
+        schedule_index: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Schedule Index'
+        },
+        assumptions_confirmed: {
+            type: 'boolean',
+            const: true,
+            title: 'Assumptions Confirmed',
+            description: 'The person reviewed the route\'s consequential assumptions. This does not apply, enrol or resign.'
+        },
+        full_horizon_accounting_acknowledged: {
+            type: 'boolean',
+            title: 'Full Horizon Accounting Acknowledged',
+            description: 'Required when completed steps exist: this solve has not recalculated sunk costs.',
+            default: false
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'expected_version',
+        'solve_run_id',
+        'schedule_index',
+        'assumptions_confirmed'
+    ],
+    title: 'ChoosePlan'
+} as const;
+
 export const ChooseRoleSchema = {
     properties: {
         expected_version: {
@@ -1977,6 +2072,44 @@ export const ChooseTargetSchema = {
     description: 'Make an ESCO occupation one of the targets: added, or in place of `replaces` (a\ntarget title it is the occupation for).'
 } as const;
 
+export const ChosenPartSchema = {
+    properties: {
+        start: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Start',
+            description: 'Inclusive, in UTF-16 code units of the text.'
+        },
+        end: {
+            type: 'integer',
+            minimum: 1,
+            title: 'End',
+            description: 'Exclusive, in UTF-16 code units of the text.'
+        },
+        excerpt: {
+            type: 'string',
+            title: 'Excerpt'
+        },
+        entry_facts: {
+            items: {
+                $ref: '#/components/schemas/EntryFact'
+            },
+            type: 'array',
+            title: 'Entry Facts'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'start',
+        'end',
+        'excerpt',
+        'entry_facts'
+    ],
+    title: 'ChosenPart',
+    description: 'A part the person chose in one of their own example adverts, with the qualifications\nof theirs that name it.'
+} as const;
+
 export const CitationSchema = {
     properties: {
         basis: {
@@ -2014,6 +2147,17 @@ export const CitationSchema = {
                 }
             ],
             title: 'Source Hash'
+        },
+        source_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source Url'
         },
         locator: {
             anyOf: [
@@ -2446,6 +2590,26 @@ export const ComparisonBasisSchema = {
         synthetic: {
             type: 'boolean',
             title: 'Synthetic'
+        },
+        opening_cash: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Money'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        replan: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/ReplanAccounting'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     additionalProperties: false,
@@ -4320,7 +4484,8 @@ export const ExclusionReasonSchema = {
         'over_the_limit',
         'site_root',
         'not_returned_by_search',
-        'search_results_page'
+        'search_results_page',
+        'rights_review_required'
     ],
     title: 'ExclusionReason',
     description: 'Why a proposed page is not a candidate: the URL checks\' refusals, or these.'
@@ -8594,6 +8759,240 @@ export const OptionFactsSchema = {
     title: 'OptionFacts'
 } as const;
 
+export const OptionResearchCoverageSchema = {
+    type: 'string',
+    enum: [
+        'complete',
+        'partial',
+        'stopped',
+        'none_read'
+    ],
+    title: 'OptionResearchCoverage'
+} as const;
+
+export const OptionResearchEstimateOutSchema = {
+    properties: {
+        model_id: {
+            type: 'string',
+            title: 'Model Id'
+        },
+        model_mode: {
+            $ref: '#/components/schemas/ModelMode'
+        },
+        search_maximum_nano_usd: {
+            type: 'integer',
+            title: 'Search Maximum Nano Usd'
+        },
+        pages_maximum_nano_usd: {
+            type: 'integer',
+            title: 'Pages Maximum Nano Usd'
+        },
+        combined_maximum_nano_usd: {
+            type: 'integer',
+            title: 'Combined Maximum Nano Usd'
+        },
+        hard_maximum_nano_usd: {
+            type: 'integer',
+            title: 'Hard Maximum Nano Usd'
+        },
+        refused_scope: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/BudgetScope'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'model_id',
+        'model_mode',
+        'search_maximum_nano_usd',
+        'pages_maximum_nano_usd',
+        'combined_maximum_nano_usd',
+        'hard_maximum_nano_usd',
+        'refused_scope'
+    ],
+    title: 'OptionResearchEstimateOut'
+} as const;
+
+export const OptionResearchOutSchema = {
+    properties: {
+        research_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Research Id'
+        },
+        target: {
+            type: 'string',
+            title: 'Target'
+        },
+        city: {
+            type: 'string',
+            title: 'City'
+        },
+        status: {
+            $ref: '#/components/schemas/ResearchStatus'
+        },
+        coverage: {
+            $ref: '#/components/schemas/OptionResearchCoverage'
+        },
+        search: {
+            $ref: '#/components/schemas/RunOut'
+        },
+        reading: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/RunOut'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        candidates: {
+            type: 'integer',
+            title: 'Candidates'
+        },
+        empty_reason: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SearchEmptyReason'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        pages_attempted: {
+            type: 'integer',
+            title: 'Pages Attempted'
+        },
+        pages_read: {
+            type: 'integer',
+            title: 'Pages Read'
+        },
+        pages_blocked: {
+            type: 'integer',
+            title: 'Pages Blocked'
+        },
+        pages_failed: {
+            type: 'integer',
+            title: 'Pages Failed'
+        },
+        failure_reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Failure Reason'
+        },
+        records: {
+            items: {
+                $ref: '#/components/schemas/OptionResearchRecordOut'
+            },
+            type: 'array',
+            title: 'Records'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'research_id',
+        'target',
+        'city',
+        'status',
+        'coverage',
+        'search',
+        'reading',
+        'candidates',
+        'empty_reason',
+        'pages_attempted',
+        'pages_read',
+        'pages_blocked',
+        'pages_failed',
+        'failure_reason',
+        'records'
+    ],
+    title: 'OptionResearchOut'
+} as const;
+
+export const OptionResearchRecordOutSchema = {
+    properties: {
+        record_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Record Id'
+        },
+        kind: {
+            type: 'string',
+            enum: [
+                'course',
+                'apprenticeship',
+                'funding'
+            ],
+            title: 'Kind'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        source_url: {
+            type: 'string',
+            title: 'Source Url'
+        },
+        retrieved_on: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Retrieved On'
+        },
+        expires_on: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Expires On'
+        },
+        expired: {
+            type: 'boolean',
+            title: 'Expired'
+        },
+        review_state: {
+            type: 'string',
+            const: 'proposed',
+            title: 'Review State',
+            default: 'proposed'
+        },
+        citations: {
+            additionalProperties: {
+                $ref: '#/components/schemas/Citation'
+            },
+            type: 'object',
+            title: 'Citations',
+            description: 'Each accepted field\'s source hash, verified offset and exact excerpt.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'record_id',
+        'kind',
+        'title',
+        'source_url',
+        'retrieved_on',
+        'expires_on',
+        'expired',
+        'citations'
+    ],
+    title: 'OptionResearchRecordOut'
+} as const;
+
 export const OptionTextOutSchema = {
     properties: {
         text_id: {
@@ -10049,6 +10448,619 @@ export const PlaceOutSchema = {
     title: 'PlaceOut'
 } as const;
 
+export const PlanActivitySchema = {
+    properties: {
+        kind: {
+            type: 'string',
+            enum: [
+                'step_completed',
+                'step_retracted',
+                'commitment_accepted',
+                'commitment_retracted',
+                'rest',
+                'resume',
+                'review_rescheduled'
+            ],
+            title: 'Kind'
+        },
+        variant_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Variant Id'
+        },
+        until: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Until'
+        },
+        recorded_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Recorded At'
+        },
+        step_title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Step Title',
+            description: 'The step\'s title when this report was made; null for earlier records.'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'kind',
+        'variant_id',
+        'until',
+        'recorded_at'
+    ],
+    title: 'PlanActivity'
+} as const;
+
+export const PlanChangesSchema = {
+    properties: {
+        plan_version: {
+            type: 'integer',
+            title: 'Plan Version'
+        },
+        profile: {
+            type: 'boolean',
+            title: 'Profile'
+        },
+        planning_inputs: {
+            type: 'boolean',
+            title: 'Planning Inputs'
+        },
+        capability: {
+            type: 'boolean',
+            title: 'Capability'
+        },
+        target_matrix: {
+            type: 'boolean',
+            title: 'Target Matrix'
+        },
+        option_pack: {
+            type: 'boolean',
+            title: 'Option Pack'
+        },
+        possibly_affected_steps: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Possibly Affected Steps'
+        },
+        new_solve_needed: {
+            type: 'boolean',
+            title: 'New Solve Needed'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'plan_version',
+        'profile',
+        'planning_inputs',
+        'capability',
+        'target_matrix',
+        'option_pack',
+        'possibly_affected_steps',
+        'new_solve_needed'
+    ],
+    title: 'PlanChanges',
+    description: 'Conservative invalidation: a changed source may affect any unfinished route step.'
+} as const;
+
+export const PlanDifferenceSchema = {
+    properties: {
+        added_steps: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Added Steps'
+        },
+        removed_steps: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Removed Steps'
+        },
+        changed_steps: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Changed Steps'
+        },
+        old_readiness_month: {
+            type: 'string',
+            title: 'Old Readiness Month'
+        },
+        new_readiness_month: {
+            type: 'string',
+            title: 'New Readiness Month'
+        },
+        old_direct_cost: {
+            $ref: '#/components/schemas/Money'
+        },
+        new_direct_cost: {
+            $ref: '#/components/schemas/Money'
+        },
+        old_economic_cost: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SignedMoney'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        new_economic_cost: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SignedMoney'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        same_accounting_basis: {
+            type: 'boolean',
+            title: 'Same Accounting Basis'
+        },
+        old_basis: {
+            $ref: '#/components/schemas/ComparisonBasis'
+        },
+        new_basis: {
+            $ref: '#/components/schemas/ComparisonBasis'
+        },
+        remaining_horizon_recalculated: {
+            type: 'boolean',
+            title: 'Remaining Horizon Recalculated',
+            default: false
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'added_steps',
+        'removed_steps',
+        'changed_steps',
+        'old_readiness_month',
+        'new_readiness_month',
+        'old_direct_cost',
+        'new_direct_cost',
+        'old_economic_cost',
+        'new_economic_cost',
+        'same_accounting_basis',
+        'old_basis',
+        'new_basis'
+    ],
+    title: 'PlanDifference'
+} as const;
+
+export const PlanEventSchema = {
+    properties: {
+        key: {
+            type: 'string',
+            title: 'Key'
+        },
+        kind: {
+            type: 'string',
+            enum: [
+                'start',
+                'finish',
+                'application_deadline',
+                'review'
+            ],
+            title: 'Kind'
+        },
+        variant_id: {
+            type: 'string',
+            title: 'Variant Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        on: {
+            type: 'string',
+            format: 'date',
+            title: 'On'
+        },
+        conditional: {
+            type: 'boolean',
+            title: 'Conditional'
+        },
+        proposed: {
+            type: 'boolean',
+            const: true,
+            title: 'Proposed',
+            default: true
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'key',
+        'kind',
+        'variant_id',
+        'title',
+        'on',
+        'conditional'
+    ],
+    title: 'PlanEvent'
+} as const;
+
+export const PlanHistoryItemSchema = {
+    properties: {
+        version: {
+            type: 'integer',
+            title: 'Version'
+        },
+        plan_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Plan Id'
+        },
+        target_title: {
+            type: 'string',
+            title: 'Target Title'
+        },
+        selected_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Selected At'
+        },
+        last_activity_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Activity At'
+        },
+        solve_run_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Solve Run Id'
+        },
+        schedule_index: {
+            type: 'integer',
+            title: 'Schedule Index'
+        },
+        completed_steps: {
+            type: 'integer',
+            title: 'Completed Steps'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'version',
+        'plan_id',
+        'target_title',
+        'selected_at',
+        'last_activity_at',
+        'solve_run_id',
+        'schedule_index',
+        'completed_steps'
+    ],
+    title: 'PlanHistoryItem'
+} as const;
+
+export const PlanProgressSchema = {
+    properties: {
+        completed_steps: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Completed Steps'
+        },
+        rest_until: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Rest Until'
+        },
+        review_on: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Review On'
+        },
+        activity: {
+            items: {
+                $ref: '#/components/schemas/PlanActivity'
+            },
+            type: 'array',
+            title: 'Activity'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    title: 'PlanProgress',
+    description: 'Planning activity is self-reported, never new skill or credential evidence.'
+} as const;
+
+export const PlanRevisionPreviewSchema = {
+    properties: {
+        from_version: {
+            type: 'integer',
+            title: 'From Version'
+        },
+        proposed_solve_run_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Proposed Solve Run Id'
+        },
+        proposed_schedule_index: {
+            type: 'integer',
+            title: 'Proposed Schedule Index'
+        },
+        proposed_route: {
+            $ref: '#/components/schemas/RouteDetail'
+        },
+        proposed_search: {
+            $ref: '#/components/schemas/PlanSearch'
+        },
+        difference: {
+            $ref: '#/components/schemas/PlanDifference'
+        },
+        completed_steps: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Completed Steps'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'from_version',
+        'proposed_solve_run_id',
+        'proposed_schedule_index',
+        'proposed_route',
+        'proposed_search',
+        'difference',
+        'completed_steps'
+    ],
+    title: 'PlanRevisionPreview',
+    description: 'A read-only proposal. Accepting it is a separate expected-version plan write.'
+} as const;
+
+export const PlanSearchSchema = {
+    properties: {
+        coverage: {
+            $ref: '#/components/schemas/SearchCoverage'
+        },
+        stop_reason: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/StopReason'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        instance: {
+            $ref: '#/components/schemas/InstanceSize'
+        },
+        limits: {
+            $ref: '#/components/schemas/M0SearchLimits'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'coverage',
+        'stop_reason',
+        'instance',
+        'limits'
+    ],
+    title: 'PlanSearch'
+} as const;
+
+export const PlanSnapshotSchema = {
+    properties: {
+        plan_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Plan Id'
+        },
+        version: {
+            type: 'integer',
+            minimum: 1,
+            title: 'Version'
+        },
+        workspace_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Workspace Id'
+        },
+        selected_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Selected At'
+        },
+        selected_by: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Selected By'
+        },
+        assumptions_confirmed: {
+            type: 'boolean',
+            const: true,
+            title: 'Assumptions Confirmed',
+            default: true
+        },
+        commitments: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Commitments',
+            description: 'Accepted commitments on unchanged current steps; prior reports remain in activity.'
+        },
+        target_title: {
+            type: 'string',
+            title: 'Target Title'
+        },
+        source: {
+            $ref: '#/components/schemas/PlanSource'
+        },
+        search: {
+            $ref: '#/components/schemas/PlanSearch'
+        },
+        route: {
+            $ref: '#/components/schemas/RouteDetail'
+        },
+        events: {
+            items: {
+                $ref: '#/components/schemas/PlanEvent'
+            },
+            type: 'array',
+            title: 'Events'
+        },
+        next_action: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/PlanEvent'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        progress: {
+            $ref: '#/components/schemas/PlanProgress'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'plan_id',
+        'version',
+        'workspace_id',
+        'selected_at',
+        'selected_by',
+        'target_title',
+        'source',
+        'search',
+        'route',
+        'events',
+        'next_action'
+    ],
+    title: 'PlanSnapshot'
+} as const;
+
+export const PlanSourceSchema = {
+    properties: {
+        solve_run_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Solve Run Id'
+        },
+        solve_id: {
+            type: 'string',
+            title: 'Solve Id'
+        },
+        schedule_index: {
+            type: 'integer',
+            title: 'Schedule Index'
+        },
+        profile_version: {
+            type: 'integer',
+            title: 'Profile Version'
+        },
+        inputs_version: {
+            type: 'integer',
+            title: 'Inputs Version'
+        },
+        capability_version: {
+            type: 'integer',
+            title: 'Capability Version'
+        },
+        input_version: {
+            type: 'string',
+            title: 'Input Version'
+        },
+        matrix_version: {
+            type: 'string',
+            title: 'Matrix Version'
+        },
+        definition_version: {
+            type: 'string',
+            title: 'Definition Version'
+        },
+        algorithm_version: {
+            type: 'string',
+            title: 'Algorithm Version'
+        },
+        pruning_version: {
+            type: 'string',
+            title: 'Pruning Version'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'solve_run_id',
+        'solve_id',
+        'schedule_index',
+        'profile_version',
+        'inputs_version',
+        'capability_version',
+        'input_version',
+        'matrix_version',
+        'definition_version',
+        'algorithm_version',
+        'pruning_version'
+    ],
+    title: 'PlanSource'
+} as const;
+
 export const PlanningInputsDocumentSchema = {
     properties: {
         objective_basis: {
@@ -11288,6 +12300,60 @@ export const ProfileWriteInSchema = {
         'profile'
     ],
     title: 'ProfileWriteIn'
+} as const;
+
+export const ProgressUpdateSchema = {
+    properties: {
+        expected_version: {
+            type: 'integer',
+            minimum: 1,
+            title: 'Expected Version'
+        },
+        kind: {
+            type: 'string',
+            enum: [
+                'step_completed',
+                'step_retracted',
+                'commitment_accepted',
+                'commitment_retracted',
+                'rest',
+                'resume',
+                'review_rescheduled'
+            ],
+            title: 'Kind'
+        },
+        variant_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Variant Id'
+        },
+        until: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Until'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'expected_version',
+        'kind'
+    ],
+    title: 'ProgressUpdate',
+    description: 'A user\'s action report or pause; dates never rewrite the route\'s modelled timetable.'
 } as const;
 
 export const PromptSchema = {
@@ -12892,6 +13958,148 @@ export const RenameWorkspaceInSchema = {
     title: 'RenameWorkspaceIn'
 } as const;
 
+export const ReplanAccountingSchema = {
+    properties: {
+        from_plan_version: {
+            type: 'integer',
+            title: 'From Plan Version'
+        },
+        completed_variants: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Completed Variants'
+        },
+        excluded_variants: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Excluded Variants'
+        },
+        sunk_paid: {
+            $ref: '#/components/schemas/Money'
+        },
+        remaining_payments: {
+            items: {
+                $ref: '#/components/schemas/AccountingPayment'
+            },
+            type: 'array',
+            title: 'Remaining Payments'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'from_plan_version',
+        'completed_variants',
+        'excluded_variants',
+        'sunk_paid',
+        'remaining_payments'
+    ],
+    title: 'ReplanAccounting'
+} as const;
+
+export const ReplanPaymentSchema = {
+    properties: {
+        variant_id: {
+            type: 'string',
+            title: 'Variant Id'
+        },
+        due: {
+            type: 'string',
+            format: 'date',
+            title: 'Due'
+        },
+        amount: {
+            $ref: '#/components/schemas/Money'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'variant_id',
+        'due',
+        'amount'
+    ],
+    title: 'ReplanPayment'
+} as const;
+
+export const ReplanRequestSchema = {
+    properties: {
+        expected_inputs_version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Expected Inputs Version',
+            description: 'The planning inputs version the person saw.'
+        },
+        target: {
+            type: 'string',
+            maxLength: 120,
+            minLength: 1,
+            title: 'Target',
+            description: 'One of the profile\'s target titles.'
+        },
+        planning_start: {
+            type: 'string',
+            pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$',
+            title: 'Planning Start',
+            description: 'The comparison\'s first month, as YYYY-MM: this month or later.'
+        },
+        horizon_months: {
+            type: 'integer',
+            maximum: 24,
+            minimum: 1,
+            title: 'Horizon Months'
+        },
+        expected_plan_version: {
+            type: 'integer',
+            minimum: 1,
+            title: 'Expected Plan Version'
+        },
+        opening_cash: {
+            $ref: '#/components/schemas/Money'
+        },
+        sunk_paid: {
+            $ref: '#/components/schemas/Money'
+        },
+        remaining_payments: {
+            items: {
+                $ref: '#/components/schemas/ReplanPayment'
+            },
+            type: 'array',
+            title: 'Remaining Payments'
+        },
+        all_remaining_payments_confirmed: {
+            type: 'boolean',
+            const: true,
+            title: 'All Remaining Payments Confirmed'
+        },
+        no_ongoing_steps_confirmed: {
+            type: 'boolean',
+            const: true,
+            title: 'No Ongoing Steps Confirmed'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'expected_inputs_version',
+        'target',
+        'planning_start',
+        'horizon_months',
+        'expected_plan_version',
+        'opening_cash',
+        'sunk_paid',
+        'remaining_payments',
+        'all_remaining_payments_confirmed',
+        'no_ongoing_steps_confirmed'
+    ],
+    title: 'ReplanRequest',
+    description: 'The person\'s confirmed actuals for the remaining part of a chosen plan.'
+} as const;
+
 export const RequirementSchema = {
     properties: {
         row_id: {
@@ -12992,6 +14200,40 @@ export const RequirementSchema = {
             },
             type: 'array',
             title: 'Entry Facts'
+        },
+        latest_holding: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/Holding'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        source_urls: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Source Urls'
+        },
+        rubric_anchors: {
+            additionalProperties: {
+                type: 'string'
+            },
+            type: 'object',
+            title: 'Rubric Anchors'
+        },
+        latest_skill: {
+            anyOf: [
+                {
+                    $ref: '#/components/schemas/SavedSkillAnswer'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     additionalProperties: false,
@@ -13010,7 +14252,11 @@ export const RequirementSchema = {
         'review_state',
         'as_of',
         'employer_specific',
-        'entry_facts'
+        'entry_facts',
+        'latest_holding',
+        'source_urls',
+        'rubric_anchors',
+        'latest_skill'
     ],
     title: 'Requirement',
     description: 'A required row of the target\'s matrix: what the target asks.'
@@ -13030,6 +14276,20 @@ export const ResearchStateSchema = {
     ],
     title: 'ResearchState',
     description: 'Where a research is. Only `found` and `not_yet_found` are results; neither says a role\ndoes or doesn\'t exist, only what Careerwright checked.'
+} as const;
+
+export const ResearchStatusSchema = {
+    type: 'string',
+    enum: [
+        'searching',
+        'search_stopped',
+        'no_pages',
+        'ready_to_read',
+        'reading',
+        'completed',
+        'reading_stopped'
+    ],
+    title: 'ResearchStatus'
 } as const;
 
 export const ResolutionSchema = {
@@ -14901,6 +16161,57 @@ export const SalaryPeriodSchema = {
     description: 'The period a source states pay per (the profile\'s salary floor has its own).'
 } as const;
 
+export const SavedSkillAnswerSchema = {
+    properties: {
+        answer: {
+            $ref: '#/components/schemas/Answer'
+        },
+        self_assessed_level: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Self Assessed Level'
+        },
+        example: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Example'
+        },
+        last_done: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Done'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'answer',
+        'self_assessed_level',
+        'example',
+        'last_done'
+    ],
+    title: 'SavedSkillAnswer',
+    description: 'The person\'s latest self-report against this row\'s rubric, for a later correction.'
+} as const;
+
 export const ScenarioSchema = {
     type: 'string',
     enum: [
@@ -15626,7 +16937,8 @@ export const SearchPurposeSchema = {
     type: 'string',
     enum: [
         'job_postings',
-        'role_research'
+        'role_research',
+        'option_research'
     ],
     title: 'SearchPurpose',
     description: 'What a source search looks for (ADR 0009 decision 12, amendment).'
@@ -15936,35 +17248,6 @@ export const SelectAdvertSpansSchema = {
     ],
     title: 'SelectAdvertSpans',
     description: 'The parts of one of the person\'s own example adverts that say what the target asks\nfor, as offsets into its text in UTF-16 code units (a browser\'s selection), converted to\ncharacters on the server. An empty list clears the selection.'
-} as const;
-
-export const SelectedSpanSchema = {
-    properties: {
-        start: {
-            type: 'integer',
-            minimum: 0,
-            title: 'Start',
-            description: 'Inclusive, in UTF-16 code units of the text.'
-        },
-        end: {
-            type: 'integer',
-            minimum: 1,
-            title: 'End',
-            description: 'Exclusive, in UTF-16 code units of the text.'
-        },
-        excerpt: {
-            type: 'string',
-            title: 'Excerpt'
-        }
-    },
-    additionalProperties: false,
-    type: 'object',
-    required: [
-        'start',
-        'end',
-        'excerpt'
-    ],
-    title: 'SelectedSpan'
 } as const;
 
 export const SessionSchema = {
@@ -16993,6 +18276,18 @@ export const SolveOutSchema = {
                     type: 'null'
                 }
             ]
+        },
+        remaining_horizon_recalculated: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Remaining Horizon Recalculated',
+            description: 'Null until complete; true only for a solve using confirmed remaining actuals.'
         }
     },
     type: 'object',
@@ -17733,6 +19028,36 @@ export const StartBasisSchema = {
         'stated_intake'
     ],
     title: 'StartBasis'
+} as const;
+
+export const StartOptionResearchSchema = {
+    properties: {
+        expected_profile_version: {
+            type: 'integer',
+            minimum: 0,
+            title: 'Expected Profile Version'
+        },
+        target: {
+            type: 'string',
+            maxLength: 120,
+            minLength: 1,
+            title: 'Target'
+        },
+        city: {
+            type: 'string',
+            maxLength: 120,
+            minLength: 1,
+            title: 'City'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    required: [
+        'expected_profile_version',
+        'target',
+        'city'
+    ],
+    title: 'StartOptionResearch'
 } as const;
 
 export const StartRoleResearchSchema = {
@@ -21702,9 +23027,9 @@ export const WorkspaceExportSchema = {
         },
         format_version: {
             type: 'integer',
-            const: 5,
+            const: 6,
             title: 'Format Version',
-            default: 5
+            default: 6
         },
         exported_at: {
             type: 'string',
@@ -21779,6 +23104,14 @@ export const WorkspaceExportSchema = {
         interview_preferences: {
             $ref: '#/components/schemas/PreferencesOut'
         },
+        plans: {
+            items: {
+                $ref: '#/components/schemas/PlanSnapshot'
+            },
+            type: 'array',
+            title: 'Plans',
+            description: 'Chosen plan versions, oldest first.'
+        },
         spend: {
             $ref: '#/components/schemas/SpendOut'
         }
@@ -21798,6 +23131,7 @@ export const WorkspaceExportSchema = {
         'provisional_concepts',
         'discoveries',
         'interview_preferences',
+        'plans',
         'spend'
     ],
     title: 'WorkspaceExport'

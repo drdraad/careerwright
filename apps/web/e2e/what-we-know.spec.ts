@@ -3,7 +3,7 @@
 // know, each with Undo where it was done, the suggestions staying current throughout; and the
 // answer form's Save in reach while the form is open, on a wide screen and on a phone.
 import { expect, test } from "@playwright/test";
-import { chosenTargetWorkspace, emulatorToken } from "./api";
+import { asBrowser, chosenTargetWorkspace, emulatorToken } from "./api";
 import { chapterUrl, inReach, saved, signIn, youView } from "./helpers";
 
 test("[STATE-10][PROF-07] a target is removed on its suggestion and in What we know, each with Undo, and the suggestions stay current", async ({
@@ -60,6 +60,38 @@ test("[STATE-10][PROF-07] a target is removed on its suggestion and in What we k
     /btn-primary/,
   );
   await expect(directions.getByText("Based on your earlier answers")).toHaveCount(0);
+});
+
+test("[STATE-06] earlier answers can be previewed and restored with their saved source", async ({
+  page,
+}) => {
+  const token = await emulatorToken("ada");
+  const { workspace } = await chosenTargetWorkspace(token);
+  const base = `/v1/workspaces/${workspace}`;
+  const first = await asBrowser<{
+    document: { current_role: { source_ref_id: string | null } };
+  }>("GET", `${base}/profile/versions/1`, token);
+  await signIn(page, "ada", chapterUrl("you", workspace));
+  await youView(page, "What we know");
+  await page.getByText("Earlier answers", { exact: true }).click();
+  await page.getByRole("button", { name: "View version 1" }).click();
+  const preview = page.getByRole("region", { name: "Answers in version 1" });
+  await expect(preview).toBeVisible();
+  await preview.getByRole("button", { name: "Restore version 1" }).click();
+  await expect(preview.getByText("Restore version 1 as a new saved version?")).toBeVisible();
+  await preview.getByRole("button", { name: "Confirm restore" }).click();
+  await expect(saved(page, 3)).toBeVisible();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Version 1 was restored as a new saved version." }),
+  ).toBeVisible();
+  const restored = await asBrowser<{
+    version: number;
+    document: { current_role: { source_ref_id: string | null } };
+  }>("GET", `${base}/profile`, token);
+  expect(restored.version).toBe(3);
+  expect(restored.document.current_role.source_ref_id).toBe(
+    first.document.current_role.source_ref_id,
+  );
 });
 
 for (const viewport of [

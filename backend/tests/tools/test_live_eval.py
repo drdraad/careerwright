@@ -97,35 +97,29 @@ def test_wonder_cases_run_on_the_production_model_within_their_own_caps() -> Non
     plan = authorise_eval(wonder, two, budget=WONDER_BUDGET, spent=NOTHING_SPENT, production=True)
 
     assert (plan.model_id, plan.production, plan.calls) == ("muse-wonder-1.0", True, 4)
-    # Two interview attempts ($0.176 each on Wonder: two requests).
+    # Each interview can use the normal call and one validation repair.
     assert plan.worst_case_nano_usd == 2 * 176_000_000 <= WONDER_MAX_COST_NANO_USD
-    # A discovery ($0.292 since Task 6g slice B's fix round set its output bound) runs alone.
-    # With an interview ($0.468), or as the explanation case's two runs ($0.584), it would pass
-    # the cap, so either is refused before any call.
     discovered = select(load_cases(), ["DSC-01"])
     alone = authorise_eval(
         wonder, discovered, budget=WONDER_BUDGET, spent=NOTHING_SPENT, production=True
     )
     assert alone.worst_case_nano_usd == 292_000_000 <= WONDER_MAX_COST_NANO_USD
-    for ids in (["INT-01", "DSC-01"], ["EXP-01"]):
-        with pytest.raises(CapExceededError, match="exceeds the cap"):
-            authorise_eval(
-                wonder,
-                select(load_cases(), ids),
-                budget=WONDER_BUDGET,
-                spent=NOTHING_SPENT,
-                production=True,
-            )
     four = select(load_cases(), None)
-    with pytest.raises(CapExceededError, match="exceeds the cap"):
-        authorise_eval(wonder, four, budget=WONDER_BUDGET, spent=NOTHING_SPENT, production=True)
-    with pytest.raises(CapExceededError, match="committed"):  # $0.50 in all, the pair included
+    default = authorise_eval(
+        wonder, four, budget=WONDER_BUDGET, spent=NOTHING_SPENT, production=True
+    )
+    assert default.worst_case_nano_usd <= WONDER_MAX_COST_NANO_USD
+    with pytest.raises(CapExceededError, match="committed"):
         authorise_eval(
-            wonder, two, budget=WONDER_BUDGET, spent=ScopeSpend(2, 2, 200_000_000), production=True
+            wonder,
+            two,
+            budget=WONDER_BUDGET,
+            spent=ScopeSpend(2, 2, 5_000_000_000 - plan.worst_case_nano_usd + 1),
+            production=True,
         )
-    with pytest.raises(CapExceededError, match="production calls used"):
+    with pytest.raises(CapExceededError, match="calls used"):
         authorise_eval(
-            wonder, two, budget=WONDER_BUDGET, spent=ScopeSpend(2, 12, 0), production=True
+            wonder, two, budget=WONDER_BUDGET, spent=ScopeSpend(47, 47, 0), production=True
         )
     # Without the flag the same configuration runs the test model, as before.
     assert authorise_eval(wonder, two, budget=ROOMY, spent=NOTHING_SPENT).model_id == (

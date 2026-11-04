@@ -3,13 +3,22 @@ decisions 23 to 27): the comparison, the archive paged and viewed, and a chosen 
 details. Every number here comes from `search_routes` and `check_route` on the same input."""
 
 from datetime import date
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
 from careerwright.errors import CareerwrightError, ErrorCode
 from careerwright.money import SignedMoney
-from careerwright.planning.catalogue import ActionKind, AwardState, OfferGate, RecordState
+from careerwright.planning.catalogue import (
+    ActionKind,
+    AwardState,
+    Citation,
+    CitationBasis,
+    Fact,
+    OfferGate,
+    RecordState,
+    SuppliedFact,
+)
 from careerwright.planning.checker import FindingCode, Scenario
 from careerwright.planning.comparison import (
     COMPARATOR_RULE,
@@ -438,6 +447,59 @@ def test_a_step_on_a_supplied_figure_or_a_proposed_record_names_why_it_is_qualif
     assert all(c.basis.value != "person" for c in step.sources)
 
 
+@pytest.mark.parametrize("record", ["concept", "offering", "concept_fact", "offering_fact"])
+def test_researched_step_keeps_sources_beside_person_supplied_figures(record: str) -> None:
+    source = Citation(
+        basis=CitationBasis.SOURCE,
+        source_id="research:course",
+        source_url="https://provider.example/course",
+        excerpt="A course in the required skill.",
+    )
+    own = Citation(basis=CitationBasis.PERSON, locator="The person's planning answers")
+    concept, offering, variant = course("researched", payments=((0, 1000),))
+    concept = concept.model_copy(update={"cited": None})
+    plan = offering.payment_plans[0]
+    plan = plan.model_copy(
+        update={
+            "supplied_cost": True,
+            "payments": [p.model_copy(update={"cited": own}) for p in plan.payments],
+        }
+    )
+    offering = offering.model_copy(
+        update={
+            "cited": None,
+            "payment_plans": [plan],
+            "supplied": [
+                SuppliedFact.START_DATE,
+                SuppliedFact.FINISH_DATE,
+                SuppliedFact.WEEKLY_HOURS,
+            ],
+        }
+    )
+    provenance = (
+        {"facts": [Fact(field="description", value="Course description", cited=source)]}
+        if record.endswith("_fact")
+        else {"cited": source}
+    )
+    if record.startswith("concept"):
+        concept = concept.model_copy(update=provenance)
+    else:
+        offering = offering.model_copy(update=provenance)
+    monthly = constructed(2, (concept, offering, variant), teaches=("researched",))
+    result = search_routes(monthly)
+    [step] = route_detail(result, monthly, index_of(result, ["researched"])).steps
+
+    assert step.sources == [source]
+    assert step.supplied == [
+        SuppliedFact.START_DATE,
+        SuppliedFact.FINISH_DATE,
+        SuppliedFact.WEEKLY_HOURS,
+        SuppliedFact.COST,
+    ]
+    assert StepQualification.SUPPLIED_FIGURES in step.qualified_by
+    assert monthly.variants[0].payments[0].cited == own
+
+
 @pytest.mark.req("VIS2-05", "VIS2-08", "OPTN-04")
 def test_the_gantt_shows_waits_before_a_start_and_an_offer_s_gate() -> None:
     later = course("later", first=2)
@@ -506,3 +568,63 @@ def test_the_baseline_kind_is_named_when_the_person_stated_it() -> None:
     found = comparison(search_routes(stated), stated)
     assert found.basis.baseline is not None
     assert found.basis.baseline.kind is BaselineKind.CURRENT_ROLE
+
+
+@pytest.mark.parametrize("changed_source", [None, "research", "expired_research", "definition"])
+def test_comparison_reports_changed_route_sources(
+    monkeypatch: pytest.MonkeyPatch, changed_source: str | None
+) -> None:
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+    from uuid import uuid4
+
+    from careerwright.api import routes_comparison
+
+    monthly = compile_input(trace_inputs(), trace_catalogue(), readiness=trace_readiness())
+    result = search_routes(monthly)
+    result = result.model_copy(
+        update={
+            "label": result.label.model_copy(update={"research_fingerprint": "original-research"})
+        }
+    )
+    view = SimpleNamespace(
+        result=result,
+        monthly=monthly,
+        solve=SimpleNamespace(inputs_version=1, capability_version=1),
+        run=SimpleNamespace(profile_version=1),
+    )
+    label = result.label
+    if changed_source == "research":
+        label = label.model_copy(update={"research_fingerprint": "refreshed-research"})
+    elif changed_source == "expired_research":
+        label = label.model_copy(update={"research_fingerprint": None})
+    monkeypatch.setattr(routes_comparison, "actor_transaction", lambda *_: nullcontext(None))
+    monkeypatch.setattr(routes_comparison, "solve_view", lambda *_: view)
+    monkeypatch.setattr(
+        routes_comparison,
+        "current_inputs",
+        lambda *_: SimpleNamespace(version=1, profile_version=1),
+    )
+    monkeypatch.setattr(routes_comparison, "capability_view", lambda *_: SimpleNamespace(version=1))
+    monkeypatch.setattr(
+        routes_comparison,
+        "_current_target_versions",
+        lambda *_: (
+            result.matrix_version,
+            "updated-definition" if changed_source == "definition" else result.definition_version,
+            label,
+        ),
+    )
+    response = routes_comparison.get_comparison(
+        uuid4(),
+        uuid4(),
+        cast(Any, SimpleNamespace(actor=SimpleNamespace(actor_id=uuid4()))),
+        cast(Any, SimpleNamespace(engine=None, keyring=None, capability=None)),
+    )
+    assert response.changed_since.model_dump() == {
+        "planning_inputs": False,
+        "profile": False,
+        "capability": False,
+        "target_matrix": changed_source == "definition",
+        "option_pack": changed_source in {"research", "expired_research"},
+    }

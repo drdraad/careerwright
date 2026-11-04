@@ -9,7 +9,6 @@ import type {
   BudgetScope,
   ConversationMode,
   DataMode,
-  Emphasis,
   EmptyReason,
   EntryMode,
   ErrorCode,
@@ -805,14 +804,6 @@ export const REFERENCE_BASIS: Record<SlateOut["reference"]["basis"], string> = {
     "Careerwright placed each suggestion by the training its job group usually needs, compared with the job group the UK job-title index gives your job title.",
   unknown:
     "Careerwright placed each suggestion by the training its job group usually needs: Aim higher is work that usually needs study after A-levels or similar.",
-};
-
-export const EMPHASIS: Record<Emphasis, string> = {
-  balanced: "Balanced",
-  practical: "Closer to what I do",
-  unfamiliar: "Less familiar",
-  broad: "Broader",
-  deeper: "More depth",
 };
 
 /** "Show why this wasn't included". */

@@ -107,7 +107,7 @@ export function layoutLabels(
       const spot = tries.find(
         (b) =>
           inside(b) &&
-          !covers.some((c) => meets(b, c, 0) || meets(leader(b), c, 0)) &&
+          !covers.some((c) => meets(b, c, APART) || meets(leader(b), c, 0)) &&
           !placed.some((o) => meets(b, o, APART)) &&
           !lines.some((line) => meets(b, line, 0)) &&
           !lights.some((l) => l.id !== id && meets(b, l.box, 0)) &&

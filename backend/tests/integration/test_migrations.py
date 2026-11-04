@@ -22,6 +22,7 @@ from careerwright.cli import (
     import_reference_data,
     import_taxonomy,
     migrate_app,
+    reset_demo,
     seed,
     seed_fixture,
 )
@@ -49,7 +50,7 @@ from careerwright.profile.records import (
     TargetRecord,
 )
 from careerwright.profile.targets import resolve_target, target_titles
-from careerwright.seed import FIXTURE_WORKSPACE_ID, INVITED_ACTORS
+from careerwright.seed import FIXTURE_PERSONAS, FIXTURE_WORKSPACE_ID, INVITED_ACTORS
 from careerwright.vocabulary import DataMode
 from tests.support.client import ApiClient
 from tests.support.esco import SAMPLE_PATH, SAMPLE_RELEASE
@@ -86,6 +87,12 @@ def test_a_fresh_database_migrates_to_head_and_seeds(infra: Infra, tmp_path: Pat
         import_reference_data(engine, sample_files(tmp_path))
         seed(engine, infra.ops_settings(database))
         seed(engine, infra.ops_settings(database))  # seeding twice changes nothing
+        before_reset = infra.query(
+            "SELECT workspace_id, count(*) AS versions FROM careerwright.planning_input_versions "
+            "GROUP BY workspace_id ORDER BY workspace_id",
+            database=database,
+        )
+        reset_demo(engine, infra.ops_settings(database))
     finally:
         engine.dispose()
 
@@ -97,7 +104,31 @@ def test_a_fresh_database_migrates_to_head_and_seeds(infra: Infra, tmp_path: Pat
         "(SELECT count(*) FROM careerwright.profile_versions) AS versions",
         database=database,
     )
-    assert counts == [{"actors": 2, "workspaces": 1, "versions": 1}]
+    assert counts == [{"actors": 2, "workspaces": 5, "versions": 5}]
+    fixtures = infra.query(
+        "SELECT workspace_id, fixture_key, synthetic, data_mode FROM careerwright.workspaces "
+        "ORDER BY fixture_key",
+        database=database,
+    )
+    assert [row["workspace_id"] for row in fixtures] == [
+        persona.workspace_id for persona in FIXTURE_PERSONAS
+    ]
+    assert [row["fixture_key"] for row in fixtures] == [persona.key for persona in FIXTURE_PERSONAS]
+    assert all(row["synthetic"] and row["data_mode"] == "demo" for row in fixtures)
+    after_reset = infra.query(
+        "SELECT workspace_id, count(*) AS versions FROM careerwright.planning_input_versions "
+        "GROUP BY workspace_id ORDER BY workspace_id",
+        database=database,
+    )
+    assert (
+        before_reset
+        == after_reset
+        == [
+            {"workspace_id": persona.workspace_id, "versions": 1}
+            for persona in FIXTURE_PERSONAS
+            if persona.key in {"p01", "p03"}
+        ]
+    )
 
 
 TABLES_0001 = (
@@ -190,7 +221,7 @@ def test_a_populated_database_upgrades_to_head_without_losing_data(infra: Infra)
     count = "SELECT count(*) AS n FROM careerwright.profile_versions"
     owner = infra.as_role("pg_api", count, actor=str(INVITED_ACTORS[0].actor_id), database=database)
     other = infra.as_role("pg_api", count, actor=str(INVITED_ACTORS[1].actor_id), database=database)
-    assert (owner, other) == ([{"n": 3}], [{"n": 0}])
+    assert (owner, other) == ([{"n": 7}], [{"n": 0}])
 
 
 def add_edited_workspace(tx: sa.Connection) -> uuid.UUID:

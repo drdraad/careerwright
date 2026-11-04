@@ -24,6 +24,7 @@ from careerwright.capability import store, usual
 from careerwright.capability.adverts import (
     MAX_SPANS_PER_EXAMPLE,
     AdvertSpan,
+    SelectedSpan,
     check_spans,
     read_spans,
 )
@@ -44,6 +45,7 @@ from careerwright.capability.skills import (
     AdvertExample,
     PersonQualification,
     TargetSkills,
+    chosen_parts,
     requirement_texts,
     target_skills,
 )
@@ -130,32 +132,39 @@ def skills_view(
     details = target_details(tx, workspace_id, document)
     examples = acquisition.examples(tx, keyring, workspace_id)
     selections = {(s.target_key, s.job_id): s for s in store.span_selections(tx, workspace_id)}
-    texts = [q.name for q in qualifications]
-    texts += [t for m in view.matrices for r in m.rows if r.required for t in requirement_texts(r)]
-    keys = taxonomy_store.concept_keys(tx, texts) if qualifications else {t: "" for t in texts}
-    targets: list[TargetSkills] = []
-    for matrix, record, assessment in zip(
-        view.matrices, view.records, readiness(view, data), strict=True
-    ):
-        held = details.get(record.key)
-        shown: list[AdvertExample] = []
-        for example in examples.get(matrix.target_key, []):
-            chosen = selections.get((matrix.target_key, example.job_id))
+    # The chosen parts are read first: their words are named by the qualifications too.
+    spans: dict[tuple[str, uuid.UUID], list[SelectedSpan]] = {}
+    for target_key, kept in examples.items():
+        for example in kept:
+            chosen = selections.get((target_key, example.job_id))
             if chosen is not None and chosen.content_sha256 != example.sha256:
                 raise CareerwrightError(  # kept text never changes: never shown as no spans
                     ErrorCode.INTERNAL_ERROR,
                     "An example's chosen parts don't match its text.",
                     stage=ErrorStage.CAPABILITY,
                 )
-            shown.append(
-                AdvertExample(
-                    job_id=example.job_id,
-                    title=example.title,
-                    employer=example.employer,
-                    text=example.text,
-                    spans=read_spans(example.text, chosen.spans) if chosen else [],
-                )
+            spans[target_key, example.job_id] = (
+                read_spans(example.text, chosen.spans) if chosen else []
             )
+    texts = [q.name for q in qualifications]
+    texts += [t for m in view.matrices for r in m.rows if r.required for t in requirement_texts(r)]
+    texts += [s.excerpt for chosen in spans.values() for s in chosen]
+    keys = taxonomy_store.concept_keys(tx, texts) if qualifications else {t: "" for t in texts}
+    targets: list[TargetSkills] = []
+    for matrix, record, assessment in zip(
+        view.matrices, view.records, readiness(view, data), strict=True
+    ):
+        held = details.get(record.key)
+        shown = [
+            AdvertExample(
+                job_id=example.job_id,
+                title=example.title,
+                employer=example.employer,
+                text=example.text,
+                spans=chosen_parts(spans[matrix.target_key, example.job_id], qualifications, keys),
+            )
+            for example in examples.get(matrix.target_key, [])
+        ]
         targets.append(
             target_skills(
                 matrix,
@@ -166,6 +175,8 @@ def skills_view(
                 examples=shown,
                 qualifications=qualifications,
                 keys=keys,
+                statements=view.statements,
+                evidence=view.evidence,
             )
         )
     return SkillsView(

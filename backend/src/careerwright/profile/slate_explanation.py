@@ -27,7 +27,6 @@ and quotation bounds, are product policy to be reviewed.
 
 import json
 import re
-import unicodedata
 import uuid
 from collections.abc import Iterable, Sequence
 from enum import StrEnum
@@ -42,6 +41,8 @@ from careerwright.profile.dashes import DASH_PROBLEM, DASH_RULE, model_dash
 from careerwright.profile.discovery import EvidenceItem
 from careerwright.profile.interview import ProfileField, ProposalOrigin
 from careerwright.profile.safety import inferred_sensitive_terms
+from careerwright.quote_spans import folded as _folded
+from careerwright.quote_spans import span_offsets, unwrapped
 
 # 2 (Task W2F slice E, the product owner: "Em-dashes are outlawed!"): never an em dash or a
 # spaced en dash in a claim.
@@ -326,39 +327,6 @@ _QUOTE_MARKS = re.compile(
     f"[{_DOUBLE}]"
     f"|(?<!\\w)['{_OPEN_SINGLE}][^'{_OPEN_SINGLE}{_CLOSE_SINGLE}]+?['{_CLOSE_SINGLE}](?!\\w)"
 )
-# Spans are matched with one kind of apostrophe and one kind of hyphen or dash.
-_APOSTROPHES = str.maketrans(
-    {
-        **dict.fromkeys(map(chr, (0x2018, 0x2019, 0x201B, 0x02BB, 0x02BC, 0x0060, 0x00B4)), "'"),
-        **dict.fromkeys(map(chr, (0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0x2015, 0x2212)), "-"),
-    }
-)
-# Taken off a quotation's ends: spaces and double quotation marks, and closing punctuation
-# at its end. Single quotes come off only as a matching pair (straight, or curly left and
-# right): a lone apostrophe may be the source's own ("'s work", "workers'").
-_EDGE_TRIM = f" \t\n{_DOUBLE}"
-_CLOSING = f" .,;:!?{chr(0x2026)}"
-_SINGLE_PAIRS = (("'", "'"), (_OPEN_SINGLE, _CLOSE_SINGLE))
-
-
-def _bare(text: str) -> str:
-    """Spaces and double quotation marks off both ends and closing punctuation off the end,
-    until nothing more comes off ('"mending bikes".' is 'mending bikes')."""
-    previous = None
-    while text != previous:
-        previous = text
-        text = text.strip(_EDGE_TRIM).rstrip(_CLOSING)
-    return text
-
-
-def unwrapped(text: str) -> str:
-    """A quotation as the check reads it: spaces, double quotation marks and closing
-    punctuation off its ends, and single quotes only as a matching pair."""
-    text = _bare(text)
-    for opening, closing in _SINGLE_PAIRS:
-        if len(text) > 2 and text.startswith(opening) and text.endswith(closing):
-            return _bare(text[1:-1])
-    return text
 
 
 def unsupported_claim_terms(text: str, allowed: Iterable[str]) -> list[str]:
@@ -371,64 +339,6 @@ def unsupported_claim_terms(text: str, allowed: Iterable[str]) -> list[str]:
         if pattern.search(text) and not pattern.search(allowed_text)
     ]
     return found + [sign for sign in _CURRENCY if sign in text and sign not in allowed_text]
-
-
-def _folded(text: str) -> tuple[str, list[int]]:
-    """The text in lower case, with compatibility forms, one kind of apostrophe and hyphen,
-    and single spaces; and, for each character of it, the index of the original character."""
-    chars: list[str] = []
-    index: list[int] = []
-    space = True  # drop leading whitespace
-    for i, original in enumerate(text):
-        if original.isspace():
-            if not space:
-                chars.append(" ")
-                index.append(i)
-            space = True
-            continue
-        for char in unicodedata.normalize("NFKC", original).translate(_APOSTROPHES).lower():
-            chars.append(char)
-            index.append(i)
-        space = False
-    if chars and chars[-1] == " ":
-        chars.pop()
-        index.pop()
-    return "".join(chars), index
-
-
-def _in_word(folded: str, i: int) -> bool:
-    """Whether the folded text's character `i` belongs to a word: a letter or digit, or an
-    apostrophe inside a word ("mechanic's", "don't": so "s tools" is no phrase of
-    "mechanic's tools") or after an "s" (a plural possessive, "students'"). Any other
-    apostrophe is a quotation mark, so "people person" is a phrase of "'people person'"."""
-    char = folded[i]
-    if char.isalnum():
-        return True
-    if char != "'":
-        return False
-    letter_before = i > 0 and folded[i - 1].isalpha()
-    letter_after = i + 1 < len(folded) and folded[i + 1].isalpha()
-    return (letter_before and letter_after) or (i > 0 and folded[i - 1] == "s" and not letter_after)
-
-
-def span_offsets(quote: str, source: str) -> tuple[int, int] | None:
-    """The start and end, in the source, of the first place the quotation appears in it
-    whole (case, spacing and apostrophe forms aside), starting and ending at a word
-    boundary; None if it appears nowhere so. Page extraction cites these offsets
-    (`careerwright.evidence.extraction`)."""
-    wanted, _ = _folded(quote)
-    folded, index = _folded(source)
-    if not wanted:
-        return None
-    start = folded.find(wanted)
-    while start != -1:
-        end = start + len(wanted)
-        before = start == 0 or not _in_word(folded, start - 1)
-        after = end == len(folded) or not _in_word(folded, end)
-        if before and after:
-            return index[start], index[end - 1] + 1
-        start = folded.find(wanted, start + 1)
-    return None
 
 
 def find_span(quote: str, source: str) -> str | None:

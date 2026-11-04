@@ -119,6 +119,9 @@ class ExtractionOutcome(StrEnum):
     # Every posting it verified disagrees with another on a critical field: none published
     # (review C M5).
     POSTINGS_CONFLICTING = "postings_conflicting"
+    OPTIONS_RECORDED = "options_recorded"
+    NO_OPTION_FOUND = "no_option_found"
+    OPTIONS_UNVERIFIED = "options_unverified"
 
 
 class BodyNotKept(StrEnum):

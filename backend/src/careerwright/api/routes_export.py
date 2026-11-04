@@ -36,6 +36,8 @@ from careerwright.identity.keyring import Keyring
 from careerwright.identity.records import Run, WorkspaceEvent
 from careerwright.identity.spend_limits import spend_summary
 from careerwright.identity.workspaces import visible_workspace
+from careerwright.planning import store as planning_store
+from careerwright.planning.plan_records import PlanSnapshot
 from careerwright.profile import interview_store
 from careerwright.profile import store as profile_store
 from careerwright.profile.conversation import turn_view
@@ -53,7 +55,7 @@ class WorkspaceExport(ResponseModel):
     format: Literal["careerwright.workspace-export"] = "careerwright.workspace-export"
     # 4 (Task 6b): each discovery carries its slate's written explanation, if asked for.
     # 5 (Task 6g slice B): each discovery's proposal carries its aim higher title ideas.
-    format_version: Literal[5] = 5
+    format_version: Literal[6] = 6
     exported_at: datetime
     synthetic: bool
     workspace: WorkspaceOut
@@ -69,6 +71,7 @@ class WorkspaceExport(ResponseModel):
         "searches and the answers they cite; a written explanation is never cited as one."
     )
     interview_preferences: PreferencesOut
+    plans: list[PlanSnapshot] = Field(description="Chosen plan versions, oldest first.")
     spend: SpendOut
 
 
@@ -164,6 +167,7 @@ def export_workspace(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> 
         concepts = _all_concepts(tx, workspace_id)
         found = _all_discoveries(tx, deps.keyring, workspace_id)
         preferences = current_preferences(tx, workspace_id)
+        plans = planning_store.plan_versions(tx, workspace_id)
         spend = spend_summary(tx, workspace_id, deps.clock(), deps.spend_defaults)
     return WorkspaceExport(
         exported_at=deps.clock(),
@@ -178,5 +182,6 @@ def export_workspace(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> 
         provisional_concepts=[ProvisionalConceptOut.of(c) for c in concepts],
         discoveries=found,
         interview_preferences=PreferencesOut.of(preferences),
+        plans=plans,
         spend=SpendOut.of(spend),
     )

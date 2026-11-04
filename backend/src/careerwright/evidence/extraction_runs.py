@@ -26,11 +26,16 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from careerwright.db import Tx
-from careerwright.evidence import extraction, store
+from careerwright.evidence import extraction, option_extraction, option_records, store
 from careerwright.evidence.acquire import AcquisitionResult
 from careerwright.evidence.extraction import ExtractionInput, ExtractionProposal
 from careerwright.evidence.recording import record_copies
-from careerwright.evidence.records import MODEL_READABLE, AttemptStatus, ExtractionNotRun
+from careerwright.evidence.records import (
+    MODEL_READABLE,
+    AttemptStatus,
+    ExtractionNotRun,
+    ExtractionOutcome,
+)
 from careerwright.identity import credential_store, run_store
 from careerwright.identity import store as identity_store
 from careerwright.identity.activity import run_worst_case_nano_usd
@@ -178,16 +183,101 @@ def start_extraction(
     )
 
 
+def start_option_extraction(
+    tx: Tx,
+    keyring: Keyring,
+    models: ModelChoice,
+    run: Run,
+    attempt_id: uuid.UUID,
+    result: AcquisitionResult,
+    now: datetime,
+) -> None:
+    """One option page without structured records goes to the same bounded extraction kind."""
+    if result.status is not AttemptStatus.SUCCEEDED:
+        return
+    if result.extraction_text is None:
+        store.insert_extraction_not_run(
+            tx,
+            attempt_id=attempt_id,
+            workspace_id=run.workspace_id,
+            acquisition_run_id=run.run_id,
+            reason=ExtractionNotRun.NO_VISIBLE_TEXT,
+        )
+        return
+    current = run_store.run(tx, run.run_id)
+    model = models.for_workspace(synthetic=run.synthetic)
+    if current is None or current.cancel_requested_at is not None:
+        reason: ExtractionNotRun | None = ExtractionNotRun.ACQUISITION_CANCELLED
+    else:
+        reason = _not_run(tx, run, model, result.extraction_text, now)
+    if reason is not None:
+        store.insert_extraction_not_run(
+            tx,
+            attempt_id=attempt_id,
+            workspace_id=run.workspace_id,
+            acquisition_run_id=run.run_id,
+            reason=reason,
+        )
+        return
+    context = option_extraction.OptionExtractionInput(text=result.extraction_text)
+    extraction_run = uuid.uuid4()
+    store.submit_extraction(
+        tx,
+        attempt_id=attempt_id,
+        run_id=extraction_run,
+        model_id=model.model_id,
+        model_mode=model.mode.value,
+        sealed=keyring.seal(
+            context.model_dump_json().encode(), input_context(run.workspace_id, extraction_run)
+        ),
+        text_sha256=context.sha256,
+    )
+    identity_store.append_event(
+        tx,
+        run.workspace_id,
+        EventKind.RUN_STATE_CHANGED,
+        str(extraction_run),
+        state=WorkState.QUEUED,
+        detail={"kind": RunKind.PAGE_EXTRACTION.value},
+    )
+
+
 def record_extraction(tx: Tx, _keyring: Keyring, run: Run, output: BaseModel) -> None:
     """Worker, in the transaction that accepts the extraction's output (`RunTask.record`):
     its postings as copies of the page's attempt, and what it found. Raises when the page
     is not on record, so nothing is accepted."""
-    if not isinstance(output, ExtractionProposal):
-        raise TypeError("a page extraction's output is its checked proposal")
     link = store.extraction_of_run(tx, run.run_id)
     page = None if link is None else store.attempt(tx, link.attempt_id)
     if link is None or page is None:
         raise LookupError("the extraction's page is not on record")
+    if isinstance(output, option_extraction.OptionExtractionProposal):
+        target = next(
+            (t for t in store.targets(tx, link.acquisition_run_id) if t.position == page.position),
+            None,
+        )
+        if target is None or target.option_research_id is None:
+            raise LookupError("the option extraction has no research target")
+        store.lock_workspace_records(tx, run.workspace_id)
+        count = option_records.record_proposal(
+            tx,
+            run,
+            target.option_research_id,
+            page.attempt_id,
+            page.final_url or page.requested_url or "",
+            page.finished_at or page.started_at,
+            output,
+        )
+        outcome = (
+            ExtractionOutcome.OPTIONS_RECORDED
+            if count
+            else ExtractionOutcome.OPTIONS_UNVERIFIED
+            if output.dropped
+            else ExtractionOutcome.NO_OPTION_FOUND
+        )
+        store.set_extraction_outcome(tx, run.run_id, outcome)
+        return
+    if not isinstance(output, ExtractionProposal):
+        raise TypeError("a page extraction's output is its checked proposal")
     store.lock_workspace_records(tx, run.workspace_id)
     record_copies(
         tx,

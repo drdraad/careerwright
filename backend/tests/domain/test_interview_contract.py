@@ -279,6 +279,47 @@ def test_an_invalid_update_is_a_problem_the_repair_request_can_name(
     assert any(expected in problem for problem in found), found
 
 
+def test_redundant_model_slots_do_not_discard_checked_answers() -> None:
+    ctx = context("I am out of work. I enjoy fixing machines, not paperwork or desk work.")
+    proposal, found = check_turn(
+        output(
+            update("enjoyed_tasks", text="fixing machines", items=["fixing machines"]),
+            update(
+                "disliked_tasks",
+                text="paperwork; desk work",
+                items=["paperwork", "desk work"],
+            ),
+            update("work_status", text="looking_for_work", items=[]),
+        ),
+        ctx,
+        ProposalOrigin.MODEL,
+    )
+
+    assert found == []
+    assert proposal is not None
+    assert {change.field: change.value for change in proposal.changes} == {
+        ProfileField.ENJOYED_TASKS: ["fixing machines"],
+        ProfileField.DISLIKED_TASKS: ["paperwork", "desk work"],
+        ProfileField.WORK_STATUS: "looking_for_work",
+    }
+    assert all(change.message_ids == [M1] for change in proposal.changes)
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        update("enjoyed_tasks", text="driving", items=["fixing machines"]),
+        update("target_titles", text="Nurse", items=["Data analyst"]),
+        update("direct_spend_cap", text="100", items=["500"]),
+        update("qualifications", text="achieved: GCSE maths", items=["achieved: GCSE maths"]),
+    ],
+)
+def test_a_distinct_or_consequential_second_value_still_requires_repair(
+    bad: dict[str, Any],
+) -> None:
+    assert problems(output(bad), context("I liked fixing machines."))
+
+
 def test_two_updates_to_one_field_and_out_of_bounds_text_are_problems() -> None:
     assert problems(output(update("current_role", text="A"), update("current_role", text="B")))
     assert problems(output(reply=""))
@@ -419,7 +460,7 @@ def instructions_text() -> str:
 # Task W2F (session W2's findings 4 to 7 and Sam's first message): one new prompt version.
 @pytest.mark.req("REC1-04", "PROF-08")
 def test_the_version_moved_and_what_the_person_doesnt_enjoy_goes_in_its_own_answer() -> None:
-    assert PROMPT_VERSION == "interview-turn-7"  # slice E moved it on
+    assert PROMPT_VERSION == "interview-turn-9"
     assert "disliked_tasks: what they don't enjoy or find draining." in instructions_text()
     assert "Keep these four apart" in instructions_text()
 
@@ -581,6 +622,8 @@ def test_the_one_question_lives_only_in_next_question_never_in_the_reply() -> No
     ctx = context("I could work in York.")
 
     assert "only in next_question" in INSTRUCTIONS
+    assert "for one thing" in INSTRUCTIONS
+    assert "Don't combine them" in INSTRUCTIONS
     assert problems(output(), ctx) == []
     assert problems(output(reply="Thanks. Where could you work?"), ctx) == [
         "reply: no question here; ask the one question only in next_question"
@@ -614,7 +657,7 @@ def test_the_prompt_says_how_the_person_chose_to_start_and_to_be_spoken_to() -> 
     payload = json.loads(render_prompt(ctx).removeprefix(CONTEXT_MARKER))
 
     assert (payload["entry"], payload["mode"]) == ("sure", "gentle")
-    assert ctx.prompt_version == "interview-turn-7"
+    assert ctx.prompt_version == "interview-turn-9"
 
 
 @pytest.mark.req("PROF-09")
@@ -923,7 +966,7 @@ def test_the_instructions_say_never_to_write_an_em_dash() -> None:
 
 @pytest.mark.req("STATE-11", "PROF-14")
 def test_the_instructions_say_an_answer_state_is_never_text() -> None:
-    assert PROMPT_VERSION == "interview-turn-7"
+    assert PROMPT_VERSION == "interview-turn-9"
     assert '"no_job_yet" when they haven\'t had a job yet (a state, never text)' in (
         instructions_text()
     )

@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  type CheckpointOut,
   type ChooseClosest,
   type ChooseRole,
   type ChooseTarget,
@@ -28,9 +29,12 @@ import {
   type ExplanationRunOut,
   estimateRun,
   getMe,
+  getOptionCheckpoint,
   getOrigin,
+  getPlanningInputs,
   getPreferences,
   getProfile,
+  getProfileVersion,
   getSketch,
   getSlate,
   getSpend,
@@ -39,6 +43,8 @@ import {
   getWorkspace,
   listCredentials,
   listDiscoveries,
+  listPlanningOptions,
+  listProfileVersions,
   listRoleResearch,
   listSources,
   listTargets,
@@ -49,12 +55,17 @@ import {
   type NoJobYet,
   nameRole,
   noJobYet,
+  type OptionsOut,
+  type OptionTextRef,
   type OriginOut,
   type PartialReplyOut,
+  type PasteOptionText,
+  type PlanningInputsOut,
   type PreferencesOut,
   type ProfileInput,
   type ProfileOut,
   type ProfileSavedOut,
+  pasteOptionText,
   putPreferences,
   putProfile,
   putSpendLimits,
@@ -90,6 +101,8 @@ import {
   type TitleMatchesOut,
   type TurnOut,
   type TurnSubmittedOut,
+  type WriteInputs,
+  writePlanningInputs,
 } from "@/generated/api";
 import { API_BASE, ApiError, ChangeKeys } from "./api";
 import { openWorkspaceStream, type StreamStatus } from "./events";
@@ -101,6 +114,9 @@ export const keys = {
   workspaces: ["workspaces"] as const,
   workspace: (id: string) => ["ws", id, "workspace"] as const,
   profile: (id: string) => ["ws", id, "profile"] as const,
+  profileVersions: (id: string) => ["ws", id, "profile", "versions"] as const,
+  profileVersion: (id: string, version: number) =>
+    ["ws", id, "profile", "versions", version] as const,
   sources: (id: string) => ["ws", id, "sources"] as const,
   scope: (id: string) => ["ws", id] as const,
   /** A turn's streamed reply (`GET .../interview/turns/{id}/reply`). */
@@ -115,6 +131,9 @@ export const keys = {
   noteRequests: (id: string, discoveryId: string) =>
     ["ws", id, "discoveries", discoveryId, "note-requests"] as const,
   sketch: (id: string) => ["ws", id, "sketch"] as const,
+  planningOptions: (id: string) => ["ws", id, "planning", "options"] as const,
+  checkpoint: (id: string) => ["ws", id, "planning", "checkpoint"] as const,
+  planningInputs: (id: string) => ["ws", id, "planning", "inputs"] as const,
   targets: (id: string) => ["ws", id, "targets"] as const,
   roleResearch: (id: string) => ["ws", id, "role-research"] as const,
   origin: (id: string) => ["ws", id, "origin"] as const,
@@ -207,6 +226,34 @@ export function profileQuery(id: string) {
 
 export function useProfile(id: string, enabled = true) {
   return useQuery({ ...profileQuery(id), enabled });
+}
+
+export function useProfileVersions(id: string, enabled = true) {
+  return useQuery({
+    queryKey: keys.profileVersions(id),
+    queryFn: (): Promise<ProfileOut[]> =>
+      allPages(
+        async (query) =>
+          (await listProfileVersions({ path: path(id), query, throwOnError: true })).data,
+      ),
+    retry: retryable,
+    enabled,
+  });
+}
+
+export function useProfileVersion(id: string, version: number | null, enabled = true) {
+  return useQuery({
+    queryKey: keys.profileVersion(id, version ?? 0),
+    queryFn: async (): Promise<ProfileOut> =>
+      (
+        await getProfileVersion({
+          path: { ...path(id), version: version ?? 0 },
+          throwOnError: true,
+        })
+      ).data,
+    retry: retryable,
+    enabled: enabled && version !== null,
+  });
 }
 
 /** Every source reference of the workspace (a provenance list is never truncated). */
@@ -583,6 +630,75 @@ export function useSketch(id: string, enabled = true) {
     retry: retryable,
     enabled,
   });
+}
+
+// The Options chapter's reads and its one write (Task 12b, screens half), shared with Routes.
+
+/** Each target's options as the planning model reads them: titles, providers, dates, payment
+ *  plans and funding schemes, every field cited or unknown with its reason. */
+export function usePlanningOptions(id: string, enabled = true) {
+  return useQuery({
+    queryKey: keys.planningOptions(id),
+    queryFn: async (): Promise<OptionsOut> =>
+      (await listPlanningOptions({ path: path(id), throwOnError: true })).data,
+    retry: retryable,
+    enabled,
+  });
+}
+
+/** The review checkpoint: for each option, what the route search still lacks. */
+export function useCheckpoint(id: string, enabled = true) {
+  return useQuery({
+    queryKey: keys.checkpoint(id),
+    queryFn: async (): Promise<CheckpointOut> =>
+      (await getOptionCheckpoint({ path: path(id), throwOnError: true })).data,
+    retry: retryable,
+    enabled,
+  });
+}
+
+/** The person's planning inputs, with their version for the next write. */
+export function usePlanningInputs(id: string, enabled = true) {
+  return useQuery({
+    queryKey: keys.planningInputs(id),
+    queryFn: async (): Promise<PlanningInputsOut> =>
+      (await getPlanningInputs({ path: path(id), throwOnError: true })).data,
+    retry: retryable,
+    enabled,
+  });
+}
+
+/** Replaces the planning inputs as their next version: the whole document, against the version
+ *  the person saw (`lib/planningInputs` builds it from the stored one). */
+export function useWritePlanningInputs(id: string) {
+  return useCommand(
+    id,
+    async (body: WriteInputs, key: string) =>
+      (
+        await writePlanningInputs({
+          path: path(id),
+          body,
+          headers: { "Idempotency-Key": key },
+          throwOnError: true,
+        })
+      ).data as PlanningInputsOut,
+  );
+}
+
+/** Keeps a page's text the person pasted for an option they add: its source, never fetched. */
+export function usePasteOptionText(id: string) {
+  return useCommand(
+    id,
+    async (body: PasteOptionText, key: string) =>
+      (
+        await pasteOptionText({
+          path: path(id),
+          body,
+          headers: { "Idempotency-Key": key },
+          throwOnError: true,
+        })
+      ).data as OptionTextRef,
+  );
 }
 
 /** Words worth matching: a letter or a digit (the API refuses anything else). */

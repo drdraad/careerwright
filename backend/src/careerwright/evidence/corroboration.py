@@ -34,7 +34,7 @@ from enum import StrEnum
 from careerwright.evidence.jobs import CanonicalFacts, canonical_facts, same_job
 from careerwright.evidence.pages import EXCERPT_CHARS
 from careerwright.evidence.records import JobCopy, RightsClass
-from careerwright.profile.slate_explanation import span_offsets
+from careerwright.quote_spans import span_offsets
 
 # The classes the corroboration rule calls official (ADR 0015 decision 2).
 OFFICIAL_CLASSES = frozenset(

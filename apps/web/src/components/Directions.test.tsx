@@ -3,7 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type {
   DiscoveryOut,
   ProfileOut,
@@ -224,6 +224,8 @@ function renderDirections(
   withProfile: ProfileOut = profile,
 ) {
   const queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const onEditAnswers = vi.fn();
+  const onNameRole = vi.fn();
   const view = (found: DiscoveryOut) => (
     <QueryClientProvider client={queries}>
       <EvidenceProvider>
@@ -231,6 +233,8 @@ function renderDirections(
           workspaceId={WS}
           profile={withProfile}
           discovery={found}
+          onEditAnswers={onEditAnswers}
+          onNameRole={onNameRole}
           {...(unavailable === undefined ? {} : { unavailable })}
         />
         <EvidenceDrawer />
@@ -238,7 +242,12 @@ function renderDirections(
     </QueryClientProvider>
   );
   const { rerender } = render(view(shown));
-  return { user: userEvent.setup(), rerender: (found: DiscoveryOut) => rerender(view(found)) };
+  return {
+    user: userEvent.setup(),
+    onEditAnswers,
+    onNameRole,
+    rerender: (found: DiscoveryOut) => rerender(view(found)),
+  };
 }
 
 const slateRoute: Route = { method: "GET", path: /\/slate$/, answer: () => slate([suggestion]) };
@@ -256,13 +265,13 @@ async function openNotes(user: ReturnType<typeof userEvent.setup>, count: number
 }
 
 describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls, and choosing", () => {
-  it("shows why, what might not suit and a small test, fewer with the reason, and no percentage", async () => {
+  it("shows why first and keeps the other detail one step away", async () => {
     fakeApi([{ method: "GET", path: /\/slate$/, answer: slate([suggestion]) }]);
     const { user } = renderDirections();
 
     expect(await screen.findByRole("heading", { name: "Bicycle mechanic" })).toBeVisible();
     expect(screen.getByText("Why this could suit you")).toBeVisible();
-    expect(screen.getByText("Try it before committing")).toBeVisible();
+    expect(screen.getByText("Try it before committing")).not.toBeVisible();
     // Never overwhelming: the notes are one step away, and each keeps its words there.
     const few = /Careerwright found only 1 occupation for Next step/;
     expect(screen.getByText(few)).not.toBeVisible();
@@ -286,6 +295,52 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
     expect(document.body.textContent).not.toMatch(/\d\s?(%|per ?cent)/i); // a number as a percentage
   });
 
+  it("shows one sentence about the work and the reason, with the full account and checked quotes one step away", async () => {
+    const long = {
+      ...suggestion,
+      workday:
+        "Bicycle mechanics maintain and repair bicycles. They also inspect parts, explain repairs and test the finished work.",
+    };
+    fakeApi([{ method: "GET", path: /\/slate$/, answer: slate([long]) }]);
+    const { user } = renderDirections();
+    const shown = within(await card());
+
+    expect(shown.getByText("Bicycle mechanics maintain and repair bicycles.")).toBeVisible();
+    expect(shown.getByText(long.workday)).not.toBeVisible();
+    expect(shown.getByText(/mostly maintaining and repairing them/)).toBeVisible();
+    expect(shown.getByText("How Careerwright found it")).not.toBeVisible();
+    expect(shown.getByText("Try it before committing")).not.toBeVisible();
+    expect(shown.getByText("You said:")).not.toBeVisible();
+    for (const name of [
+      "Balanced",
+      "Closer to what I do",
+      "Less familiar",
+      "Broader",
+      "More depth",
+    ]) {
+      expect(screen.queryByRole("button", { name })).toBeNull();
+    }
+
+    await user.click(shown.getByText("More about this role"));
+    expect(shown.getByText(long.workday)).toBeVisible();
+    expect(shown.getByText("How Careerwright found it")).toBeVisible();
+    expect(shown.getByText("You said:")).toBeVisible();
+    expect(shown.getByText("Try it before committing")).toBeVisible();
+  });
+
+  it("cuts a long first sentence at a word and keeps the full description available", async () => {
+    const workday = `Bicycle mechanics ${"inspect and repair complicated equipment ".repeat(6)}every day.`;
+    fakeApi([{ method: "GET", path: /\/slate$/, answer: slate([{ ...suggestion, workday }]) }]);
+    const { user } = renderDirections();
+    const shown = within(await card());
+    const preview = shown.getByText(/^Bicycle mechanics.*…$/);
+    expect(preview.textContent?.length).toBeLessThanOrEqual(141);
+    expect(workday.startsWith(preview.textContent?.slice(0, -1) ?? "")).toBe(true);
+    expect(shown.getByText(workday)).not.toBeVisible();
+    await user.click(shown.getByText("More about this role"));
+    expect(shown.getByText(workday)).toBeVisible();
+  });
+
   it("[DIV1-16][DIV1-12] lists Next step then Aim higher, never by direction, and says an Aim higher job group's usual training", async () => {
     // The product owner's re-test (3 November 2026): "Directions to consider" was very odd,
     // and the suggestions too basic. The API places each in a set; the web heads the two.
@@ -304,6 +359,12 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
 
     const sets = await screen.findAllByRole("heading", { level: 3 });
     expect(sets.map((heading) => heading.textContent)).toEqual(["Next step", "Aim higher"]);
+    expect(
+      screen.getByText("These job groups usually need less study than Aim higher."),
+    ).toBeVisible();
+    expect(
+      screen.getByText("These job groups usually need study after A-levels or similar."),
+    ).toBeVisible();
     for (const direction of ["Directions to consider", "Close to what you do now"]) {
       expect(screen.queryByText(direction)).toBeNull();
     }
@@ -322,7 +383,9 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
     ).toBeVisible();
     // Next step says nothing of training.
     const next = screen.getByRole("region", { name: "Next step" });
-    expect(within(next).getByText("Kind of work: Machinery mechanics and repairers")).toBeVisible();
+    expect(
+      within(next).getByText("Kind of work: Machinery mechanics and repairers"),
+    ).not.toBeVisible();
     expect(within(next).queryByText(/usually needs/)).toBeNull();
   });
 
@@ -431,7 +494,6 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
     expect(await screen.findByRole("heading", { name: "Next step" })).toBeVisible();
     expect(screen.queryByText("Close to what you do now")).toBeNull();
     expect(screen.queryByRole("button", { name: "Closer to what I do" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Balanced" })).toBeVisible();
     cleanup();
 
     // No role, no target: someone who said they haven't had a job is never told their work
@@ -448,7 +510,7 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
     expect(screen.queryByRole("button", { name: "Closer to what I do" })).toBeNull();
     cleanup();
 
-    // A role kept in their words: "Closer to what I do" is offered.
+    // A role kept in their words does not bring back the old direction buttons.
     const working: ProfileOut = {
       ...profile,
       document: {
@@ -457,11 +519,11 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
       },
     };
     renderDirections(discovery, undefined, working);
-    expect(await screen.findByRole("button", { name: "Closer to what I do" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Next step" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Closer to what I do" })).toBeNull();
   });
 
-  it("[PROF-14] resets Closer to what I do to Balanced once it isn't offered, so no hidden view stays applied", async () => {
-    // Task 6f review M3: chosen while the role was known, then the role stops being known.
+  it("[PROF-14] keeps the neutral view when the person's role changes", async () => {
     const sent = fakeApi([slateRoute]);
     const working: ProfileOut = {
       ...profile,
@@ -486,24 +548,16 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
       </QueryClientProvider>
     );
     const { rerender } = render(view(working));
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Closer to what I do" }));
-    await waitFor(() =>
-      expect(sent.some((s) => s.query.includes("emphasis=practical"))).toBe(true),
-    );
+    await screen.findByRole("heading", { name: "Next step" });
 
     rerender(view(noJob));
 
     expect(screen.queryByRole("button", { name: "Closer to what I do" })).toBeNull();
-    expect(await screen.findByRole("button", { name: "Balanced" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    await waitFor(() =>
-      expect(sent.filter((s) => s.path.endsWith("/slate")).at(-1)?.query).toContain(
-        "emphasis=balanced",
-      ),
-    );
+    expect(
+      sent
+        .filter((s) => s.path.endsWith("/slate"))
+        .every((s) => s.query.includes("emphasis=balanced")),
+    ).toBe(true);
   });
 
   it("[DIV1-04][TEST1-15] lists a title idea the UK job-title index lists beside the slate, with its answers", async () => {
@@ -674,6 +728,32 @@ describe("[REC1-05][REC1-07][REC1-08][DIV1-06] the slate in words, its controls,
     expect(await screen.findByText(line, { exact: false })).toBeVisible();
   });
 
+  it("offers a concrete next action when a demo answer finds no work", async () => {
+    fakeApi([
+      {
+        method: "GET",
+        path: /\/slate$/,
+        answer: { ...slate([]), pool_size: 0, queries: [nothing] },
+      },
+    ]);
+    const fixture = {
+      ...discovery,
+      proposal: { origin: "fixture" },
+    } as unknown as DiscoveryOut;
+    const { user, onEditAnswers, onNameRole } = renderDirections(fixture);
+
+    expect(
+      await screen.findByRole("heading", { name: "No directions found from these answers" }),
+    ).toBeVisible();
+    expect(
+      screen.getByText(/synthetic demo searches your words in ESCO skill names/),
+    ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Add a concrete task" }));
+    expect(onEditAnswers).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole("button", { name: "Name a role" }));
+    expect(onNameRole).toHaveBeenCalledOnce();
+  });
+
   it("excludes a title as a view only, and makes a target only when chosen", async () => {
     const sent = fakeApi([
       {
@@ -772,7 +852,7 @@ const other: SuggestionOut = {
 };
 
 describe("[REC1-11] the written why: one request per slate, its states, provenance always", () => {
-  it("asks once when the slate first shows, and a changed view never asks again", async () => {
+  it("asks once when the slate first shows, and an exclusion never asks again", async () => {
     const sent = fakeApi([
       slateRoute,
       {
@@ -786,10 +866,6 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
 
     expect(await within(await card()).findByText(/writing a note/)).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent(/is writing a note/);
-    await user.click(screen.getByRole("button", { name: "Less familiar" }));
-    await waitFor(() =>
-      expect(sent.some((s) => s.query.includes("emphasis=unfamiliar"))).toBe(true),
-    );
     await user.click(screen.getByRole("button", { name: "Not for me : Bicycle mechanic" }));
     await waitFor(() => expect(sent.some((s) => s.query.includes("exclude_concept"))).toBe(true));
 
@@ -879,13 +955,16 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
     await waitFor(() => expect(noteRequests(sent)).toHaveLength(2));
   });
 
-  it("shows the note and each checked quotation above how Careerwright found it", async () => {
+  it("shows the note first and keeps checked quotations above how Careerwright found it, one step away", async () => {
     const sent = fakeApi([slateRoute]);
-    renderDirections();
+    const { user } = renderDirections();
 
     const shown = within(await card());
     const note = shown.getByText(/mostly maintaining and repairing them/);
     const found = shown.getByText(FOUND_BY);
+    expect(note).toBeVisible();
+    expect(found).not.toBeVisible();
+    await user.click(shown.getByText("More about this role"));
     expect(shown.getByText("You said:")).toBeVisible();
     expect(shown.getByText("ESCO's description:")).toBeVisible();
     expect(shown.getByText(/“maintain and repair bicycles”/)).toBeVisible();
@@ -912,7 +991,10 @@ describe("[REC1-11] the written why: one request per slate, its states, provenan
     rerender(
       discoveryWith(explanation("complete", { ...WRITTEN, origin: "fixture" } as typeof WRITTEN)),
     );
-    expect(await screen.findByText(/Written by the demo explainer \(synthetic\)/)).toBeVisible();
+    const writtenBy = await screen.findByText(/Written by the demo explainer \(synthetic\)/);
+    expect(writtenBy).not.toBeVisible();
+    await userEvent.setup().click(within(await card()).getByText("More about this role"));
+    expect(writtenBy).toBeVisible();
   });
 
   it("shows a note that failed after a request as unavailable, and offers Suggest again", async () => {
@@ -1193,9 +1275,12 @@ describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, as a plain
 
     const mechanic = await card();
     // The reason above says how they were joined; this line only names the skills (D-I2).
-    expect(
-      within(mechanic).getByText("Among them: adjust brakes, fit tyres and replace chains."),
-    ).toBeVisible();
+    const first = within(mechanic).getByText(
+      "Among them: adjust brakes, fit tyres and replace chains.",
+    );
+    expect(first).not.toBeVisible();
+    await user.click(within(mechanic).getByText("More about this role"));
+    expect(first).toBeVisible();
     const rest = within(mechanic).getByText("The other 2 skills");
     expect(within(mechanic).getByText("true wheels")).not.toBeVisible();
     await user.click(rest);
@@ -1206,9 +1291,10 @@ describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, as a plain
   it("names all the skills it was joined by when there are only a few", async () => {
     const few = { ...joined, shared_skills: joined.shared_skills.slice(0, 3) };
     fakeApi([{ method: "GET", path: /\/slate$/, answer: slate([few]) }]);
-    renderDirections();
+    const { user } = renderDirections();
 
     const mechanic = await card();
+    await user.click(within(mechanic).getByText("More about this role"));
     expect(
       within(mechanic).getByText("Those skills: adjust brakes, fit tyres and replace chains."),
     ).toBeVisible();
@@ -1220,6 +1306,7 @@ describe("[STATE-10][DIV1-10][WLD-10] the skills a suggestion shares, as a plain
     const { user } = renderDirections();
 
     const mechanic = await card();
+    await user.click(within(mechanic).getByText("More about this role"));
     expect(
       within(mechanic).getByText("Among them: adjust brakes, fit tyres and replace chains."),
     ).toBeVisible();
@@ -1505,19 +1592,23 @@ describe("[REC1-05] an open suggestion: its title, what the work is and its kind
     const description = within(mechanic).getByText(
       "Bicycle mechanics maintain and repair bicycles.",
     );
-    const kind = within(mechanic).getByText("Kind of work: Machinery mechanics and repairers");
     const why = within(mechanic).getByText("Why this could suit you");
+    const more = within(mechanic).getByText("More about this role");
+    const kind = within(mechanic).getByText("Kind of work: Machinery mechanics and repairers");
     const follows = (first: Node, then: Node) =>
       (first.compareDocumentPosition(then) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
     expect(heading).toHaveClass("section-title");
     expect(
       follows(choose, heading) &&
         follows(heading, description) &&
-        follows(description, kind) &&
-        follows(kind, why),
+        follows(description, why) &&
+        follows(why, more) &&
+        follows(more, kind),
     ).toBe(true);
     expect(description).not.toHaveClass("small"); // body size, never the 14 px of a note
-    // The kind of work no longer sits under the title, between it and the choice.
+    expect(kind).not.toBeVisible();
+    await userEvent.setup().click(more);
+    expect(kind).toBeVisible();
     expect(within(mechanic).getAllByText(/^Kind of work:/)).toHaveLength(1);
   });
 });

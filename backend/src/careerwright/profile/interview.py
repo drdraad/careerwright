@@ -67,7 +67,7 @@ from careerwright.profile.safety import (
 # start chosen, never asking how to start. Version 7 (Task W2F slice E, the product owner's
 # re-test): never an em dash or a spaced en dash, and "no_job_yet" is a state, never text (it
 # was proposed as a role's text and saved as a title); words cut to keep the size guard.
-PROMPT_VERSION = "interview-turn-7"
+PROMPT_VERSION = "interview-turn-9"
 INPUT_FORMAT: Literal["careerwright.interview-turn-input"] = "careerwright.interview-turn-input"
 MAX_MESSAGE = 2_000
 MAX_REPLY = 1_200
@@ -295,6 +295,21 @@ def _value(update: ModelUpdate, problems: list[str]) -> object:
     return text
 
 
+def _without_redundant_slot(update: ModelUpdate) -> ModelUpdate:
+    """Discard a duplicate JSON slot, never a distinct proposed value."""
+    kind = FIELD_SPECS[update.field.value].kind
+    if (
+        kind is FieldKind.LIST
+        and update.text is not None
+        and update.items
+        and update.text.strip() == "; ".join(item.strip() for item in update.items)
+    ):
+        return update.model_copy(update={"text": None})
+    if kind not in (FieldKind.LIST, FieldKind.QUALIFICATIONS) and update.items == []:
+        return update.model_copy(update={"items": None})
+    return update
+
+
 _QUALIFICATION_ITEM = re.compile(r"^(achieved|expected):\s*(\S.*)$", re.IGNORECASE)
 
 
@@ -431,7 +446,11 @@ def check_turn(
     On any turn, a change whose words trip the support screen is dropped the same way
     (`trips_support_screen`); the rest of the proposal is kept."""
     problems: list[str] = []
-    kept = [update for update in output.proposed_updates if not trips_support_screen(update)]
+    kept = [
+        _without_redundant_slot(update)
+        for update in output.proposed_updates
+        if not trips_support_screen(update)
+    ]
     question = None if has_risk_stem(context.messages[-1].text) else output.next_question
     if not _bounded(output.reply, MAX_REPLY):
         problems.append(f"reply: 1-{MAX_REPLY} characters")
@@ -536,10 +555,10 @@ def context_profile(document: ProfileDocument) -> dict[ProfileField, ContextFiel
 
 
 INSTRUCTIONS = f"""\
-You are the interviewer in Careerwright, a career-planning service in England.
-Write a short, warm reply in British English, with no question in it. Ask at most one
-question, only in next_question: the one that most changes the next decision. Never ask
-again for what the profile already holds. {DASH_RULE}
+You are Careerwright's career interviewer in England.
+Reply briefly and warmly in British English, without a question. Ask only in next_question
+for one thing that most changes the next decision. Never join requests with "and".
+Do not ask for anything already in the profile. {DASH_RULE}
 
 From the person's messages, propose updates to their fields. Propose only what a message
 states, or clearly implies; mark implications as "inferred". Every update cites the refs of
@@ -570,10 +589,10 @@ clubs and hobbies; never treat no job as a gap.
 
 "entry" is how the person chose to start. "sure": they know their direction; confirm the
 target role and the level they aim for, then the practical limits; don't explore interests
-or work style unless they raise them. "unsure": they want to explore; before
-naming any career, ask about kinds of tasks they enjoy or find draining. null: not chosen
-yet; never ask how they want to start (Careerwright asks that itself): use what they wrote
-and ask what most changes the next decision.
+or work style unless they raise them. "unsure": before naming a career, ask for one
+enjoyed task; ask about draining tasks only later. Don't combine them.
+null: not chosen yet; never ask how they want to start (Careerwright asks that itself):
+use what they wrote and ask what most changes the next decision.
 "mode" is the tone they chose. "practical": brief and concrete. "gentle": acknowledge
 uncertainty kindly and offer small steps. "challenge": question one assumption, politely.
 If they say they feel overwhelmed, acknowledge it in one sentence and offer one smaller

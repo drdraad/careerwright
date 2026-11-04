@@ -46,6 +46,7 @@ import {
 } from "react";
 import type { ProfileOut, SupportNoteOut, WorkspaceOut } from "@/generated/api";
 import { entryNeeded, reviewable, turnFailed, turnRunning } from "@/lib/conversation";
+import { describeField } from "@/lib/profile";
 import {
   useCredentials,
   useLatestDiscovery,
@@ -63,6 +64,7 @@ import { KeySetup } from "./KeySetup";
 import { LoadingState } from "./LoadingState";
 import { RequestFailure } from "./PageState";
 import { ProfileEditor } from "./ProfileEditor";
+import { ProfileHistory } from "./ProfileHistory";
 import { ReviewTray } from "./ReviewTray";
 import { SketchCard } from "./SketchCard";
 import { SupportNote } from "./SupportNote";
@@ -202,7 +204,7 @@ export function YouChapter({
   const failed = loads.find((load) => load.data === undefined && load.error);
   if (failed !== undefined) {
     return (
-      <>
+      <div className="chapter-reading">
         <h1 className="page-title">You</h1>
         <RequestFailure
           error={failed.error}
@@ -215,7 +217,7 @@ export function YouChapter({
             </Button>
           }
         />
-      </>
+      </div>
     );
   }
   if (
@@ -225,10 +227,10 @@ export function YouChapter({
     (!demo && credentials.data === undefined)
   ) {
     return (
-      <>
+      <div className="chapter-reading">
         <h1 className="page-title">You</h1>
         <LoadingState stage="Loading the conversation" />
-      </>
+      </div>
     );
   }
 
@@ -350,123 +352,163 @@ export function YouChapter({
   );
 
   return (
-    <>
-      <h1 className="page-title">You</h1>
-      <p role="status" className="sr-only" data-testid="you-announcer">
-        {announcement}
-      </p>
-      <ViewTabs view={view} onChange={setView} />
-      {panel(
-        "conversation",
-        <>
-          {!demo && !keyStored && (
-            <KeySetup
+    <div className="chapter-layout">
+      <div className="chapter-reading">
+        <header className="chapter-heading">
+          <h1 className="page-title">You</h1>
+          <p>
+            {view === "conversation"
+              ? "Start with your experience. Find a direction that feels like yours."
+              : view === "known"
+                ? "Your answers and choices, ready to review or change."
+                : "Possible directions, grounded in what you have shared."}
+          </p>
+        </header>
+        <p role="status" className="sr-only" data-testid="you-announcer">
+          {announcement}
+        </p>
+        <ViewTabs view={view} onChange={setView} />
+        {panel(
+          "conversation",
+          <>
+            {!demo && !keyStored && (
+              <KeySetup
+                workspace={workspace}
+                credentials={credentials.data ?? []}
+                primary={primary === "key"}
+              />
+            )}
+            <Conversation
               workspace={workspace}
-              credentials={credentials.data ?? []}
-              primary={primary === "key"}
-            />
-          )}
-          <Conversation
-            workspace={workspace}
-            profile={profile}
-            preferences={current}
-            turns={turns.data}
-            sender={sender}
-            sendBlocked={sendBlocked}
-            reviewing={reviewing}
-            replyField={replyField}
-            primary={primary}
-            announce={announce}
-            onEditAnswers={edit}
-            onShowSuggestions={showSuggestions}
-            onNameRole={nameRole}
-            review={
-              <>
-                {saveNotice(conversationNotice)}
-                {reviewPanel}
-                {tray}
-              </>
-            }
-          />
-        </>,
-      )}
-      {panel(
-        "known",
-        <section className="known" aria-labelledby="known-title">
-          <h2 id="known-title" className="display text-25">
-            What we know
-          </h2>
-          {saveNotice(knownNotice)}
-          <WhatWeKnow
-            profile={profile}
-            editing={editing}
-            onEdit={() => setEditing((open) => !open)}
-            form={
-              editing && (
-                <div id="edit-answers">
-                  <ProfileEditor
-                    key={id}
-                    workspaceId={id}
-                    profile={profile}
-                    headingRef={formTitle}
-                    openTargets={openTarget}
-                    onTargetsOpened={targetsOpened}
-                  />
-                </div>
-              )
-            }
-          />
-          <TitleDetails workspaceId={id} />
-          {/* A second idea (a route sketch for the target), so one step away (D-M6). */}
-          <details className="details">
-            <summary>The early sketch for your target</summary>
-            <div className="mt-12">
-              <SketchCard workspaceId={id} profile={profile} />
-            </div>
-          </details>
-        </section>,
-      )}
-      {panel(
-        "suggestions",
-        <div className="directions">
-          {sure ? (
-            <p className="small">
-              You know your direction, so suggestions are optional.{" "}
-              <Button
-                variant="quiet"
-                onClick={() => {
-                  // The button goes with the change; focus goes to the suggestions that
-                  // replace it, never to the page (fix round 1, concern 3).
-                  setFocusTo("directions");
-                  setPreferences.mutate(
-                    {
-                      expected_version: current.version,
-                      entry_mode: "unsure",
-                      conversation_mode: current.conversation_mode,
-                      paused: current.paused,
-                    },
-                    { onError: () => setFocusTo(null) },
-                  );
-                }}
-                disabledReason={setPreferences.isPending ? "Saving…" : undefined}
-              >
-                Help me explore instead
-              </Button>
-            </p>
-          ) : (
-            <Directions
-              workspaceId={id}
               profile={profile}
-              discovery={discovery.data}
-              unavailable={unavailable}
-              shown={view === "suggestions"}
-              submit={suggest}
-              headingRef={directionsTitle}
+              preferences={current}
+              turns={turns.data}
+              sender={sender}
+              sendBlocked={sendBlocked}
+              reviewing={reviewing}
+              replyField={replyField}
+              primary={primary}
+              announce={announce}
+              onEditAnswers={edit}
+              onShowSuggestions={showSuggestions}
+              onNameRole={nameRole}
+              review={
+                <>
+                  {saveNotice(conversationNotice)}
+                  {reviewPanel}
+                  {tray}
+                </>
+              }
             />
-          )}
-          {setPreferences.error !== null && <RequestFailure error={setPreferences.error} />}
-        </div>,
-      )}
-    </>
+          </>,
+        )}
+        {panel(
+          "known",
+          <section className="known" aria-labelledby="known-title">
+            <h2 id="known-title" className="display text-25">
+              What we know
+            </h2>
+            {saveNotice(knownNotice)}
+            <WhatWeKnow
+              profile={profile}
+              editing={editing}
+              onEdit={() => setEditing((open) => !open)}
+              form={
+                editing && (
+                  <div id="edit-answers">
+                    <ProfileEditor
+                      key={id}
+                      workspaceId={id}
+                      profile={profile}
+                      headingRef={formTitle}
+                      openTargets={openTarget}
+                      onTargetsOpened={targetsOpened}
+                    />
+                  </div>
+                )
+              }
+            />
+            <ProfileHistory workspaceId={id} profile={profile} />
+            <TitleDetails workspaceId={id} />
+            {/* A second idea (a route sketch for the target), so one step away (D-M6). */}
+            <details className="details">
+              <summary>The early sketch for your target</summary>
+              <div className="mt-12">
+                <SketchCard workspaceId={id} profile={profile} />
+              </div>
+            </details>
+          </section>,
+        )}
+        {panel(
+          "suggestions",
+          <div className="directions">
+            {sure ? (
+              <p className="small">
+                You know your direction, so suggestions are optional.{" "}
+                <Button
+                  variant="quiet"
+                  onClick={() => {
+                    // The button goes with the change; focus goes to the suggestions that
+                    // replace it, never to the page (fix round 1, concern 3).
+                    setFocusTo("directions");
+                    setPreferences.mutate(
+                      {
+                        expected_version: current.version,
+                        entry_mode: "unsure",
+                        conversation_mode: current.conversation_mode,
+                        paused: current.paused,
+                      },
+                      { onError: () => setFocusTo(null) },
+                    );
+                  }}
+                  disabledReason={setPreferences.isPending ? "Saving…" : undefined}
+                >
+                  Help me explore instead
+                </Button>
+              </p>
+            ) : (
+              <Directions
+                workspaceId={id}
+                profile={profile}
+                discovery={discovery.data}
+                unavailable={unavailable}
+                shown={view === "suggestions"}
+                submit={suggest}
+                headingRef={directionsTitle}
+                onEditAnswers={edit}
+                onNameRole={nameRole}
+              />
+            )}
+            {setPreferences.error !== null && <RequestFailure error={setPreferences.error} />}
+          </div>,
+        )}
+      </div>
+      <aside className="chapter-landscape you-landscape" aria-labelledby="you-starting-point">
+        <header className="chapter-heading">
+          <h2 id="you-starting-point">Your starting point</h2>
+          <p>Your saved answers give the journey its shape.</p>
+        </header>
+        <div className="you-origin" aria-hidden="true">
+          <span />
+        </div>
+        <dl className="you-starting-facts">
+          <div>
+            <dt>Experience</dt>
+            <dd>{describeField(profile.document.current_role, "current_role")}</dd>
+          </div>
+          <div>
+            <dt>Your chosen direction</dt>
+            <dd>{describeField(profile.document.target_titles, "target_titles")}</dd>
+          </div>
+          <div>
+            <dt>What you enjoy</dt>
+            <dd>{describeField(profile.document.enjoyed_tasks, "enjoyed_tasks")}</dd>
+          </div>
+        </dl>
+        <p className="decision-map-note">
+          Only answers you save appear here. Suggestions become targets when you choose them.
+        </p>
+      </aside>
+    </div>
   );
 }

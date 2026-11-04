@@ -2,6 +2,7 @@
 SQL). Input versions, solves and results are append-only; an attempt's stage and end are
 written once each as it runs."""
 
+import json
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -13,6 +14,7 @@ from careerwright.db import Tx, is_unique_violation
 from careerwright.errors import CareerwrightError, ErrorCode, ErrorStage
 from careerwright.identity.records import Run
 from careerwright.planning.inputs import PlanningInputsDocument
+from careerwright.planning.plan_records import PlanSnapshot
 from careerwright.planning.search import M0SearchLimits, SearchResult
 from careerwright.planning.solve_records import (
     AttemptOutcome,
@@ -37,6 +39,55 @@ _SOLVE_COLUMNS = (
     f"algorithm_version, pruning_version, created_by, created_at, {', '.join(_LIMITS)}"
 )
 _ATTEMPT_COLUMNS = "attempt_id, stage, outcome, started_at, finished_at"
+
+
+def plan(tx: Tx, workspace_id: uuid.UUID, version: int | None = None) -> PlanSnapshot | None:
+    """Read a selected immutable version, or the latest selected version."""
+    clause = "AND version = :version" if version is not None else "ORDER BY version DESC LIMIT 1"
+    row = tx.execute(
+        sa.text(
+            f"SELECT snapshot FROM careerwright.plan_versions WHERE workspace_id = :ws {clause}"
+        ),
+        {"ws": workspace_id, "version": version},
+    ).scalar_one_or_none()
+    return None if row is None else PlanSnapshot.model_validate(row)
+
+
+def plan_versions(tx: Tx, workspace_id: uuid.UUID) -> list[PlanSnapshot]:
+    rows = tx.execute(
+        sa.text(
+            "SELECT snapshot FROM careerwright.plan_versions WHERE workspace_id = :ws "
+            "ORDER BY version"
+        ),
+        {"ws": workspace_id},
+    ).scalars()
+    return [PlanSnapshot.model_validate(row) for row in rows]
+
+
+def insert_plan(
+    tx: Tx,
+    snapshot: PlanSnapshot,
+    *,
+    created_by: uuid.UUID | None = None,
+    created_at: datetime | None = None,
+) -> None:
+    tx.execute(
+        sa.text(
+            "INSERT INTO careerwright.plan_versions (workspace_id, version, plan_id, "
+            "solve_run_id, schedule_index, snapshot, created_by, created_at) "
+            "VALUES (:ws, :version, :plan, :run, :index, CAST(:snapshot AS jsonb), :by, :at)"
+        ),
+        {
+            "ws": snapshot.workspace_id,
+            "version": snapshot.version,
+            "plan": snapshot.plan_id,
+            "run": snapshot.source.solve_run_id,
+            "index": snapshot.source.schedule_index,
+            "snapshot": json.dumps(snapshot.model_dump(mode="json")),
+            "by": created_by or snapshot.selected_by,
+            "at": created_at or snapshot.selected_at,
+        },
+    )
 
 
 @dataclass(frozen=True)

@@ -21,7 +21,7 @@ const updated = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyl
 
 /** What each mode means, beside the select (V-05): a native option label cannot wrap. */
 const MODE_HINT: Record<Extract<DataMode, "demo" | "live_assisted">, string> = {
-  demo: "Synthetic data only. Nothing leaves this computer.",
+  demo: "Uses synthetic records without a model key. A new workspace starts blank; preloaded sample workspaces have example answers.",
   live_assisted:
     "Uses your Meta API key for the interview and suggestions, so what you write is sent to Meta's model.",
 };
@@ -109,7 +109,7 @@ export function CreateWorkspace({ onCreated }: { onCreated(id: string): void }) 
           aria-describedby={`${id}-mode-hint`}
           onChange={(e) => setMode(e.target.value as typeof mode)}
         >
-          <option value="demo">{DATA_MODE.demo}</option>
+          <option value="demo">Demo mode</option>
           <option value="live_assisted">{DATA_MODE.live_assisted}</option>
         </select>
         <p id={`${id}-mode-hint`} className="field-hint">
@@ -171,6 +171,9 @@ export function WorkspaceList() {
     );
   }
   const open = (id: string) => router.push(chapterHref(id, "you"));
+  const hasSamples = workspaces.data?.some(
+    (workspace) => workspace.synthetic && /^P0[1-5] · /.test(workspace.name),
+  );
   return (
     <>
       <div className="flex flex-wrap items-baseline justify-between gap-12">
@@ -181,6 +184,13 @@ export function WorkspaceList() {
       </div>
       {workspaces.isPending && <LoadingState stage="Loading your workspaces" />}
       {workspaces.isError && <RequestFailure error={workspaces.error} />}
+      {hasSamples && (
+        <p className="measure">
+          Try a sample journey below. Each P01–P05 workspace starts with a different person's
+          synthetic answers; skills evidence, route searches and vacancies may still need work. Or
+          create a blank workspace to try your own path.
+        </p>
+      )}
       {workspaces.data !== undefined &&
         (workspaces.data.length === 0 ? (
           <EmptyState state="notStarted" title="No workspaces yet">

@@ -13,6 +13,7 @@ const preview: Preview = {
   },
   decorators: [
     (Story, context) => {
+      if (context.parameters.designProposal) return <Story />;
       const surface = context.parameters.surface === "reading" ? "reading" : "space";
       return (
         <EvidenceProvider>

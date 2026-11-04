@@ -350,7 +350,7 @@ def test_the_export_cites_the_deterministic_provenance_never_the_written_text(
 
     export = explaining.api.get(f"{base(explaining)}/export", explaining.token).json()
 
-    assert export["format_version"] == 5
+    assert export["format_version"] == 6
     [exported] = export["discoveries"]
     written = exported["explanation"]["written"]
     assert written["suggestions"][0]["claims"]  # kept, labelled as written by the model

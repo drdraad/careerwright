@@ -422,6 +422,20 @@ class _Check:
         self.beyond: list[Liability] = []
         self.unscheduled: list[Liability] = []
         self.before_start: list[Liability] = []
+        replan = self.inputs.replan
+        if replan is not None:
+            for payment in replan.remaining_payments:
+                index = Month.of(payment.due).months_after(monthly.start) + 1
+                if 1 <= index <= self.horizon:
+                    self.months.payments[index - 1] += payment.amount_minor
+                else:
+                    self.beyond.append(
+                        Liability(
+                            variant_id=payment.variant_id,
+                            due=payment.due.isoformat(),
+                            amount_minor=payment.amount_minor,
+                        )
+                    )
         self.debts, self.debt_service = self._debts()
         self.costs_known = True
         # Every payment's amount and month is known, so each month's row is exact (a payment

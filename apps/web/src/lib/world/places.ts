@@ -13,5 +13,5 @@ export const PLACES: Record<ChapterId, Place> = {
   skills: { where: "The ground between you and a destination." },
   options: { where: "Bridges across the dark stretches: courses, work routes and funding." },
   routes: { where: "Whole journeys from you to a destination, compared on time and cost." },
-  plan: { where: "The path you choose, made solid, with your next move glowing at its start." },
+  plan: { where: "The path you choose, made solid, with the next action at its start." },
 };
