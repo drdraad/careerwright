@@ -12,7 +12,7 @@
 #                           SEARCH=1 runs one source search (Meta web search; scope live-search);
 #                           SEARCH_BOUND=1 asks one in-process search for max_tool_calls 1;
 #                           WONDER=1 makes Muse Wonder's two qualification calls in process
-#                           (scope wonder-qualification, $0.50 in all with live-eval WONDER=1)
+#                           (scope wonder-qualification, $5 in all with live-eval WONDER=1)
 #   make live-eval          budget-capped live run of the representative evaluation cases (at most
 #                           6) on the test model; CASES=INT-01,DSC-01 runs a chosen subset;
 #                           WONDER=1 runs them on Muse Wonder (scope wonder-qualification)
@@ -27,14 +27,14 @@
 #   make session           the product owner's live session: `make dev`'s stack with Muse Wonder
 #                           as the production model (synthetic workspaces keep the test model),
 #                           and caps per workspace on each live workspace not marked synthetic
-#                           ($0.75 a run, $5 per workspace; it prints the session's total);
+#                           ($1.60 a run, $5 per workspace; it prints the session's total);
 #                           a running API and worker restart, and a run in flight restarts (its
 #                           call counted at its full reservation); no data is reset
 #   make session-ledger     with the stack up: copy every model attempt in its database (counts,
 #                           cost and state, never content) into docs/evidence/live-usage.*,
 #                           scope live-app-<date>
 #   make stop               stop every service, bounded; persisted work is kept
-#   make reset-demo         recreate the named fixture workspace only
+#   make reset-demo         recreate the five P01–P05 fixture workspaces only
 #   make rotate-master-key  add a master key version, reload it, reseal every sealed record
 #   make reseal             reseal every sealed record under the current master key
 #   make spike-world        the throwaway spike of three world directions (session W1), opened in

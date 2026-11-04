@@ -5,7 +5,7 @@ regulator or vacancy, and no fixture may fill a missing live field (Global Const
 
 ## `m0/`: the supplied M0 fixture pack (original, unchanged)
 
-Extracted from `Careerwright_M0_Fixtures.zip` at the repository root (named
+Extracted from [`Careerwright_M0_Fixtures.zip`](../docs/Careerwright_M0_Fixtures.zip) (named
 `Nessa_M0_Fixtures.zip` until 2026-11-01; renamed, bytes unchanged). The files are byte-identical
 to the archive members (checked with `shasum -a 256` on 2026-10-27; do not edit them; if the
 pack changes, re-extract it and re-run the hand check).

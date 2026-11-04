@@ -1,7 +1,7 @@
 # Repository contract
 
 Careerwright L0: a local career-planning app (FastAPI, Pydantic AI, DBOS and PostgreSQL 16
-backend; Next.js web app in `apps/web`). Authority order: `Careerwright_Product_Specification.md`
+backend; Next.js web app in `apps/web`). Authority order: `docs/Careerwright_Product_Specification.md`
 (v1.3), then `docs/plan/development-plan.md` (v1.6), then `docs/plan/l0-sprint-tasks.md`. For the
 experience and the interface, the plan's section 4 (ADR 0014) overrides the specification's art
 direction. Decisions live in `docs/adr/`; the latest sprint review is in `docs/reviews/`.
@@ -64,7 +64,7 @@ Run from the repository root (details: `docs/runbook.md`).
   never use it for the backend. pnpm only, never npm.
 - Run: `make dev` (live: only the worker may reach Meta), `make demo` (no service has a
   route out), then open `http://127.0.0.1:53000`; `make stop` (bounded; keeps data),
-  `make reset-demo` (fixture workspace only).
+  `make reset-demo` (the five P01–P05 fixture workspaces only).
 - Fast checks: `make check` (backend: ruff format and lint, mypy, fast pytest, fixture
   validator; web: generated-client drift, Biome, `tsc`, Vitest). No Docker, no network.
 - Full acceptance checks: `make acceptance`, the command CI uses: real PostgreSQL 16.15,
@@ -90,7 +90,7 @@ Run from the repository root (details: `docs/runbook.md`).
 ## Repository facts
 - The product was called Nessa until 2026-10-30 (the product owner's rename). The old name
   stays only where changing it would rewrite a record or a pinned file: the supplied pack's
-  contents (`fixtures/m0`, and the files inside `Careerwright_M0_Fixtures.zip`), the pinned
+  contents (`fixtures/m0`, and the files inside `docs/Careerwright_M0_Fixtures.zip`), the pinned
   format names `nessa-england-option-pack` and `nessa-capability-reference`, corpus case
   X01's fetched address, and past reviews and evidence (`docs/reviews`, `docs/evidence`).
   Setups made before the rename (`~/.nessa/l0`, the `nessa-l0` Docker volumes) are not used.

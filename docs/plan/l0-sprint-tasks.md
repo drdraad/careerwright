@@ -2,7 +2,7 @@
 
 This file breaks `docs/plan/development-plan.md` (the local development plan, v1.6) into
 implementation tasks for agent execution. Authority order: product specification
-(`Careerwright_Product_Specification.md`, v1.3) → development plan local overrides → this file.
+(`docs/Careerwright_Product_Specification.md`, v1.3) → development plan local overrides → this file.
 The remaining tasks follow the order, dependency rules and dispatch preconditions (ADR
 0008), as Task A1 amended them with the product owner's approval of 2026-10-31, and as plan
 v1.6 amended them with the product owner's school-leaver decisions of 2026-11-01. The
@@ -14,7 +14,7 @@ relaxes the plan or the specification.
 Each task names its sprint card. Read that card in `docs/plan/development-plan.md`
 in full (deliverables, acceptance, coherence review) and the plan's shared sections
 listed under "Always read". Then read the specification sections the card cites
-(`grep -n '^#' Careerwright_Product_Specification.md` lists them; read only what you need).
+(`rg -n '^#' docs/Careerwright_Product_Specification.md` lists them; read only what you need).
 
 ## Always read
 
