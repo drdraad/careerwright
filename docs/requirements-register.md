@@ -2,7 +2,7 @@
 
 Canonical map from every specification requirement to the test that will prove it, its
 owning sprint and task, and its current status. Authority: product specification v1.3
-(`Careerwright_Product_Specification.md`), then the local development plan v1.6
+(`docs/Careerwright_Product_Specification.md`), then the local development plan v1.6
 (`docs/plan/development-plan.md`), then `docs/plan/l0-sprint-tasks.md`. This register adds
 test IDs and ownership only; it never relaxes a requirement. Requirement text is a short
 paraphrase. Where a row and the specification differ, the specification wins and the row
