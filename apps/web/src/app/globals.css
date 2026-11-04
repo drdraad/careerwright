@@ -1,13 +1,7 @@
-/*
- * Careerwright web styles. Colour, type, space, radius and motion come only from the design
- * tokens (src/design/tokens/tokens.css, a byte-identical mirror of docs/design/tokens,
- * imported beside this file so its font URLs resolve from its own folder). The Tailwind
- * theme is reset and rebuilt from those semantic tokens, so no default palette, spacing or
- * radius exists to drift from the design system. The shell is the living world's (plan
- * section 4, docs/design/compositions/world.css): the world behind everything, words on dark
- * glass over it, sea-glass only for selection and the one primary action.
- */
+/* Shared component rules use the semantic design tokens; careerWorkspace.css applies the
+   approved workspace palette and the reading/world layout without changing the font assets. */
 @import "tailwindcss";
+@import "../components/careerWorkspace.css";
 
 @theme inline {
   --color-*: initial;
@@ -83,9 +77,7 @@
      still there, drawn still; inside one, the world itself is drawn behind (World.tsx). */
   body {
     min-height: 100dvh;
-    background:
-      radial-gradient(120% 38% at 50% 64%, rgb(28 37 82 / 0.85), transparent 70%),
-      linear-gradient(180deg, #010309 0%, #050a1a 52%, var(--world-horizon) 64%, #050916 76%, var(--surface-space) 100%);
+    background: var(--career-atmosphere);
     background-attachment: fixed;
     color: var(--text-on-space);
     font-size: var(--type-16);
@@ -413,7 +405,6 @@
     color: var(--text-on-space);
   }
 
-  /* A chapter not built yet says so under its name, in sight before it is clicked (F2). */
   .chapter-later {
     font-family: var(--font-body);
     font-size: var(--type-12);
@@ -432,12 +423,15 @@
     box-shadow: 0 0 0 3px var(--surface-space);
   }
 
-  /* V-09: a visited chapter has a brighter ring, never a fill. A filled landmark is kept for a
-     chapter whose decisions are recorded (spec section 15), which this build has none of, so
-     having opened a chapter cannot read as having finished it. */
-  .rail-chapter[data-progress="visited"] .landmark,
-  .menu-chapter[data-progress="visited"] .landmark {
-    border: 2px solid var(--text-on-space-muted);
+  .rail-chapter[data-progress="complete"] .landmark,
+  .menu-chapter[data-progress="complete"] .landmark {
+    border: 2px solid var(--selection-space);
+    background: var(--selection-space);
+  }
+
+  .rail-chapter[data-progress="locked"],
+  .menu-chapter[data-progress="locked"] {
+    opacity: 0.55;
   }
 
   .rail-chapter[aria-current="page"] {
@@ -1902,9 +1896,17 @@
     clip-path: inset(50%);
     white-space: nowrap;
   }
+
+  .chapter-you > [aria-label="Your next step"] {
+    display: none;
+  }
 }
 
 @media (max-width: 760px) {
+  .workarea:has(> .chapter-you .you-view:not([hidden]) .tray-actions),
+  .workarea:has(> .chapter-you .you-view:not([hidden]) .directions) {
+    padding-top: 0;
+  }
 
   /* One row while updates connect or reconnect (A-M1): the state's words take the room left and
      end in an ellipsis rather than pushing the account menu to a second row; assistive tech
@@ -2012,6 +2014,54 @@
   }
 }
 
+/* ---------- Options: bridges across the dark stretches (Task 12b, screens half). The missing
+   fact's line and its box are shared with Routes. ---------- */
+
+@layer components {
+  .figure-box {
+    display: grid;
+    gap: var(--space-12);
+    padding: var(--space-16);
+    background: var(--surface-card);
+    border: 1px solid var(--line-reading-hairline);
+    border-radius: var(--radius-control);
+  }
+
+  .figure-missing {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+  }
+
+  .figure-missing .glyph {
+    color: var(--status-unknown);
+  }
+
+  .figure-input {
+    max-width: 10rem;
+  }
+
+  .option-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    gap: var(--space-8);
+  }
+
+  .option-grid .btn {
+    width: 100%;
+    min-height: 64px;
+    justify-content: flex-start;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .option-detail {
+    padding-top: var(--space-16);
+    border-top: 1px solid var(--line-reading-hairline);
+  }
+}
+
 /* Calm mode (spec section 14) does what prefers-reduced-motion does: spatial motion goes,
    information stays. */
 :root[data-calm="true"] {
@@ -2034,4 +2084,76 @@
     transition-duration: 0ms !important;
     animation-duration: 0ms !important;
   }
+}
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 12mm;
+  }
+
+  body:has(.plan-chapter),
+  body:has(.plan-chapter) .app,
+  body:has(.plan-chapter) .workarea,
+  body:has(.plan-chapter) .chapter,
+  body:has(.plan-chapter) .plan-chapter {
+    display: block;
+    position: static;
+    width: 100%;
+    max-width: none;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+    color: #111;
+    background: #fff;
+    box-shadow: none;
+  }
+
+  body:has(.plan-chapter) .rail,
+  body:has(.plan-chapter) .topbar,
+  body:has(.plan-chapter) .strip,
+  body:has(.plan-chapter) .world,
+  .plan-chapter .plan-actions,
+  .plan-chapter button,
+  .plan-chapter summary {
+    display: none !important;
+  }
+
+  .plan-chapter *,
+  .plan-chapter *::before,
+  .plan-chapter *::after {
+    color: #111 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    animation: none !important;
+  }
+
+  .plan-chapter .overflow-x-auto {
+    overflow: visible;
+  }
+
+  .plan-chapter table {
+    min-width: 0;
+    width: 100%;
+    table-layout: fixed;
+    font-size: 7pt;
+  }
+
+  .plan-chapter th,
+  .plan-chapter td {
+    overflow-wrap: anywhere;
+  }
+
+  .plan-print[data-print-redacted="true"] > :not(.plan-redacted-print) {
+    display: none !important;
+  }
+
+  .plan-print[data-print-redacted="true"] .plan-redacted-print {
+    display: block !important;
+  }
+}
+
+.plan-redacted-print {
+  display: none;
 }

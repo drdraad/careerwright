@@ -35,7 +35,7 @@ from careerwright.catalogue.pay import FloorCounts, FloorVerdict, floor_counts
 from careerwright.config import RuntimeMode
 from careerwright.db import Engine, Tx, run_transaction
 from careerwright.errors import CareerwrightError, ErrorCode, ErrorStage
-from careerwright.evidence import role_store, store
+from careerwright.evidence import option_records, role_store, store
 from careerwright.evidence.acquire import ADZUNA_PROVIDER, AcquisitionResult
 from careerwright.evidence.addresses import CheckedUrl, UrlRefusal, check_url
 from careerwright.evidence.adzuna import CREDENTIAL_PARAMETERS, AdzunaQuery, recorded_url
@@ -45,6 +45,7 @@ from careerwright.evidence.extraction_runs import (
     acquisition_model_spend,
     model_readable,
     start_extraction,
+    start_option_extraction,
 )
 from careerwright.evidence.freshness import (
     FreshnessKind,
@@ -74,6 +75,7 @@ from careerwright.evidence.records import (
     JobCopy,
     Location,
     Retention,
+    RightsClass,
     SourceSpan,
     StrictModel,
     ValidationState,
@@ -114,6 +116,7 @@ RECORDABLE_PORTS = frozenset(range(1, 65_536))
 # to 20 pages"). It tries its targets in order and goes on past a page it can't read or that
 # is no longer there; once this many are read, the rest are not needed and never fetched.
 MAX_ROLE_PAGES = 20
+MAX_OPTION_PAGES = 5
 NOT_NEEDED = "not_needed"  # a role target left unfetched: enough pages were read before it
 
 Url = Annotated[str, StringConstraints(min_length=1, max_length=2_048)]
@@ -976,6 +979,12 @@ def acquire_target(rt: AcquisitionRuntime, run_id: uuid.UUID, position: int) -> 
         if target.role_title is not None and _role_pages_read(tx, run_id) >= MAX_ROLE_PAGES:
             store.set_target_status(tx, run_id, position, NOT_NEEDED)
             return {"status": NOT_NEEDED}
+        if (
+            target.option_research_id is not None
+            and _role_pages_read(tx, run_id) >= MAX_OPTION_PAGES
+        ):
+            store.set_target_status(tx, run_id, position, NOT_NEEDED)
+            return {"status": NOT_NEEDED}
         if run_store.mark_running(tx, run_id):
             identity_store.append_event(
                 tx,
@@ -1008,7 +1017,11 @@ def acquire_target(rt: AcquisitionRuntime, run_id: uuid.UUID, position: int) -> 
         if target.route is InputRoute.ADZUNA and target.query is not None:
             result = rt.client.adzuna(AdzunaQuery.model_validate(target.query))
         elif target.url is not None:
-            result = rt.client.fetch(target.url, read_text=target.role_title is not None)
+            result = rt.client.fetch(
+                target.url,
+                read_text=target.role_title is not None,
+                read_options=target.option_research_id is not None,
+            )
         else:  # refused when submitted: recorded as blocked, nothing is asked for
             result = AcquisitionResult(
                 route=InputRoute.FETCH,
@@ -1023,7 +1036,9 @@ def acquire_target(rt: AcquisitionRuntime, run_id: uuid.UUID, position: int) -> 
     result = _kept_body_checked(result)
     role_title = target.role_title  # a page read for role research: no posting, no model
     with run_transaction(rt.engine, run_id) as tx:
-        if model_readable(result) and role_title is None:
+        if (model_readable(result) and role_title is None) or (
+            target.option_research_id is not None and result.extraction_text is not None
+        ):
             # First, before any other lock or insert: the page may start an extraction run,
             # which a cancel must see or be seen by. The cancel takes this lock and then the
             # workspace's row, which a kept body's document would already hold by its key
@@ -1043,12 +1058,34 @@ def acquire_target(rt: AcquisitionRuntime, run_id: uuid.UUID, position: int) -> 
         store.finish_attempt(tx, attempt_id, result, http_requests=result.http_requests)
         if result.status is AttemptStatus.SUCCEEDED and role_title is not None:
             _record_role_page(tx, rt, run, attempt_id, result, role_title)
+        elif result.status is AttemptStatus.SUCCEEDED and target.option_research_id is not None:
+            if result.rights_class in (RightsClass.OTHER, RightsClass.JOB_BOARD):
+                pass
+            elif result.option_structured is not None:
+                option_records.record_proposal(
+                    tx,
+                    run,
+                    target.option_research_id,
+                    attempt_id,
+                    result.final_url or result.requested_url or target.url or "",
+                    result.fetched_at,
+                    result.option_structured,
+                )
+            else:
+                start_option_extraction(
+                    tx, rt.keyring, rt.models, run, attempt_id, result, rt.clock()
+                )
         elif result.status is AttemptStatus.SUCCEEDED:
             _record_copies(tx, rt, run, attempt_id, result)
             # A page whose structured data gave no posting goes to the workspace's own model
             # extraction run, or says why not (fix round 2, rulings 9-10).
             start_extraction(tx, rt.keyring, rt.models, run, attempt_id, result, rt.clock())
-        elif target.url and result.requested_url and role_title is None:
+        elif (
+            target.url
+            and result.requested_url
+            and role_title is None
+            and target.option_research_id is None
+        ):
             store.job_attempted(
                 tx,
                 store.jobs_from_url(tx, run.workspace_id, result.requested_url),

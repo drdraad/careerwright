@@ -68,3 +68,79 @@ Budget scope `live-eval`. Model `muse-spark-1.3-contributor` (test model, synthe
 |---|---|---|---|---|
 | INT-19 Sam's first message, sent before choosing how to start: a pay cut hinted without a figure is asked for in pounds next, never proposed, and the start choice is never asked | interview | complete | pass | - |
 
+## Live evaluation, 2026-11-03 22:29 UTC
+
+Budget scope `live-eval-demo-20261103`. Model `muse-spark-1.3-contributor` (test model, synthetic cases only); 2 cases; at most 4 requests, worst case $0.008400; ledger rows [56, 57]. Failures by type: {'question': 1}. Each case's output is kept in the private evidence directory (`CAREERWRIGHT_HOME/evidence/live-eval.jsonl`, not committed).
+
+| Case | Kind | Run | Result | Failures |
+|---|---|---|---|---|
+| INT-01 P02, unsure: practical enjoyed tasks, no invented income baseline or budget | interview | complete | fail | question: 2 asks: 'What other hands on tasks do you enjoy, and which tasks leave you drained?' |
+| DSC-01 P02: a grounded, varied slate across families without a match percentage | discovery | complete | pass | - |
+
+## Live evaluation, 2026-11-03 22:34 UTC
+
+Budget scope `live-eval-demo-followup-20261103`. Model `muse-spark-1.3-contributor` (test model, synthetic cases only); 1 cases; at most 2 requests, worst case $0.003500; ledger rows [58]. Failures by type: none. Each case's output is kept in the private evidence directory (`CAREERWRIGHT_HOME/evidence/live-eval.jsonl`, not committed).
+
+| Case | Kind | Run | Result | Failures |
+|---|---|---|---|---|
+| INT-01 P02, unsure: practical enjoyed tasks, no invented income baseline or budget | interview | complete | pass | - |
+
+## Live evaluation, 2026-11-04 06:53 UTC
+
+Budget scope `wonder-qualification`. Model `muse-wonder-1.0` (production model, synthetic cases only); 1 cases; at most 2 requests, worst case $0.176000; ledger rows [59]. Failures by type: {'schema_invalid': 1}. Each case's output is kept in the private evidence directory (`CAREERWRIGHT_HOME/evidence/live-eval.jsonl`, not committed).
+
+| Case | Kind | Run | Result | Failures |
+|---|---|---|---|---|
+| INT-01 P02, unsure: practical enjoyed tasks, no invented income baseline or budget | interview | failed | fail | schema_invalid: run failed |
+
+## Live evaluation, 2026-11-04 06:56 UTC
+
+Budget scope `wonder-qualification`. Model `muse-wonder-1.0` (production model, synthetic cases only); 1 cases; at most 2 requests, worst case $0.176000; ledger rows [60]. Failures by type: {'schema_invalid': 1}. Each case's output is kept in the private evidence directory (`CAREERWRIGHT_HOME/evidence/live-eval.jsonl`, not committed).
+
+| Case | Kind | Run | Result | Failures |
+|---|---|---|---|---|
+| INT-01 P02, unsure: practical enjoyed tasks, no invented income baseline or budget | interview | failed | fail | schema_invalid: run failed |
+
+## Live evaluation, 2026-11-04 07:46 UTC
+
+Budget scope `live-eval-demo-int02-20261104`. Model `muse-spark-1.3-contributor` (test model, synthetic cases only); 1 cases; at most 2 requests, worst case $0.003500; ledger rows [61]. Failures by type: none. Each case's output is kept in the private evidence directory (`CAREERWRIGHT_HOME/evidence/live-eval.jsonl`, not committed).
+
+| Case | Kind | Run | Result | Failures |
+|---|---|---|---|---|
+| INT-02 Sure entry: confirms the target and its level, skips exploration | interview | complete | pass | - |
+
+## Live evaluation, 2026-11-04 10:04 UTC
+
+Budget scope `wonder-qualification`. Model `muse-wonder-1.0` (production model, synthetic cases only); 1 cases; at most 2 requests, worst case $0.176000; ledger rows [62]. Failures by type: {'schema_invalid': 1}. Each case's output is kept in the private evidence directory (`CAREERWRIGHT_HOME/evidence/live-eval.jsonl`, not committed).
+
+| Case | Kind | Run | Result | Failures |
+|---|---|---|---|---|
+| INT-01 P02, unsure: practical enjoyed tasks, no invented income baseline or budget | interview | failed | fail | schema_invalid: run failed |
+
+## Live evaluation, 2026-11-04 11:56 UTC
+
+Budget scope `wonder-qualification`. Model `muse-wonder-1.0` (production model, synthetic cases only); 2 cases; at most 4 requests, worst case $0.352000; ledger rows [63, 64]. Failures by type: none. Each case's output is kept in the private evidence directory (`CAREERWRIGHT_HOME/evidence/live-eval.jsonl`, not committed).
+
+| Case | Kind | Run | Result | Failures |
+|---|---|---|---|---|
+| INT-01 P02, unsure: practical enjoyed tasks, no invented income baseline or budget | interview | complete | pass | - |
+| INT-02 Sure entry: confirms the target and its level, skips exploration | interview | complete | pass | - |
+
+## Live evaluation, 2026-11-04 11:58 UTC
+
+Budget scope `wonder-qualification`. Model `muse-wonder-1.0` (production model, synthetic cases only); 2 cases; at most 4 requests, worst case $0.468000; ledger rows [65, 66]. Failures by type: none. Each case's output is kept in the private evidence directory (`CAREERWRIGHT_HOME/evidence/live-eval.jsonl`, not committed).
+
+| Case | Kind | Run | Result | Failures |
+|---|---|---|---|---|
+| INT-01 P02, unsure: practical enjoyed tasks, no invented income baseline or budget | interview | complete | pass | - |
+| DSC-01 P02: a grounded, varied slate across families without a match percentage | discovery | complete | pass | - |
+
+## Live evaluation, 2026-11-04 12:09 UTC
+
+Budget scope `wonder-qualification`. Model `muse-wonder-1.0` (production model, synthetic cases only); 2 cases; at most 6 requests, worst case $0.760000; ledger rows [67, 68, 69]. Failures by type: none. Each case's output is kept in the private evidence directory (`CAREERWRIGHT_HOME/evidence/live-eval.jsonl`, not committed).
+
+| Case | Kind | Run | Result | Failures |
+|---|---|---|---|---|
+| INT-01 P02, unsure: practical enjoyed tasks, no invented income baseline or budget | interview | complete | pass | - |
+| EXP-01 P02: each suggestion's written why quotes P02's answers and ESCO's record, and nothing else | explanation | discovery complete, explanation complete | pass | - |
+

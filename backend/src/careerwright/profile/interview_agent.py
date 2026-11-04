@@ -4,10 +4,12 @@ The task runs one Pydantic AI agent on whatever model the worker built for the r
 native provider for live workspaces, or the fixture interviewer for demo workspaces. Both
 answer the same strict JSON schema (`NativeOutput`), and both outputs pass the same
 deterministic check (`interview.check_turn`). A failed check is sent back once as a repair
-request with the problems listed; a second failure ends the run `invalid_model_output`.
-That repair is the agent's output-retry budget, the only retry owner for invalid output;
-the DBOS step retries only transient provider failures (ADR 0002 decision 7). A response
-cut off at its token limit ends the run at once (`TruncationGuard`): never repaired.
+request with the problems listed. On the final reply, one malformed optional change may
+be dropped if the rest passes the full check; otherwise failure ends the run
+`invalid_model_output`. The repair is the agent's output-retry budget, the only retry owner
+for invalid output; the DBOS step retries only transient provider failures (ADR 0002
+decision 7). A response cut off at its token limit ends the run at once
+(`TruncationGuard`): never repaired.
 
 The reply streams (spec section 4: stream natural conversation, commit only after complete
 validation). `ReplyStream` reads the `reply` text out of the JSON as it arrives and hands it
@@ -39,6 +41,7 @@ from pydantic_ai.usage import UsageLimits
 from careerwright.identity.activity import PartialSink, RepairBound, RunTask, TruncationGuard
 from careerwright.identity.model_registry import FIXTURE_MODEL_ID, ModelMode
 from careerwright.profile import interview
+from careerwright.profile.document import FIELD_SPECS
 from careerwright.profile.fixture_interviewer import fixture_turn
 from careerwright.profile.interview import (
     CONTEXT_MARKER,
@@ -121,8 +124,20 @@ def run_interview_turn(
     accepted: list[InterviewProposal] = []
 
     @agent.output_validator
-    def _check(output: InterviewTurnOutput) -> InterviewTurnOutput:
+    def _check(ctx: RunContext[None], output: InterviewTurnOutput) -> InterviewTurnOutput:
         proposal, problems = interview.check_turn(output, context, origin)
+        if proposal is None and ctx.retry == MAX_REQUESTS - 1:
+            # Drop one malformed optional claim only after the normal repair has failed.
+            for index, update in enumerate(output.proposed_updates):
+                if FIELD_SPECS[update.field.value].hard_constraint or not all(
+                    problem.startswith(f"{update.field.value}:") for problem in problems
+                ):
+                    continue
+                remaining = output.proposed_updates[:index] + output.proposed_updates[index + 1 :]
+                candidate = output.model_copy(update={"proposed_updates": remaining})
+                proposal, _ = interview.check_turn(candidate, context, origin)
+                if proposal is not None:
+                    break
         if proposal is None:
             raise ModelRetry(
                 "The JSON object does not pass validation. Answer again with the whole object, "

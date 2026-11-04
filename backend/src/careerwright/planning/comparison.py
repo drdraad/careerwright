@@ -125,6 +125,20 @@ class BaselineFact(StrictModel):
     net_income_by_month: list[Money]
 
 
+class AccountingPayment(StrictModel):
+    variant_id: str
+    due: date
+    amount: Money
+
+
+class ReplanAccounting(StrictModel):
+    from_plan_version: int
+    completed_variants: list[str]
+    excluded_variants: list[str]
+    sunk_paid: Money
+    remaining_payments: list[AccountingPayment]
+
+
 class ComparisonBasis(StrictModel):
     """One comparison's definitions, the same for every route in it (VIS2-01)."""
 
@@ -135,6 +149,8 @@ class ComparisonBasis(StrictModel):
     scenario: Scenario
     baseline: BaselineFact | None = Field(description="Null: no baseline; direct spending.")
     synthetic: bool
+    opening_cash: Money | None = None
+    replan: ReplanAccounting | None = None
 
 
 class MeasuredCompletion(StrictModel):
@@ -560,6 +576,7 @@ def comparison(
 
 def basis(monthly: MonthlyInput) -> ComparisonBasis:
     inputs, baseline = monthly.inputs, monthly.inputs.baseline
+    replan = inputs.replan
     kinds = {k.value: k for k in BaselineKind}
     return ComparisonBasis(
         objective_basis=inputs.objective_basis,
@@ -574,6 +591,19 @@ def basis(monthly: MonthlyInput) -> ComparisonBasis:
         if baseline is not None
         else None,
         synthetic=inputs.synthetic,
+        opening_cash=_money(inputs.opening_cash_minor),
+        replan=ReplanAccounting(
+            from_plan_version=replan.from_plan_version,
+            completed_variants=replan.completed_variants,
+            excluded_variants=replan.excluded_variants,
+            sunk_paid=_money(replan.sunk_paid_minor),
+            remaining_payments=[
+                AccountingPayment(variant_id=p.variant_id, due=p.due, amount=_money(p.amount_minor))
+                for p in replan.remaining_payments
+            ],
+        )
+        if replan is not None
+        else None,
     )
 
 
@@ -959,6 +989,7 @@ def _step(monthly: MonthlyInput, v: CompiledVariant) -> RouteStep:
         if holds
     ]
     cited = [
+        *v.sources,
         *(p.cited for p in v.payments),
         *([v.recurring.cited] if v.recurring is not None else []),
         *(s.cited for s in v.supports),

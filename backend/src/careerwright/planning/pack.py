@@ -25,6 +25,7 @@ model needs more than a page states, the field stays unknown rather than guessed
 from calendar import monthrange
 from datetime import date, timedelta
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import JsonValue
 
@@ -151,6 +152,8 @@ class _Reader:
 
     def cite(self, claim: Claim) -> Citation:
         source = self.sources[claim.source_id]
+        url = source.final_url or source.url
+        parsed = urlsplit(url)
         span = claim.span
         locator = (
             f"offsets {span.start}-{span.end}"
@@ -162,6 +165,7 @@ class _Reader:
             claim_id=claim.claim_id,
             source_id=claim.source_id,
             source_hash=source.sha256,
+            source_url=url if parsed.scheme in {"http", "https"} and parsed.netloc else None,
             locator=locator,
             excerpt=claim.excerpt,
             retrieved_on=source.retrieved_at.date(),

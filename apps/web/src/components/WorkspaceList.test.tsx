@@ -118,9 +118,11 @@ describe("[UI-06] the data mode is a short choice with its full explanation besi
     const mode = screen.getByRole("combobox", { name: "Data mode" });
 
     expect(Array.from(mode.querySelectorAll("option")).map((option) => option.textContent)).toEqual(
-      ["Demo data", "Live-assisted"],
+      ["Demo mode", "Live-assisted"],
     );
-    expect(mode).toHaveAccessibleDescription("Synthetic data only. Nothing leaves this computer.");
+    expect(mode).toHaveAccessibleDescription(
+      "Uses synthetic records without a model key. A new workspace starts blank; preloaded sample workspaces have example answers.",
+    );
 
     await user.selectOptions(mode, "live_assisted");
 

@@ -16,7 +16,7 @@ from careerwright.cli import import_reference_data, import_taxonomy, migrate_app
 from careerwright.db import system_transaction
 from careerwright.profile import store, titles
 from careerwright.profile.targets import stored_targets
-from careerwright.seed import FIXTURE_WORKSPACE_ID
+from careerwright.seed import FIXTURE_PERSONAS
 from tests.support.client import ApiClient, profile_with
 from tests.support.esco import SAMPLE_PATH, SAMPLE_RELEASE
 from tests.support.infra import Infra, migrator_engine
@@ -321,16 +321,32 @@ def test_the_seed_and_the_demo_reset_store_the_fixture_s_target_records(
         assert import_taxonomy(engine, SAMPLE_PATH, SAMPLE_RELEASE) == "imported"
         import_reference_data(engine, sample_files(tmp_path))  # the UK job-title index
         seed(engine, settings)
-        seeded = unrecorded(infra, FIXTURE_WORKSPACE_ID, database)
+        seeded = {
+            persona.key: unrecorded(infra, persona.workspace_id, database)
+            for persona in FIXTURE_PERSONAS
+        }
         reset_demo(engine, settings)
-        reset = unrecorded(infra, FIXTURE_WORKSPACE_ID, database)
+        reset = {
+            persona.key: unrecorded(infra, persona.workspace_id, database)
+            for persona in FIXTURE_PERSONAS
+        }
     finally:
         engine.dispose()
-    records = infra.query(
-        "SELECT title, link FROM careerwright.target_records WHERE workspace_id = %s",
-        (FIXTURE_WORKSPACE_ID,),
-        database=database,
-    )
+    records = {
+        persona.key: infra.query(
+            "SELECT title, link FROM careerwright.target_records WHERE workspace_id = %s",
+            (persona.workspace_id,),
+            database=database,
+        )
+        for persona in FIXTURE_PERSONAS
+    }
 
-    assert (seeded, reset) == ([], [])
-    assert records == [{"title": "Data quality analyst", "link": "pack_crosswalk"}]
+    assert all(rows == [] for rows in seeded.values())
+    assert all(rows == [] for rows in reset.values())
+    assert records == {
+        "p01": [{"title": "Data quality analyst", "link": "pack_crosswalk"}],
+        "p02": [],
+        "p03": [{"title": "IT support technician", "link": "exact_label"}],
+        "p04": [{"title": "Registered nurse", "link": "pack_crosswalk"}],
+        "p05": [{"title": "Bookkeeping assistant", "link": "pack_crosswalk"}],
+    }

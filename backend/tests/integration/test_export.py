@@ -21,12 +21,10 @@ def test_export_holds_every_version_source_and_event_with_its_synthetic_label(
 
     export = api.get(f"/v1/workspaces/{workspace_id}/export", ada).json()
 
-    # Format 2 (Task 5) adds the interview turns and provisional concepts; format 3 (Task 6)
-    # the discoveries and the interview preferences; format 4 (Task 6b) each discovery's
-    # written explanation; format 5 (Task 6g slice B) each proposal's aim higher title ideas.
+    # The export includes each saved profile version and a place for chosen plan versions.
     assert (export["format"], export["format_version"], export["synthetic"]) == (
         "careerwright.workspace-export",
-        5,
+        6,
         True,
     )
     assert [v["version"] for v in export["profile_versions"]] == [1, 2]
@@ -36,3 +34,4 @@ def test_export_holds_every_version_source_and_event_with_its_synthetic_label(
     assert export["discoveries"] == []
     assert export["interview_preferences"]["version"] == 0  # never chosen, not paused
     assert export["interview_preferences"]["paused"] is False
+    assert export["plans"] == []

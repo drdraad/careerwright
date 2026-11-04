@@ -383,7 +383,7 @@ def test_only_wonder_equals_one_puts_muse_wonder_in_a_live_command(
 
 
 @pytest.mark.req("MODEL-11")
-def test_the_wonder_pair_has_its_own_cap_and_its_scope_stops_at_fifty_cents() -> None:
+def test_the_wonder_pair_has_its_own_cap_and_shared_scope() -> None:
     models = ModelChoice.configure("muse-spark-1.3-contributor", "muse-wonder-1.0", "production")
     pair = {"budget": WONDER_BUDGET, "kind": WONDER_PAIR}
 
@@ -401,7 +401,7 @@ def test_the_wonder_pair_has_its_own_cap_and_its_scope_stops_at_fifty_cents() ->
     assert WONDER_PAIR.calls() == 2
     assert (WONDER_BUDGET.scope, WONDER_BUDGET.max_cost_nano_usd) == (
         "wonder-qualification",
-        500_000_000,
+        5_000_000_000,
     )
     with pytest.raises(CapExceededError, match="exceeds the cap"):  # Spark's cap refuses it
         authorise(models, production=True, spent=NOTHING_SPENT, **pair)  # type: ignore[arg-type]
@@ -409,7 +409,7 @@ def test_the_wonder_pair_has_its_own_cap_and_its_scope_stops_at_fifty_cents() ->
         authorise(
             models,
             production=True,
-            spent=ScopeSpend(2, 2, 500_000_000 - worst_case + 1),
+            spent=ScopeSpend(2, 2, 5_000_000_000 - worst_case + 1),
             max_cost_nano_usd=WONDER_MAX_COST_NANO_USD,
             **pair,  # type: ignore[arg-type]
         )
@@ -503,12 +503,14 @@ def test_the_wonder_qualification_refuses_before_any_request_once_its_scope_is_s
             is_production_model=True,
             endpoint="POST /v1/responses",
             outcome=CallOutcome.FAILED,
-            reserved_nano_usd=400_000_000,  # unknown: counts its full reservation
+            reserved_nano_usd=5_000_000_000 - 149_460_000 + 1,
         )
     )
     built: list[str] = []
 
-    with pytest.raises(CapExceededError, match=r"wonder-qualification: \$0.400000 of"):
+    with pytest.raises(
+        CapExceededError, match=r"wonder-qualification: .* of \$5\.000000 committed"
+    ):
         qualify_wonder(SmokeSettings(_env_file=None), ledger, build=_wonder_meta(built))
     assert built == []
     assert len(ledger.records()) == 1

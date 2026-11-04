@@ -6,8 +6,7 @@
 // question with its two ways on, the slate in its own view with its written note written,
 // pending and unavailable, a chosen target confirmed in place, the support panel, a failed
 // reply, key consent, Unknown/Skipped/Prefer not to say, the scrolled stale conflict and its
-// Save, and expanded phone sheets), Routes not built yet in the fixture workspace too (the
-// route preview left the person's path, the audit's ruling), at
+// Save, and expanded phone sheets), Routes with its live planning checkpoint, at
 // 1440×900, 390×844 and 768×1024, plus the home page at 200 % zoom, each with the automatable
 // checks: axe (WCAG 2.0, 2.1 and 2.2 A/AA), horizontal overflow, a label overprinting its
 // value, a select cutting off its chosen option, console errors and font loading. These
@@ -200,12 +199,17 @@ const ENTRY_NOTE = {
 /** The first suggestion's "Why this could suit you", once its written note reads `state`;
  *  a missing note is shown from the notice above the cards, which holds its action. */
 const slateNote =
-  (state: RegExp, notice = false) =>
+  (state: RegExp, notice = false, inDetails = false) =>
   async (page: Page) => {
     await youView(page, "Suggestions");
     const directions = page.getByRole("region", { name: "Directions to explore" });
     const first = directions.getByRole("article").first();
-    await expect(first.getByText(state)).toBeVisible({ timeout: 60_000 });
+    if (inDetails) {
+      await expect(first.getByText(state)).toHaveCount(1, { timeout: 60_000 });
+      await expect(first.getByText("More about this role")).toBeVisible();
+    } else {
+      await expect(first.getByText(state)).toBeVisible({ timeout: 60_000 });
+    }
     const anchor = notice
       ? directions.getByText(/^No written note:/)
       : first.getByText("Why this could suit you");
@@ -624,7 +628,7 @@ const shots = (scratch: Scratch): Shot[] => [
     name: "you--slate",
     as: "ada",
     url: chapterUrl("you", scratch.talked),
-    ready: slateNote(/Written by the demo explainer \(synthetic\)/),
+    ready: slateNote(/Written by the demo explainer \(synthetic\)/, false, true),
   },
   {
     // A target chosen from the slate: confirmed in place, never "out of date" (STATE-10).
@@ -782,27 +786,36 @@ const shots = (scratch: Scratch): Shot[] => [
   { name: "skills", as: "ada", url: chapterUrl("skills"), ready: heading("Skills") },
   { name: "options", as: "ada", url: chapterUrl("options"), ready: heading("Options") },
   {
-    // The fixture workspace too: the route preview left the person's path (Storybook keeps
-    // it for design review until Routes is built).
     name: "routes",
     as: "ada",
     url: chapterUrl("routes"),
     ready: async (page) => {
-      await heading("Routes")(page);
-      await expect(page.getByText("Not built yet", { exact: true })).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: "Routes needs an earlier step" }),
+      ).toBeVisible();
+      await expect(page.getByRole("link", { name: "Open Options" })).toBeVisible();
       await expect(page.getByText("Fixture preview: not your routes")).toHaveCount(0);
     },
   },
-  { name: "plan", as: "ada", url: chapterUrl("plan"), ready: heading("Plan") },
+  {
+    name: "plan",
+    as: "ada",
+    url: chapterUrl("plan"),
+    refused: true,
+    ready: async (page) => {
+      await expect(page.getByRole("heading", { name: "Plan needs an earlier step" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Open Options" })).toBeVisible();
+    },
+  },
   {
     name: "routes--empty",
     as: "ada",
     url: chapterUrl("routes", scratch.empty),
     ready: async (page) => {
-      // A place not built yet: the reference's short card, one sentence on why it is empty
-      // (its kicker; the rail's marks say it in lower case).
-      await expect(page.getByText("Not built yet", { exact: true })).toBeVisible();
-      await expect(page.getByText(/^Route search isn't ready yet/)).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: "Routes needs an earlier step" }),
+      ).toBeVisible();
+      await expect(page.getByRole("link", { name: "Open You" })).toBeVisible();
       await expect(page.getByRole("banner").getByText("Nothing saved yet")).toBeVisible();
       await expect(liveUpdates(page, "Live")).toBeVisible();
     },

@@ -29,6 +29,7 @@ from careerwright.identity.keyring import Keyring
 from careerwright.identity.receipts import CommandResult, fingerprint, run_idempotent
 from careerwright.identity.workspaces import visible_workspace
 from careerwright.money import Money
+from careerwright.planning.catalogue import Citation, CitationBasis
 from careerwright.planning.checkpoint import TargetCheckpoint
 from careerwright.planning.commands import (
     InputsView,
@@ -44,12 +45,19 @@ from careerwright.planning.inputs import (
     ContinuationInput,
     Need,
     PlanningInputsDocument,
+    with_answers,
 )
 from careerwright.planning.option_texts import PasteOptionText, option_text, paste_option_text
 from careerwright.planning.pack import TargetOptions
 from careerwright.planning.search import M0SearchLimits, SearchResult
 from careerwright.planning.solve_records import SolveStage
-from careerwright.planning.solves import SolveRequest, SolveView, request_solve, solve_view
+from careerwright.planning.solves import (
+    ReplanRequest,
+    SolveRequest,
+    SolveView,
+    request_solve,
+    solve_view,
+)
 from careerwright.profile.document import WorkStatus
 from careerwright.vocabulary import DataMode, WorkState
 
@@ -110,16 +118,35 @@ def get_options(workspace_id: uuid.UUID, caller: CallerDep, deps: Deps) -> Optio
     themselves beside the pack's, each `proposed` and marked as theirs."""
     with actor_transaction(deps.engine, caller.actor.actor_id) as tx:
         view = capability_view(tx, workspace_id, deps.capability)
-        own = current_inputs(tx, workspace_id).document.own_options
+        inputs = current_inputs(tx, workspace_id)
+        document = inputs.document
+        own = document.own_options
         found = target_catalogues(
             tx, deps.keyring, workspace_id, view.matrices, own, deps.capability
         )
+        cited = Citation(
+            basis=CitationBasis.PERSON, locator=f"planning inputs, version {inputs.version}"
+        )
+        targets = [
+            options.model_copy(
+                update={
+                    "catalogue": with_answers(
+                        options.catalogue,
+                        document.model_copy(update={"excluded_variants": []}),
+                        cited,
+                    )
+                    if options.catalogue is not None
+                    else None
+                }
+            )
+            for _, options in found
+        ]
     return OptionsOut(
         profile_version=view.profile_version,
         synthetic=view.synthetic,
         data_mode=view.data_mode,
         pack=PackLabel.of(deps.capability),
-        targets=[options for _, options in found],
+        targets=targets,
     )
 
 
@@ -335,6 +362,10 @@ class SolveOut(BaseModel):
     )
     code: ResultCode | None
     result: SearchResult | None
+    remaining_horizon_recalculated: bool | None = Field(
+        default=None,
+        description="Null until complete; true only for a solve using confirmed remaining actuals.",
+    )
 
 
 def solve_out(tx: Tx, keyring: Keyring, view: SolveView) -> SolveOut:
@@ -358,6 +389,9 @@ def solve_out(tx: Tx, keyring: Keyring, view: SolveView) -> SolveOut:
         attempts=len(view.attempts),
         code=result_code(view.result) if view.result is not None else None,
         result=view.result,
+        remaining_horizon_recalculated=(
+            view.monthly.inputs.replan is not None if view.monthly is not None else None
+        ),
     )
 
 
@@ -402,6 +436,51 @@ def post_solve(
         key,
         "request_route_solve",
         fingerprint("request_route_solve", request),
+        execute,
+    )
+    return JSONResponse(response, status_code=status)
+
+
+@router.post(
+    "/solves/replan",
+    status_code=202,
+    response_model=SolveOut,
+    responses={200: {"model": SolveOut, "description": "The same solve is under way: joined."}},
+    operation_id="request_remaining_route_solve",
+)
+def post_replan(
+    workspace_id: uuid.UUID,
+    body: ReplanRequest,
+    caller: CallerDep,
+    deps: Deps,
+    key: IdempotencyKey,
+) -> JSONResponse:
+    """Search the chosen plan's remaining months from confirmed actuals and obligations."""
+
+    def execute(tx: Tx) -> CommandResult:
+        view, started = request_solve(
+            tx,
+            caller.actor,
+            workspace_id,
+            body,
+            data=deps.capability,
+            keyring=deps.keyring,
+            runtime_mode=deps.settings.runtime_mode,
+            now=deps.clock(),
+        )
+        return CommandResult(
+            202 if started else 200,
+            solve_out(tx, deps.keyring, view).model_dump(mode="json"),
+            workspace_id,
+        )
+
+    request = {"workspace_id": str(workspace_id), **body.model_dump(mode="json")}
+    status, response = run_idempotent(
+        deps.engine,
+        caller.actor.actor_id,
+        key,
+        "request_remaining_route_solve",
+        fingerprint("request_remaining_route_solve", request),
         execute,
     )
     return JSONResponse(response, status_code=status)

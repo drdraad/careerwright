@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, ServerSentEventsResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CancelRunData, CancelRunErrors, CancelRunResponses, ChooseClosestData, ChooseClosestErrors, ChooseClosestResponses, ChooseRoleData, ChooseRoleErrors, ChooseRoleResponses, ChooseTargetData, ChooseTargetErrors, ChooseTargetResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, DecideStrengthData, DecideStrengthErrors, DecideStrengthResponses, DecideTurnData, DecideTurnErrors, DecideTurnResponses, EditMatrixRowData, EditMatrixRowErrors, EditMatrixRowResponses, EstimateRunData, EstimateRunErrors, EstimateRunResponses, ExportWorkspaceData, ExportWorkspaceErrors, ExportWorkspaceResponses, FavouriteJobData, FavouriteJobErrors, FavouriteJobResponses, GetAcquisitionData, GetAcquisitionErrors, GetAcquisitionResponses, GetCapabilityQuestionsData, GetCapabilityQuestionsErrors, GetCapabilityQuestionsResponses, GetCapabilityReadinessData, GetCapabilityReadinessErrors, GetCapabilityReadinessResponses, GetDiscoveryData, GetDiscoveryErrors, GetDiscoveryResponses, GetJobData, GetJobErrors, GetJobResponses, GetMeData, GetMeErrors, GetMeResponses, GetOccupationData, GetOccupationErrors, GetOccupationEvidenceData, GetOccupationEvidenceErrors, GetOccupationEvidenceResponses, GetOccupationResponses, GetOptionCheckpointData, GetOptionCheckpointErrors, GetOptionCheckpointResponses, GetOptionTextData, GetOptionTextErrors, GetOptionTextResponses, GetOriginData, GetOriginErrors, GetOriginResponses, GetPlanningInputsData, GetPlanningInputsErrors, GetPlanningInputsResponses, GetPreferencesData, GetPreferencesErrors, GetPreferencesResponses, GetProfileData, GetProfileErrors, GetProfileResponses, GetProfileVersionData, GetProfileVersionErrors, GetProfileVersionResponses, GetRoleResearchData, GetRoleResearchErrors, GetRoleResearchResponses, GetRouteComparisonData, GetRouteComparisonErrors, GetRouteComparisonResponses, GetRouteScheduleData, GetRouteScheduleErrors, GetRouteScheduleResponses, GetRouteSolveData, GetRouteSolveErrors, GetRouteSolveResponses, GetRunData, GetRunErrors, GetRunResponses, GetSearchData, GetSearchErrors, GetSearchResponses, GetSketchData, GetSketchErrors, GetSketchResponses, GetSkillsData, GetSkillsErrors, GetSkillsResponses, GetSlateData, GetSlateErrors, GetSlateResponses, GetSpendData, GetSpendErrors, GetSpendResponses, GetStrengthData, GetStrengthErrors, GetStrengthResponses, GetTaxonomyData, GetTaxonomyErrors, GetTaxonomyResponses, GetTitleDetailsData, GetTitleDetailsErrors, GetTitleDetailsResponses, GetTurnData, GetTurnErrors, GetTurnReplyData, GetTurnReplyErrors, GetTurnReplyResponses, GetTurnResponses, GetWorkspaceData, GetWorkspaceErrors, GetWorkspaceResponses, HealthzData, HealthzResponses, ListCapabilityMatricesData, ListCapabilityMatricesErrors, ListCapabilityMatricesResponses, ListCredentialsData, ListCredentialsErrors, ListCredentialsResponses, ListDiscoveriesData, ListDiscoveriesErrors, ListDiscoveriesResponses, ListEventsData, ListEventsErrors, ListEventsResponses, ListJobsData, ListJobsErrors, ListJobsResponses, ListPlacesData, ListPlacesErrors, ListPlacesResponses, ListPlanningOptionsData, ListPlanningOptionsErrors, ListPlanningOptionsResponses, ListProfileVersionsData, ListProfileVersionsErrors, ListProfileVersionsResponses, ListProvisionalConceptsData, ListProvisionalConceptsErrors, ListProvisionalConceptsResponses, ListRoleResearchData, ListRoleResearchErrors, ListRoleResearchResponses, ListRouteSchedulesData, ListRouteSchedulesErrors, ListRouteSchedulesResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListTargetsData, ListTargetsErrors, ListTargetsResponses, ListTurnsData, ListTurnsErrors, ListTurnsResponses, ListWorkspacesData, ListWorkspacesErrors, ListWorkspacesResponses, MatchTitlesData, MatchTitlesErrors, MatchTitlesResponses, NameRoleData, NameRoleErrors, NameRoleResponses, NoJobYetData, NoJobYetErrors, NoJobYetResponses, PasteOptionTextData, PasteOptionTextErrors, PasteOptionTextResponses, PasteTextData, PasteTextErrors, PasteTextResponses, PutPreferencesData, PutPreferencesErrors, PutPreferencesResponses, PutProfileData, PutProfileErrors, PutProfileResponses, PutSpendLimitsData, PutSpendLimitsErrors, PutSpendLimitsResponses, PutTitleDetailsData, PutTitleDetailsErrors, PutTitleDetailsResponses, ReadRolePagesData, ReadRolePagesErrors, ReadRolePagesResponses, ReadyzData, ReadyzResponses, RecordRequirementStatementData, RecordRequirementStatementErrors, RecordRequirementStatementResponses, RecordSkillEvidenceData, RecordSkillEvidenceErrors, RecordSkillEvidenceResponses, RegisterProvisionalConceptData, RegisterProvisionalConceptErrors, RegisterProvisionalConceptResponses, RenameWorkspaceData, RenameWorkspaceErrors, RenameWorkspaceResponses, RequestRouteSolveData, RequestRouteSolveErrors, RequestRouteSolveResponses, RevertProfileData, RevertProfileErrors, RevertProfileResponses, RevokeCredentialData, RevokeCredentialErrors, RevokeCredentialResponses, RotateCredentialData, RotateCredentialErrors, RotateCredentialResponses, SearchOccupationsData, SearchOccupationsErrors, SearchOccupationsResponses, SelectAdvertSpansData, SelectAdvertSpansErrors, SelectAdvertSpansResponses, SetCapabilityQuestionsData, SetCapabilityQuestionsErrors, SetCapabilityQuestionsResponses, StartRoleResearchData, StartRoleResearchErrors, StartRoleResearchResponses, StoreCredentialData, StoreCredentialErrors, StoreCredentialResponses, StreamEventsData, StreamEventsErrors, StreamEventsResponse, StreamEventsResponses, SubmitAcquisitionData, SubmitAcquisitionErrors, SubmitAcquisitionResponses, SubmitDiscoveryData, SubmitDiscoveryErrors, SubmitDiscoveryResponses, SubmitExplanationData, SubmitExplanationErrors, SubmitExplanationResponses, SubmitRunData, SubmitRunErrors, SubmitRunResponses, SubmitSearchData, SubmitSearchErrors, SubmitSearchResponses, SubmitStrengthData, SubmitStrengthErrors, SubmitStrengthResponses, SubmitTurnData, SubmitTurnErrors, SubmitTurnResponses, UnfavouriteJobData, UnfavouriteJobErrors, UnfavouriteJobResponses, WritePlanningInputsData, WritePlanningInputsErrors, WritePlanningInputsResponses } from './types.gen';
+import type { CancelRunData, CancelRunErrors, CancelRunResponses, ChooseClosestData, ChooseClosestErrors, ChooseClosestResponses, ChoosePlanData, ChoosePlanErrors, ChoosePlanResponses, ChooseRoleData, ChooseRoleErrors, ChooseRoleResponses, ChooseTargetData, ChooseTargetErrors, ChooseTargetResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, DecideStrengthData, DecideStrengthErrors, DecideStrengthResponses, DecideTurnData, DecideTurnErrors, DecideTurnResponses, EditMatrixRowData, EditMatrixRowErrors, EditMatrixRowResponses, EstimateOptionResearchData, EstimateOptionResearchErrors, EstimateOptionResearchResponses, EstimateRunData, EstimateRunErrors, EstimateRunResponses, ExportPlanCalendarData, ExportPlanCalendarErrors, ExportPlanCalendarResponses, ExportPlanJsonData, ExportPlanJsonErrors, ExportPlanJsonResponses, ExportWorkspaceData, ExportWorkspaceErrors, ExportWorkspaceResponses, FavouriteJobData, FavouriteJobErrors, FavouriteJobResponses, GetAcquisitionData, GetAcquisitionErrors, GetAcquisitionResponses, GetCapabilityQuestionsData, GetCapabilityQuestionsErrors, GetCapabilityQuestionsResponses, GetCapabilityReadinessData, GetCapabilityReadinessErrors, GetCapabilityReadinessResponses, GetCurrentPlanData, GetCurrentPlanErrors, GetCurrentPlanResponses, GetDiscoveryData, GetDiscoveryErrors, GetDiscoveryResponses, GetJobData, GetJobErrors, GetJobResponses, GetMeData, GetMeErrors, GetMeResponses, GetOccupationData, GetOccupationErrors, GetOccupationEvidenceData, GetOccupationEvidenceErrors, GetOccupationEvidenceResponses, GetOccupationResponses, GetOptionCheckpointData, GetOptionCheckpointErrors, GetOptionCheckpointResponses, GetOptionResearchData, GetOptionResearchErrors, GetOptionResearchResponses, GetOptionTextData, GetOptionTextErrors, GetOptionTextResponses, GetOriginData, GetOriginErrors, GetOriginResponses, GetPlanChangesData, GetPlanChangesErrors, GetPlanChangesResponses, GetPlanningInputsData, GetPlanningInputsErrors, GetPlanningInputsResponses, GetPlanVersionData, GetPlanVersionErrors, GetPlanVersionResponses, GetPreferencesData, GetPreferencesErrors, GetPreferencesResponses, GetProfileData, GetProfileErrors, GetProfileResponses, GetProfileVersionData, GetProfileVersionErrors, GetProfileVersionResponses, GetRoleResearchData, GetRoleResearchErrors, GetRoleResearchResponses, GetRouteComparisonData, GetRouteComparisonErrors, GetRouteComparisonResponses, GetRouteScheduleData, GetRouteScheduleErrors, GetRouteScheduleResponses, GetRouteSolveData, GetRouteSolveErrors, GetRouteSolveResponses, GetRunData, GetRunErrors, GetRunResponses, GetSearchData, GetSearchErrors, GetSearchResponses, GetSketchData, GetSketchErrors, GetSketchResponses, GetSkillsData, GetSkillsErrors, GetSkillsResponses, GetSlateData, GetSlateErrors, GetSlateResponses, GetSpendData, GetSpendErrors, GetSpendResponses, GetStrengthData, GetStrengthErrors, GetStrengthResponses, GetTaxonomyData, GetTaxonomyErrors, GetTaxonomyResponses, GetTitleDetailsData, GetTitleDetailsErrors, GetTitleDetailsResponses, GetTurnData, GetTurnErrors, GetTurnReplyData, GetTurnReplyErrors, GetTurnReplyResponses, GetTurnResponses, GetWorkspaceData, GetWorkspaceErrors, GetWorkspaceResponses, HealthzData, HealthzResponses, ListCapabilityMatricesData, ListCapabilityMatricesErrors, ListCapabilityMatricesResponses, ListCredentialsData, ListCredentialsErrors, ListCredentialsResponses, ListDiscoveriesData, ListDiscoveriesErrors, ListDiscoveriesResponses, ListEventsData, ListEventsErrors, ListEventsResponses, ListJobsData, ListJobsErrors, ListJobsResponses, ListOptionResearchData, ListOptionResearchErrors, ListOptionResearchResponses, ListPlacesData, ListPlacesErrors, ListPlacesResponses, ListPlanningOptionsData, ListPlanningOptionsErrors, ListPlanningOptionsResponses, ListPlanVersionsData, ListPlanVersionsErrors, ListPlanVersionsResponses, ListProfileVersionsData, ListProfileVersionsErrors, ListProfileVersionsResponses, ListProvisionalConceptsData, ListProvisionalConceptsErrors, ListProvisionalConceptsResponses, ListRoleResearchData, ListRoleResearchErrors, ListRoleResearchResponses, ListRouteSchedulesData, ListRouteSchedulesErrors, ListRouteSchedulesResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListSourcesData, ListSourcesErrors, ListSourcesResponses, ListTargetsData, ListTargetsErrors, ListTargetsResponses, ListTurnsData, ListTurnsErrors, ListTurnsResponses, ListWorkspacesData, ListWorkspacesErrors, ListWorkspacesResponses, MatchTitlesData, MatchTitlesErrors, MatchTitlesResponses, NameRoleData, NameRoleErrors, NameRoleResponses, NoJobYetData, NoJobYetErrors, NoJobYetResponses, PasteOptionTextData, PasteOptionTextErrors, PasteOptionTextResponses, PasteTextData, PasteTextErrors, PasteTextResponses, PreviewPlanRevisionData, PreviewPlanRevisionErrors, PreviewPlanRevisionResponses, PutPreferencesData, PutPreferencesErrors, PutPreferencesResponses, PutProfileData, PutProfileErrors, PutProfileResponses, PutSpendLimitsData, PutSpendLimitsErrors, PutSpendLimitsResponses, PutTitleDetailsData, PutTitleDetailsErrors, PutTitleDetailsResponses, ReadOptionPagesData, ReadOptionPagesErrors, ReadOptionPagesResponses, ReadRolePagesData, ReadRolePagesErrors, ReadRolePagesResponses, ReadyzData, ReadyzResponses, RecordPlanProgressData, RecordPlanProgressErrors, RecordPlanProgressResponses, RecordRequirementStatementData, RecordRequirementStatementErrors, RecordRequirementStatementResponses, RecordSkillEvidenceData, RecordSkillEvidenceErrors, RecordSkillEvidenceResponses, RegisterProvisionalConceptData, RegisterProvisionalConceptErrors, RegisterProvisionalConceptResponses, RenameWorkspaceData, RenameWorkspaceErrors, RenameWorkspaceResponses, RequestRemainingRouteSolveData, RequestRemainingRouteSolveErrors, RequestRemainingRouteSolveResponses, RequestRouteSolveData, RequestRouteSolveErrors, RequestRouteSolveResponses, RevertProfileData, RevertProfileErrors, RevertProfileResponses, RevokeCredentialData, RevokeCredentialErrors, RevokeCredentialResponses, RotateCredentialData, RotateCredentialErrors, RotateCredentialResponses, SearchOccupationsData, SearchOccupationsErrors, SearchOccupationsResponses, SelectAdvertSpansData, SelectAdvertSpansErrors, SelectAdvertSpansResponses, SetCapabilityQuestionsData, SetCapabilityQuestionsErrors, SetCapabilityQuestionsResponses, StartOptionResearchData, StartOptionResearchErrors, StartOptionResearchResponses, StartRoleResearchData, StartRoleResearchErrors, StartRoleResearchResponses, StoreCredentialData, StoreCredentialErrors, StoreCredentialResponses, StreamEventsData, StreamEventsErrors, StreamEventsResponse, StreamEventsResponses, SubmitAcquisitionData, SubmitAcquisitionErrors, SubmitAcquisitionResponses, SubmitDiscoveryData, SubmitDiscoveryErrors, SubmitDiscoveryResponses, SubmitExplanationData, SubmitExplanationErrors, SubmitExplanationResponses, SubmitRunData, SubmitRunErrors, SubmitRunResponses, SubmitSearchData, SubmitSearchErrors, SubmitSearchResponses, SubmitStrengthData, SubmitStrengthErrors, SubmitStrengthResponses, SubmitTurnData, SubmitTurnErrors, SubmitTurnResponses, UnfavouriteJobData, UnfavouriteJobErrors, UnfavouriteJobResponses, WritePlanningInputsData, WritePlanningInputsErrors, WritePlanningInputsResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -785,6 +785,55 @@ export const favouriteJob = <ThrowOnError extends boolean = false>(options: Opti
 });
 
 /**
+ * Estimate Option Research
+ */
+export const estimateOptionResearch = <ThrowOnError extends boolean = false>(options: Options<EstimateOptionResearchData, ThrowOnError>): RequestResult<EstimateOptionResearchResponses, EstimateOptionResearchErrors, ThrowOnError> => (options.client ?? client).get<EstimateOptionResearchResponses, EstimateOptionResearchErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/option-research/estimate',
+    ...options
+});
+
+/**
+ * List Option Research
+ */
+export const listOptionResearch = <ThrowOnError extends boolean = false>(options: Options<ListOptionResearchData, ThrowOnError>): RequestResult<ListOptionResearchResponses, ListOptionResearchErrors, ThrowOnError> => (options.client ?? client).get<ListOptionResearchResponses, ListOptionResearchErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/option-research',
+    ...options
+});
+
+/**
+ * Start Option Research
+ */
+export const startOptionResearch = <ThrowOnError extends boolean = false>(options: Options<StartOptionResearchData, ThrowOnError>): RequestResult<StartOptionResearchResponses, StartOptionResearchErrors, ThrowOnError> => (options.client ?? client).post<StartOptionResearchResponses, StartOptionResearchErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/option-research',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Get Option Research
+ */
+export const getOptionResearch = <ThrowOnError extends boolean = false>(options: Options<GetOptionResearchData, ThrowOnError>): RequestResult<GetOptionResearchResponses, GetOptionResearchErrors, ThrowOnError> => (options.client ?? client).get<GetOptionResearchResponses, GetOptionResearchErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/option-research/{research_id}',
+    ...options
+});
+
+/**
+ * Read Option Pages
+ */
+export const readOptionPages = <ThrowOnError extends boolean = false>(options: Options<ReadOptionPagesData, ThrowOnError>): RequestResult<ReadOptionPagesResponses, ReadOptionPagesErrors, ThrowOnError> => (options.client ?? client).post<ReadOptionPagesResponses, ReadOptionPagesErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/option-research/{research_id}/reading',
+    ...options
+});
+
+/**
  * Get Occupation Evidence
  *
  * The occupation's UK SOC 2020 candidates with ASHE for your cities' regions, its
@@ -1015,6 +1064,21 @@ export const requestRouteSolve = <ThrowOnError extends boolean = false>(options:
 });
 
 /**
+ * Post Replan
+ *
+ * Search the chosen plan's remaining months from confirmed actuals and obligations.
+ */
+export const requestRemainingRouteSolve = <ThrowOnError extends boolean = false>(options: Options<RequestRemainingRouteSolveData, ThrowOnError>): RequestResult<RequestRemainingRouteSolveResponses, RequestRemainingRouteSolveErrors, ThrowOnError> => (options.client ?? client).post<RequestRemainingRouteSolveResponses, RequestRemainingRouteSolveErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/planning/solves/replan',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * Get Solve
  *
  * A route solve, its stage while it runs, and its result once complete.
@@ -1022,6 +1086,95 @@ export const requestRouteSolve = <ThrowOnError extends boolean = false>(options:
 export const getRouteSolve = <ThrowOnError extends boolean = false>(options: Options<GetRouteSolveData, ThrowOnError>): RequestResult<GetRouteSolveResponses, GetRouteSolveErrors, ThrowOnError> => (options.client ?? client).get<GetRouteSolveResponses, GetRouteSolveErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v1/workspaces/{workspace_id}/planning/solves/{run_id}',
+    ...options
+});
+
+/**
+ * Post Plan
+ */
+export const choosePlan = <ThrowOnError extends boolean = false>(options: Options<ChoosePlanData, ThrowOnError>): RequestResult<ChoosePlanResponses, ChoosePlanErrors, ThrowOnError> => (options.client ?? client).post<ChoosePlanResponses, ChoosePlanErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/planning/plans',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Get Current Plan
+ */
+export const getCurrentPlan = <ThrowOnError extends boolean = false>(options: Options<GetCurrentPlanData, ThrowOnError>): RequestResult<GetCurrentPlanResponses, GetCurrentPlanErrors, ThrowOnError> => (options.client ?? client).get<GetCurrentPlanResponses, GetCurrentPlanErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/planning/plans/current',
+    ...options
+});
+
+/**
+ * Get Plan History
+ */
+export const listPlanVersions = <ThrowOnError extends boolean = false>(options: Options<ListPlanVersionsData, ThrowOnError>): RequestResult<ListPlanVersionsResponses, ListPlanVersionsErrors, ThrowOnError> => (options.client ?? client).get<ListPlanVersionsResponses, ListPlanVersionsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/planning/plans/history',
+    ...options
+});
+
+/**
+ * Get Plan Changes
+ */
+export const getPlanChanges = <ThrowOnError extends boolean = false>(options: Options<GetPlanChangesData, ThrowOnError>): RequestResult<GetPlanChangesResponses, GetPlanChangesErrors, ThrowOnError> => (options.client ?? client).get<GetPlanChangesResponses, GetPlanChangesErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/planning/plans/changes',
+    ...options
+});
+
+/**
+ * Get Revision Preview
+ */
+export const previewPlanRevision = <ThrowOnError extends boolean = false>(options: Options<PreviewPlanRevisionData, ThrowOnError>): RequestResult<PreviewPlanRevisionResponses, PreviewPlanRevisionErrors, ThrowOnError> => (options.client ?? client).get<PreviewPlanRevisionResponses, PreviewPlanRevisionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/planning/plans/revision-preview',
+    ...options
+});
+
+/**
+ * Post Plan Progress
+ */
+export const recordPlanProgress = <ThrowOnError extends boolean = false>(options: Options<RecordPlanProgressData, ThrowOnError>): RequestResult<RecordPlanProgressResponses, RecordPlanProgressErrors, ThrowOnError> => (options.client ?? client).post<RecordPlanProgressResponses, RecordPlanProgressErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/planning/plans/progress',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Get Plan Version
+ */
+export const getPlanVersion = <ThrowOnError extends boolean = false>(options: Options<GetPlanVersionData, ThrowOnError>): RequestResult<GetPlanVersionResponses, GetPlanVersionErrors, ThrowOnError> => (options.client ?? client).get<GetPlanVersionResponses, GetPlanVersionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/planning/plans/{version}',
+    ...options
+});
+
+/**
+ * Export Plan Json
+ */
+export const exportPlanJson = <ThrowOnError extends boolean = false>(options: Options<ExportPlanJsonData, ThrowOnError>): RequestResult<ExportPlanJsonResponses, ExportPlanJsonErrors, ThrowOnError> => (options.client ?? client).get<ExportPlanJsonResponses, ExportPlanJsonErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/planning/plans/{version}/export.json',
+    ...options
+});
+
+/**
+ * Export Plan Calendar
+ */
+export const exportPlanCalendar = <ThrowOnError extends boolean = false>(options: Options<ExportPlanCalendarData, ThrowOnError>): RequestResult<ExportPlanCalendarResponses, ExportPlanCalendarErrors, ThrowOnError> => (options.client ?? client).get<ExportPlanCalendarResponses, ExportPlanCalendarErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v1/workspaces/{workspace_id}/planning/plans/{version}/calendar.ics',
     ...options
 });
 

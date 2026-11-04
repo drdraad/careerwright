@@ -41,7 +41,7 @@ and cost, then scans the result, the rows and the requests sent for the key (fix
 code: schema output with usage (the connection check), then streaming, web search and schema
 output in one call (the source search, streamed). Wonder is the production model for that
 invocation only, whatever is configured; its own per-invocation cap and the scope
-`wonder-qualification` (shared with `make live-eval WONDER=1`, $0.50 in all) are checked
+`wonder-qualification` (shared with `make live-eval WONDER=1`, $5 in all) are checked
 before either call. Without the flag, Wonder's worst case is refused by the Spark-sized cap.
 
 Run from `backend/`: `uv run --locked python -m tools.live_smoke [--production-model]
@@ -59,7 +59,7 @@ from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 from urllib.parse import urlsplit
 
 import httpx2
@@ -253,13 +253,11 @@ PAGE_EXTRACTION = SmokeKind(
 )
 
 
-# Muse Wonder's qualification (ADR 0003, amendment of 2026-10-31), all in one scope: the two
-# in-process calls (`--wonder`) and at most six evaluation cases (`make live-eval WONDER=1`),
-# under $0.50 in all, every request on the production model. Unknown costs count their full
-# reservation, so the scope refuses any invocation whose worst case would pass $0.50.
+# Muse Wonder's qualification uses one shared, ledgered scope for smoke and evaluation calls.
+# Unknown costs count their full reservation before another production request is allowed.
 WONDER_SCOPE = "wonder-qualification"
 WONDER_BUDGET = ScopeBudget(
-    WONDER_SCOPE, max_calls=14, max_production_calls=14, max_cost_nano_usd=500_000_000
+    WONDER_SCOPE, max_calls=50, max_production_calls=50, max_cost_nano_usd=5_000_000_000
 )
 # Per invocation of `--wonder` (Spark's production cap, MAX_COST_NANO_USD, is too small):
 # the pair's worst case is $0.149 ($0.057 schema call, $0.0925 streamed search).
@@ -1053,11 +1051,14 @@ def qualify_extraction(
         proposal = None
         with capture_run_messages() as messages:
             try:
-                proposal = run_extraction(
-                    model,
-                    ModelMode.CONTRIBUTOR,
-                    context.model_dump_json().encode(),
-                    PartialWriter(lambda text: None),
+                proposal = cast(
+                    ExtractionProposal,
+                    run_extraction(
+                        model,
+                        ModelMode.CONTRIBUTOR,
+                        context.model_dump_json().encode(),
+                        PartialWriter(lambda text: None),
+                    ),
                 )
                 outcome = "succeeded"
             except Exception as error:  # the label only, never the message

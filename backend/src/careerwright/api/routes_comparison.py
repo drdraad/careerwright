@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from careerwright.api import pagination
 from careerwright.api.deps import CallerDep, Deps
 from careerwright.api.envelope import ERROR_RESPONSES
+from careerwright.capability.commands import capability_view
 from careerwright.db import actor_transaction
 from careerwright.errors import CareerwrightError, ErrorCode, ErrorStage
 from careerwright.planning.commands import current_inputs
@@ -31,6 +32,7 @@ from careerwright.planning.comparison import (
     schedule_page,
 )
 from careerwright.planning.compiler import MonthlyInput
+from careerwright.planning.plans import _current_target_versions
 from careerwright.planning.search import SearchResult
 from careerwright.planning.solves import SolveView, solve_view
 
@@ -54,6 +56,9 @@ class Changed(BaseModel):
 
     planning_inputs: bool = Field(description="The planning inputs have a newer version.")
     profile: bool = Field(description="The profile (its limits among it) has a newer version.")
+    capability: bool = Field(description="The person's skill evidence has a newer version.")
+    target_matrix: bool = Field(description="The target matrix or definition has changed.")
+    option_pack: bool = Field(description="The available options or their research have changed.")
 
 
 class ComparisonOut(Comparison):
@@ -88,6 +93,10 @@ def get_comparison(
         view = solve_view(tx, deps.keyring, workspace_id, run_id)
         result, monthly = _complete(view)
         now = current_inputs(tx, workspace_id)
+        capability = capability_view(tx, workspace_id, deps.capability)
+        matrix_version, definition_version, catalogue_label = _current_target_versions(
+            tx, workspace_id, deps.keyring, deps.capability, now, capability, result.target_title
+        )
     found = comparison(result, monthly, pinned=pin or [])
     return ComparisonOut(
         **dict(found),
@@ -95,6 +104,10 @@ def get_comparison(
             planning_inputs=now.version != view.solve.inputs_version,
             profile=view.run.profile_version is not None
             and now.profile_version != view.run.profile_version,
+            capability=capability.version != view.solve.capability_version,
+            target_matrix=matrix_version != result.matrix_version
+            or definition_version != result.definition_version,
+            option_pack=catalogue_label != result.label,
         ),
     )
 

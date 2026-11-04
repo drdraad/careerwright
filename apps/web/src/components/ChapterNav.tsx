@@ -1,7 +1,4 @@
 "use client";
-// Chapter navigation: the slim rail on desktop and tablet, a chapter menu on phones. Both are
-// lists of links in a labelled `nav`, so every chapter is a Tab stop and the current one is
-// `aria-current="page"`.
 import * as Popover from "@radix-ui/react-popover";
 import Link from "next/link";
 import { useState } from "react";
@@ -14,28 +11,58 @@ type Props = {
   progress: Partial<Record<ChapterId, ChapterProgress>>;
 };
 
-/** The mark in words; the current chapter is announced by `aria-current` instead. A chapter
- *  not built yet says so in sight, before it is clicked (the audit's F2). */
-function Mark({
-  progress,
+const COMPLETED: Record<ChapterId, string> = {
+  you: "Direction chosen",
+  roles: "Role reviewed",
+  skills: "Questions answered",
+  options: "Ready for routes",
+  routes: "Route found",
+  plan: "Plan saved",
+};
+
+function ChapterItem({
+  id,
+  label,
+  workspaceId,
   current,
-  built,
+  progress,
+  menu = false,
+  onChoose,
 }: {
-  progress: ChapterProgress | undefined;
-  current: boolean;
-  built: boolean;
+  id: ChapterId;
+  label: string;
+  workspaceId: string;
+  current: ChapterId;
+  progress: ChapterProgress;
+  menu?: boolean;
+  onChoose?(): void;
 }) {
-  return (
+  const className = menu ? "menu-chapter" : "rail-chapter";
+  const words =
+    progress === "complete" ? COMPLETED[id] : progress === "locked" ? "Locked" : "Available";
+  const content = (
     <>
-      {!built && (
-        <span className="chapter-later">
-          <span className="sr-only">,</span> not built yet
-        </span>
-      )}
-      {!current && (
-        <span className="sr-only">{progress === "visited" ? ", visited" : ", not started"}</span>
-      )}
+      <span className="landmark" aria-hidden="true" />
+      {label} <span className="chapter-later">{words}</span>
     </>
+  );
+  if (progress === "locked" && id !== current)
+    return (
+      <span className={className} data-progress="locked" aria-disabled="true">
+        {content}
+      </span>
+    );
+  return (
+    <Link
+      className={className}
+      href={chapterHref(workspaceId, id)}
+      data-progress={progress}
+      aria-label={`${label}, ${words.toLowerCase()}`}
+      aria-current={id === current ? "page" : undefined}
+      onClick={onChoose}
+    >
+      {content}
+    </Link>
   );
 }
 
@@ -49,22 +76,15 @@ export function ChapterRail({ workspaceId, current, progress }: Props) {
       </Link>
       <nav aria-label="Chapters">
         <ul className="rail-chapters">
-          {CHAPTERS.map((chapter) => (
-            <li key={chapter.id}>
-              <Link
-                className="rail-chapter"
-                href={chapterHref(workspaceId, chapter.id)}
-                data-progress={progress[chapter.id] ?? "todo"}
-                aria-current={chapter.id === current ? "page" : undefined}
-              >
-                <span className="landmark" aria-hidden="true" />
-                {chapter.label}
-                <Mark
-                  progress={progress[chapter.id]}
-                  current={chapter.id === current}
-                  built={chapter.built}
-                />
-              </Link>
+          {CHAPTERS.map(({ id, label }) => (
+            <li key={id}>
+              <ChapterItem
+                id={id}
+                label={label}
+                workspaceId={workspaceId}
+                current={current}
+                progress={progress[id] ?? "available"}
+              />
             </li>
           ))}
         </ul>
@@ -83,28 +103,21 @@ export function ChapterMenu({ workspaceId, current, progress }: Props) {
         <span>{label}</span>
         <span className="sr-only">, open chapter menu</span>
       </Popover.Trigger>
-      {/* Through a portal, so the menu stands over everything on the page, the key included. */}
       <Popover.Portal>
         <Popover.Content className="popover on-space" align="start" sideOffset={8}>
           <nav aria-label="Chapters">
             <ul>
-              {CHAPTERS.map((chapter) => (
-                <li key={chapter.id}>
-                  <Link
-                    className="menu-chapter"
-                    href={chapterHref(workspaceId, chapter.id)}
-                    data-progress={progress[chapter.id] ?? "todo"}
-                    aria-current={chapter.id === current ? "page" : undefined}
-                    onClick={() => setOpen(false)}
-                  >
-                    <span className="landmark" aria-hidden="true" />
-                    {chapter.label}
-                    <Mark
-                      progress={progress[chapter.id]}
-                      current={chapter.id === current}
-                      built={chapter.built}
-                    />
-                  </Link>
+              {CHAPTERS.map(({ id, label: itemLabel }) => (
+                <li key={id}>
+                  <ChapterItem
+                    id={id}
+                    label={itemLabel}
+                    workspaceId={workspaceId}
+                    current={current}
+                    progress={progress[id] ?? "available"}
+                    menu
+                    onChoose={() => setOpen(false)}
+                  />
                 </li>
               ))}
             </ul>

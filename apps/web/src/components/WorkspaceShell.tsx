@@ -1,38 +1,38 @@
 "use client";
-// The six-chapter shell around one workspace (spec section 3, UI-09): one persistent world
-// behind everything (plan section 4), with the chapter rail or menu, the workspace strip and
-// its world controls, the chapter's place and the evidence drawer over it. While the calm
-// support panel shows, the world is still (ADR 0007, plan section 4). It owns the session
-// checks (signed in, invited, workspace visible) and the workspace's live status events;
-// chapters read the same server state through `useWorkspaceData`.
+// One workspace session and atmosphere across all six chapters. Chapters share the same server
+// state, account controls and evidence drawer; support stills the world while it is shown.
 import { usePathname, useRouter, useSelectedLayoutSegment } from "next/navigation";
-import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 import type { ProfileOut, WorkspaceOut } from "@/generated/api";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { type ChapterId, type ChapterProgress, isChapter } from "@/lib/chapters";
+import { type ChapterId, isChapter } from "@/lib/chapters";
 import type { StreamStatus } from "@/lib/events";
+import { type Journey, journeyOf } from "@/lib/journey";
+import { readPlanCandidate, useCurrentPlan } from "@/lib/planQueries";
 import {
   firstLoadFailed,
   refreshFailed,
+  useCheckpoint,
   useMe,
   useProfile,
-  useTargets,
   useWorkspace,
   useWorkspaceEvents,
   useWorkspaces,
 } from "@/lib/queries";
+import { useLatestRouteSolve } from "@/lib/routeQueries";
+import { useSkills } from "@/lib/skillQueries";
 import { worldFromProfile } from "@/lib/world/model";
 import { SupportShown, useSupportPanels, useWorldSettings } from "@/lib/world/settings";
 import { ChapterMenu, ChapterRail } from "./ChapterNav";
 import { ConversationTone } from "./ConversationTone";
+import { DecisionAtmosphere } from "./DecisionAtmosphere";
 import { EvidenceDrawer, useEvidence } from "./EvidenceDrawer";
 import { MetaKeySetting } from "./KeySetup";
 import { ModelSpending } from "./ModelSpending";
 import { NotInvited, PageFrame, PageLoading, RequestFailure } from "./PageState";
 import { SyntheticLabel } from "./Status";
 import { WorkspaceStrip } from "./WorkspaceStrip";
-import { World } from "./World";
 import { CalmMode, StillWhileSupport, WorldControls } from "./WorldControls";
 
 type WorkspaceData = {
@@ -42,6 +42,8 @@ type WorkspaceData = {
   /** Load the profile again after a failed load, in place (V-02). */
   retryProfile(): void;
   events: StreamStatus;
+  journey: Journey;
+  planCandidate: boolean | null;
 };
 
 const WorkspaceContext = createContext<WorkspaceData | null>(null);
@@ -50,43 +52,6 @@ export function useWorkspaceData(): WorkspaceData {
   const value = useContext(WorkspaceContext);
   if (value === null) throw new Error("useWorkspaceData outside WorkspaceShell");
   return value;
-}
-
-/**
- * Chapters opened in this browser session, per workspace (a per-viewer convenience, so
- * session storage; unavailable storage only forgets the marks).
- */
-function useVisited(workspaceId: string, chapter: ChapterId): ReadonlySet<ChapterId> {
-  const key = `careerwright.visited.${workspaceId}`;
-  const [visited, setVisited] = useState<ReadonlySet<ChapterId>>(new Set([chapter]));
-  useEffect(() => {
-    let stored: ChapterId[] = [];
-    try {
-      stored = (JSON.parse(window.sessionStorage.getItem(key) ?? "[]") as string[]).filter(
-        isChapter,
-      );
-    } catch {
-      // Blocked or corrupt storage: start with the current chapter only.
-    }
-    const next = new Set<ChapterId>([...stored, chapter]);
-    setVisited(next);
-    try {
-      window.sessionStorage.setItem(key, JSON.stringify([...next]));
-    } catch {
-      // As above.
-    }
-  }, [key, chapter]);
-  return visited;
-}
-
-function progressOf(
-  visited: ReadonlySet<ChapterId>,
-  profile: ProfileOut | undefined,
-): Partial<Record<ChapterId, ChapterProgress>> {
-  const progress: Partial<Record<ChapterId, ChapterProgress>> = {};
-  for (const chapter of visited) progress[chapter] = "visited";
-  if (profile !== undefined && profile.version > 0) progress.you = "visited";
-  return progress;
 }
 
 export function WorkspaceShell({
@@ -101,6 +66,17 @@ export function WorkspaceShell({
   const auth = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [candidateCheck, setCandidateCheck] = useState<{
+    pathname: string;
+    candidate: boolean;
+  } | null>(null);
+  const planCandidate = candidateCheck?.pathname === pathname ? candidateCheck.candidate : null;
+  useEffect(() => {
+    setCandidateCheck({
+      pathname,
+      candidate: pathname.endsWith("/plan") && readPlanCandidate(window.location.search) !== null,
+    });
+  }, [pathname]);
   const { evidence, close } = useEvidence();
   const world = useWorldSettings();
   // A calm support panel is showing (each panel reports itself): the world stays still.
@@ -131,13 +107,24 @@ export function WorkspaceShell({
     token: auth.token,
     session: auth.state.status === "signed_in" ? auth.state.uid : "",
   });
-  const visited = useVisited(workspaceId, chapter);
-  const targets = useTargets(workspaceId, opened);
-  const worldInput = useMemo(
-    () =>
-      profile.data === undefined ? null : worldFromProfile(profile.data, targets.data?.targets),
-    [profile.data, targets.data],
-  );
+  const target = profile.data?.document.target_titles.value?.[0] ?? "";
+  const hasTarget = profile.data?.document.target_titles.state === "provided" && target !== "";
+  const skills = useSkills(workspaceId, opened && hasTarget);
+  const checkpoint = useCheckpoint(workspaceId, opened && hasTarget);
+  const latestRoute = useLatestRouteSolve(workspaceId, hasTarget ? null : "");
+  const currentPlan = useCurrentPlan(workspaceId, opened);
+  const shownRoute =
+    latestRoute.data?.latest?.run.status === "complete"
+      ? latestRoute.data.latest
+      : latestRoute.data?.kept;
+  const journey = journeyOf({
+    profile: profile.data,
+    skills: skills.data,
+    checkpoint: checkpoint.data,
+    routeFound: (shownRoute?.result?.schedules.length ?? 0) > 0,
+    planSaved: currentPlan.data !== null && currentPlan.data !== undefined,
+    planCandidate: planCandidate === true && chapter === "plan",
+  });
 
   if (auth.state.status !== "signed_in") return <PageLoading stage="Checking your sign-in" />;
   // Only a first load that fails replaces the shell. A failed refresh (Careerwright restarting) keeps
@@ -175,13 +162,14 @@ export function WorkspaceShell({
   }
   if (workspace.data === undefined) return <PageLoading stage="Opening your workspace" />;
 
-  const progress = progressOf(visited, profile.data);
   const data: WorkspaceData = {
     workspace: workspace.data,
     profile: profile.data,
     profileError: profile.error,
     retryProfile: () => void profile.refetch(),
     events: events.status,
+    journey,
+    planCandidate,
   };
 
   return (
@@ -193,10 +181,20 @@ export function WorkspaceShell({
         >
           Skip to the chapter
         </a>
-        <div className="app" data-drawer={evidence === null ? "closed" : "open"}>
-          <ChapterRail workspaceId={workspaceId} current={chapter} progress={progress} />
+        <div
+          className="app career-workspace"
+          data-drawer={evidence === null ? "closed" : "open"}
+          data-still={world.reduced || world.calm || world.paused || supportShown}
+        >
+          <DecisionAtmosphere
+            settings={world}
+            distress={supportShown}
+            showControl={false}
+            lit={profile.data === undefined ? null : worldFromProfile(profile.data).lit}
+          />
+          <ChapterRail workspaceId={workspaceId} current={chapter} progress={journey.progress} />
           <div className="topbar on-space" data-covers-world>
-            <ChapterMenu workspaceId={workspaceId} current={chapter} progress={progress} />
+            <ChapterMenu workspaceId={workspaceId} current={chapter} progress={journey.progress} />
             {supportShown && <StillWhileSupport />}
             {workspace.data.synthetic && <SyntheticLabel />}
           </div>
@@ -237,14 +235,6 @@ export function WorkspaceShell({
           </main>
           <EvidenceDrawer />
         </div>
-        <World
-          place={chapter}
-          input={worldInput}
-          calm={world.calm}
-          paused={world.paused}
-          distress={supportShown}
-          sound={world.sound}
-        />
       </SupportShown.Provider>
     </WorkspaceContext.Provider>
   );

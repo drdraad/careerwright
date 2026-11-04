@@ -33,7 +33,7 @@ export const ChapterRailOnRoutes: Story = {
       <ChapterRail
         workspaceId={fixtureWorkspace.workspace_id}
         current="routes"
-        progress={{ you: "visited", roles: "visited" }}
+        progress={{ you: "complete", roles: "available" }}
       />
     </div>
   ),
@@ -44,7 +44,7 @@ export const ChapterMenuOnPhone: Story = {
     <ChapterMenu
       workspaceId={fixtureWorkspace.workspace_id}
       current="you"
-      progress={{ you: "visited" }}
+      progress={{ you: "complete" }}
     />
   ),
 };

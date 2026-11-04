@@ -64,8 +64,8 @@ from careerwright.identity.records import RunKind
 from careerwright.identity.runs import workflow_id
 from careerwright.migrations.versions import r0021_page_extraction as r0021
 from careerwright.migrations.versions import r0023_cancel_started_runs as r0023
-from careerwright.migrations.versions import r0024_postings_conflicting as r0024
 from careerwright.migrations.versions import r0037_route_solves as r0037
+from careerwright.migrations.versions import r0050_option_research as r0050
 from careerwright.vocabulary import DataMode, WorkState
 from tests.domain.test_pages import POSTING, page
 from tests.support.acquisition_service import LOOPBACK, scripted_resolver
@@ -814,7 +814,7 @@ def test_the_database_holds_extraction_labels_and_the_cap_to_the_code_s() -> Non
     # Each from the latest migration that sets it.
     not_run = _quoted(r"not_run IN \((.*?)\)\)", r0023.SCHEMA)
     assert not_run == {r.value for r in ExtractionNotRun}
-    outcome = _quoted(r"outcome IN \((.*?)\)\)", r0024.SCHEMA)
+    outcome = _quoted(r"outcome IN \((.*?)\)\)", r0050.SCHEMA)
     assert outcome == {o.value for o in ExtractionOutcome}
     validation = _quoted(r"validation IN \((.*?)\)\)", r0021.SCHEMA)
     assert validation == {v.value for v in ValidationState}

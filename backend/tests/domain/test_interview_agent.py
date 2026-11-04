@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 from pydantic_ai import capture_run_messages
 from pydantic_ai.exceptions import ContentFilterError, UnexpectedModelBehavior
-from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse
+from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from careerwright.identity.activity import PartialWriter
@@ -250,6 +250,88 @@ def run_fake(failure: FakeFailure | None) -> tuple[object, list[object], list[st
         except Exception as error:  # the activity classifies this
             result = error
     return result, list(messages), streamed.texts
+
+
+def malformed_update(
+    field: str, *, text: str | None = None, items: list[str] | None = None
+) -> dict[str, object]:
+    return {
+        "field": field,
+        "state": "provided",
+        "text": text,
+        "items": items,
+        "basis": "inferred",
+        "message_refs": ["m1"],
+        "reason": "In your message.",
+    }
+
+
+def malformed_model(*updates: dict[str, object]) -> FunctionModel:
+    reply = InterviewTurnOutput.model_validate(
+        {
+            "reply": "That gives us a useful starting point.",
+            "proposed_updates": list(updates),
+            "next_question": "Which machine did you fix?",
+            "missing_critical_fields": [],
+            "ready_for_review": bool(updates),
+        }
+    ).model_dump_json()
+
+    def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        return ModelResponse(parts=[TextPart(reply)])
+
+    async def stream(messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[str]:
+        yield reply
+
+    return FunctionModel(respond, stream_function=stream)
+
+
+@pytest.mark.parametrize(
+    ("updates", "kept"),
+    [
+        ([malformed_update("work_status")], []),
+        (
+            [
+                malformed_update("work_status", text="looking_for_work"),
+                malformed_update("enjoyed_tasks", items=["fixing machines"]),
+                malformed_update("work_style", text="working outside"),
+            ],
+            [ProfileField.WORK_STATUS, ProfileField.ENJOYED_TASKS],
+        ),
+    ],
+)
+def test_final_repair_keeps_checked_changes_when_one_optional_claim_is_malformed(
+    updates: list[dict[str, object]], kept: list[ProfileField]
+) -> None:
+    ctx = turn_input("I am out of work and enjoyed fixing machines outside.")
+    model = malformed_model(*updates)
+    with capture_run_messages() as messages:
+        proposal = run_interview_turn(
+            model, ModelMode.CONTRIBUTOR, ctx.model_dump_json().encode(), ignore
+        )
+
+    assert sum(isinstance(message, ModelRequest) for message in messages) == 2
+    assert [change.field for change in proposal.changes] == kept
+    assert all(change.message_ids == [ctx.messages[0].message_id] for change in proposal.changes)
+
+
+@pytest.mark.parametrize(
+    "updates",
+    [
+        [malformed_update("work_status"), malformed_update("work_style", text="outside")],
+        [malformed_update("target_titles", text="Data analyst")],
+    ],
+)
+def test_final_repair_cannot_drop_two_bad_claims_or_a_hard_constraint(
+    updates: list[dict[str, object]],
+) -> None:
+    ctx = turn_input("I like fixing machines outside.")
+    with capture_run_messages() as messages, pytest.raises(UnexpectedModelBehavior):
+        run_interview_turn(
+            malformed_model(*updates), ModelMode.CONTRIBUTOR, ctx.model_dump_json().encode(), ignore
+        )
+
+    assert sum(isinstance(message, ModelRequest) for message in messages) == 2
 
 
 @pytest.mark.req("MODEL-03")

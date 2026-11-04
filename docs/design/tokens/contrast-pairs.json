@@ -110,5 +110,136 @@
     "status": ["--status-error-on-space", "--status-stale-on-space"],
     "meaning": ["--light-destination", "--light-chosen", "--trail-near", "--trail-far"],
     "decision": ["--decision-accept", "--decision-undo"]
+  },
+  "workspace": {
+    "stylesheet": "../../apps/web/src/components/careerWorkspace.css",
+    "pairs": [
+      {
+        "fg": "--decision-ink",
+        "bg": "--decision-reading",
+        "kind": "text",
+        "use": "Workspace text on its approved surface"
+      },
+      {
+        "fg": "--decision-muted",
+        "bg": "--decision-reading",
+        "kind": "text",
+        "use": "Workspace text on its approved surface"
+      },
+      {
+        "fg": "--decision-ink",
+        "bg": "--decision-card",
+        "kind": "text",
+        "use": "Workspace text on its approved surface"
+      },
+      {
+        "fg": "--decision-muted",
+        "bg": "--decision-card",
+        "kind": "text",
+        "use": "Workspace text on its approved surface"
+      },
+      {
+        "fg": "--decision-ink",
+        "bg": "--decision-selection-wash",
+        "kind": "text",
+        "use": "Workspace text on its approved surface"
+      },
+      {
+        "fg": "--decision-muted",
+        "bg": "--decision-selection-wash",
+        "kind": "text",
+        "use": "Workspace text on its approved surface"
+      },
+      {
+        "fg": "--decision-ink",
+        "bg": "--world-horizon",
+        "kind": "text",
+        "use": "Workspace text on its approved surface"
+      },
+      {
+        "fg": "--decision-muted",
+        "bg": "--world-horizon",
+        "kind": "text",
+        "use": "Workspace text on its approved surface"
+      },
+      {
+        "fg": "--decision-condition",
+        "bg": "--decision-condition-wash",
+        "kind": "text",
+        "use": "Planning conditions"
+      },
+      {
+        "fg": "--decision-evidence",
+        "bg": "--decision-evidence-wash",
+        "kind": "text",
+        "use": "Source labels"
+      },
+      {
+        "fg": "--text-on-action-space",
+        "bg": "--action-space",
+        "kind": "text",
+        "use": "Primary action"
+      },
+      {
+        "fg": "--decision-condition",
+        "bg": "--decision-card",
+        "kind": "text",
+        "use": "Missing planning information"
+      },
+      {
+        "fg": "--decision-evidence",
+        "bg": "--decision-card",
+        "kind": "text",
+        "use": "Planning information complete"
+      },
+      {
+        "fg": "--decision-map-line",
+        "bg": "--decision-reading",
+        "kind": "non-text",
+        "use": "Route connector core; rendered atmosphere also requires sampling"
+      },
+      {
+        "fg": "--decision-map-line",
+        "bg": "--world-horizon",
+        "kind": "non-text",
+        "use": "Route connector core; rendered atmosphere also requires sampling"
+      },
+      {
+        "fg": "--decision-condition",
+        "bg": "--decision-reading",
+        "kind": "non-text",
+        "use": "Route connector core; rendered atmosphere also requires sampling"
+      },
+      {
+        "fg": "--decision-condition",
+        "bg": "--world-horizon",
+        "kind": "non-text",
+        "use": "Route connector core; rendered atmosphere also requires sampling"
+      },
+      {
+        "fg": "--decision-evidence",
+        "bg": "--decision-reading",
+        "kind": "non-text",
+        "use": "Route connector core; rendered atmosphere also requires sampling"
+      },
+      {
+        "fg": "--decision-evidence",
+        "bg": "--world-horizon",
+        "kind": "non-text",
+        "use": "Route connector core; rendered atmosphere also requires sampling"
+      },
+      {
+        "fg": "--decision-control-line",
+        "bg": "--decision-card",
+        "kind": "non-text",
+        "use": "Interactive boundary"
+      },
+      {
+        "fg": "--decision-control-line",
+        "bg": "--decision-selection-wash",
+        "kind": "non-text",
+        "use": "Interactive boundary"
+      }
+    ]
   }
 }

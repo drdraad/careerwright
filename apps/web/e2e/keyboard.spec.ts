@@ -1,4 +1,4 @@
-// Keyboard only (UI-06): every chapter and the evidence drawer are reachable with Tab and
+// Keyboard only (UI-06): available chapters and the evidence drawer are reachable with Tab and
 // Enter, and closing the drawer returns focus to what opened it; the You chapter completes from
 // the keyboard, its views are tabs, and focus lands on what each decision did. Desktop rail and
 // phone menu.
@@ -15,7 +15,7 @@ async function tabTo(page: Page, target: Locator, limit = 80) {
   throw new Error(`not reachable with Tab within ${limit} presses`);
 }
 
-const CHAPTERS = ["You", "Roles", "Skills", "Options", "Routes", "Plan"] as const;
+const CHAPTERS = ["You", "Roles", "Skills", "Options"] as const;
 
 test.beforeEach(async ({ page }) => {
   await signIn(page, "ada", chapterUrl("you"));
@@ -23,7 +23,7 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1, name: "You" })).toBeVisible();
 });
 
-test("[UI-06][UI-09] Tab and Enter reach every chapter from the rail", async ({ page }) => {
+test("[UI-06][UI-09] Tab and Enter reach available chapters from the rail", async ({ page }) => {
   await page.locator("body").focus();
   const rail = page.getByRole("navigation", { name: "Chapters" });
   for (const chapter of CHAPTERS) {
@@ -34,6 +34,9 @@ test("[UI-06][UI-09] Tab and Enter reach every chapter from the rail", async ({ 
     await expect(page.getByRole("heading", { level: 1, name: chapter })).toBeVisible();
     await expect(link).toHaveAttribute("aria-current", "page");
   }
+  await expect(rail.getByRole("link", { name: /^Routes|^Plan/ })).toHaveCount(0);
+  await expect(rail.getByText("Routes")).toBeVisible();
+  await expect(rail.getByText("Plan")).toBeVisible();
 });
 
 test("[UI-06] the skip link moves past the rail to the chapter", async ({ page }) => {

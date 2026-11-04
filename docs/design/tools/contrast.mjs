@@ -13,7 +13,9 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const css = readFileSync(join(root, "tokens/tokens.css"), "utf8");
-const config = JSON.parse(readFileSync(join(root, "tokens/contrast-pairs.json"), "utf8"));
+const workspace = process.argv.includes("--workspace");
+const pairSets = JSON.parse(readFileSync(join(root, "tokens/contrast-pairs.json"), "utf8"));
+const config = workspace ? pairSets.workspace : pairSets;
 const THRESHOLD = { text: 4.5, "non-text": 3.0 };
 
 function rootDeclarations(source) {
@@ -94,7 +96,10 @@ function deltaE76(a, b) {
 // Floor to two decimals so a ratio of 4.496 is never displayed as a passing 4.50.
 const floor2 = (x) => (Math.floor(x * 100) / 100).toFixed(2);
 
-const declarations = rootDeclarations(css);
+const declarations = new Map([
+  ...rootDeclarations(css),
+  ...(workspace ? rootDeclarations(readFileSync(join(root, config.stylesheet), "utf8")) : []),
+]);
 const rows = [];
 let measured = 0;
 let failures = 0;
@@ -122,6 +127,13 @@ for (const pair of config.pairs) {
       : `\`${pair.fg}\` ${fg}`;
     rows.push(`| ${foreground} | ${background} | ${pair.use} | ${floor2(ratio)}:1 | ${required.toFixed(1)}:1 | ${pass ? "pass" : "**FAIL**"} |`);
   }
+}
+
+// Production checks report to stdout so browser evidence can stay outside the repository.
+if (workspace) {
+  console.log(`${measured - failures}/${measured} workspace contrast measurements pass`);
+  console.log(rows.join("\n"));
+  process.exit(failures ? 1 : 0);
 }
 
 const distinct = [];

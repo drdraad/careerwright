@@ -1,6 +1,5 @@
 // The Sprint 1 journey (plan, Sprint 1 demonstrable outcome): sign in as a seeded identity,
-// edit the profile, open Routes (a place not built yet since the fixture route preview left
-// the person's path, Task W2E), restart every service, reopen the same work. Throughout, the
+// edit the profile, open Options, restart every service, reopen the same work. Throughout, the
 // browser talks only to the web origin and the local Auth emulator.
 import { expect, test } from "@playwright/test";
 import {
@@ -20,18 +19,18 @@ test.beforeEach(() => {
   stack("reset-demo");
 });
 
-test("[BND1-14][STATE-07][DUR-03][BND1-11] sign in, edit, open Routes, restart, reopen", async ({
+test("[BND1-14][STATE-07][DUR-03][BND1-11] sign in, edit, open Options, restart, reopen", async ({
   page,
 }) => {
   test.setTimeout(420_000);
   const requests = recordRequests(page);
 
   await signIn(page, "ada");
-  await page.getByRole("link", { name: /P01 demo \(synthetic\)/ }).click();
+  await page.getByRole("link", { name: /P01 · Data quality while employed/ }).click();
   await expect(page).toHaveURL(chapterUrl("you"));
   await expect(saved(page)).toHaveText("Answers saved");
   const version = await savedVersion(page);
-  await expect(page.getByRole("banner").getByText("Synthetic demo")).toBeVisible();
+  await expect(page.getByRole("banner").getByText("Synthetic demo", { exact: true })).toBeVisible();
   await expect(liveUpdates(page, "Live")).toBeVisible();
 
   // Edit: a second work area and weekly study hours, saved as the next version. The form
@@ -54,14 +53,13 @@ test("[BND1-14][STATE-07][DUR-03][BND1-11] sign in, edit, open Routes, restart, 
   await page.keyboard.press("Escape");
   await expect(drawer).toBeHidden();
 
-  // Routes, a place not built yet in this workspace too: the fixture route preview left the
-  // person's path (Task W2E, the audit's ruling), so nothing here is anyone's route.
+  // Options reads the target and its checkpoint; later chapters wait for planning answers.
   await page
     .getByRole("navigation", { name: "Chapters" })
-    .getByRole("link", { name: /^Routes/ })
+    .getByRole("link", { name: /^Options/ })
     .click();
-  // The place's own kicker (the rail's marks say it in lower case).
-  await expect(page.getByText("Not built yet", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Options" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "For Data quality analyst" })).toBeVisible();
   await expect(page.getByText("Fixture preview: not your routes")).toHaveCount(0);
 
   // Restart every service. The open page notices, reconnects, and keeps working.
@@ -74,8 +72,8 @@ test("[BND1-14][STATE-07][DUR-03][BND1-11] sign in, edit, open Routes, restart, 
   // While Careerwright is down the work stays on screen, and the strip's live-update state (checked
   // above) is the only marker: nothing refetches, so there is no "Couldn't refresh" notice.
   // Never a blank or an error page in place of the work.
-  await expect(page.getByRole("heading", { level: 1, name: "Routes" })).toBeVisible();
-  await expect(page.getByText("Not built yet", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Options" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "For Data quality analyst" })).toBeVisible();
   stack("demo");
   // The restarted emulator re-imports its seed, which revokes ID tokens issued before; the
   // stream is refused once (401), refreshes the token and reconnects. "Live" proves that path.

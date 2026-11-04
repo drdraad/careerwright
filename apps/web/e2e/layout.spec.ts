@@ -1,76 +1,62 @@
-// Layout contracts from the Sprint 0–1 visual review (Task 6c): what must stay in view, at
-// which size, once a finding is corrected. Each asserts geometry or drawing on the real
-// stack; the captures in the visual package are the evidence a person looks at.
-//
-// Task W2E: the fixture route preview left the person's path (the audit's ruling), so its
-// layout contracts (V-03's first route cards, V-04's route sheet, S0-V07's focused card) left
-// with it; the component keeps its unit tests (`RoutePreview.test.tsx`) and its Storybook
-// stories (axe-checked) until Routes is built (Task 14).
 import { expect, test } from "@playwright/test";
 import { chapterUrl, signIn } from "./helpers";
 
-test("[UI-09] a visited chapter is a ring, never the filled mark of finished work (V-09)", async ({
-  page,
-}) => {
-  await signIn(page, "ada", chapterUrl("roles"));
-  await page.goto(chapterUrl("plan"));
-  const rail = page.getByRole("navigation", { name: "Chapters" });
-  const look = (name: RegExp) =>
-    rail
-      .getByRole("link", { name })
-      .locator(".landmark")
-      .evaluate((mark) => {
-        const style = getComputedStyle(mark);
-        const surface = getComputedStyle(mark.closest(".rail") ?? document.body);
-        return {
-          filled: style.backgroundColor !== surface.backgroundColor,
-          ring: style.borderTopColor,
-        };
-      });
-  const visited = await look(/^Roles\s*, not built yet\s*, visited$/);
-  const notStarted = await look(/^Skills\s*, not built yet\s*, not started$/);
-
-  expect(visited.filled).toBe(false);
-  expect(notStarted.filled).toBe(false);
-  expect(visited.ring).not.toBe(notStarted.ring);
-});
-
-test("[UI-09] every chapter not built yet is marked in the rail, in sight, before it is clicked (F2)", async ({
+test("[UI-09] a chosen direction has a filled mark while available work stays open", async ({
   page,
 }) => {
   await signIn(page, "ada", chapterUrl("you"));
   const rail = page.getByRole("navigation", { name: "Chapters" });
-  for (const chapter of ["Roles", "Skills", "Options", "Routes", "Plan"]) {
-    const link = rail.getByRole("link", { name: new RegExp(`^${chapter}\\s*, not built yet`) });
-    await expect(link.getByText("not built yet")).toBeVisible();
+  const chosen = rail.getByRole("link", { name: "You, direction chosen" });
+  const available = rail.getByRole("link", { name: "Roles, available" });
+  await expect(chosen).toHaveAttribute("data-progress", "complete");
+  await expect(available).toHaveAttribute("data-progress", "available");
+  const backgrounds = await Promise.all(
+    [chosen, available].map((item) =>
+      item.locator(".landmark").evaluate((mark) => getComputedStyle(mark).backgroundColor),
+    ),
+  );
+  expect(backgrounds[0]).not.toBe(backgrounds[1]);
+});
+
+test("[UI-09] the rail names saved milestones and leaves blocked chapters out of navigation", async ({
+  page,
+}) => {
+  await signIn(page, "ada", chapterUrl("you"));
+  const rail = page.getByRole("navigation", { name: "Chapters" });
+  await expect(rail.getByRole("link", { name: "You, direction chosen" })).toBeVisible();
+  for (const chapter of ["Roles", "Skills", "Options"]) {
+    await expect(rail.getByRole("link", { name: `${chapter}, available` })).toBeVisible();
   }
-  await expect(rail.getByRole("link", { name: /^You/ }).getByText("not built yet")).toHaveCount(0);
+  for (const chapter of ["Routes", "Plan"]) {
+    await expect(rail.getByRole("link", { name: chapter })).toHaveCount(0);
+    await expect(rail.getByText(new RegExp(`${chapter}.*Locked`))).toBeVisible();
+  }
 });
 
 test.describe("phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("[UI-09] the chapter menu marks every chapter not built yet (F2)", async ({ page }) => {
+  test("[UI-09] the chapter menu gives the same availability and saved milestone", async ({
+    page,
+  }) => {
     await signIn(page, "ada", chapterUrl("you"));
     await page.getByRole("button", { name: /open chapter menu/ }).click();
     const menu = page.getByRole("navigation", { name: "Chapters" });
-    for (const chapter of ["Roles", "Skills", "Options", "Routes", "Plan"]) {
-      await expect(
-        menu
-          .getByRole("link", { name: new RegExp(`^${chapter}\\s*, not built yet`) })
-          .getByText("not built yet"),
-      ).toBeVisible();
-    }
+    await expect(menu.getByRole("link", { name: "You, direction chosen" })).toBeVisible();
+    await expect(menu.getByRole("link", { name: "Roles, available" })).toBeVisible();
+    await expect(menu.getByText(/Routes.*Locked/)).toBeVisible();
+    await expect(menu.getByRole("link", { name: /Routes/ })).toHaveCount(0);
   });
 });
 
-test("[UI-09] Routes is a place not built yet in every workspace, the fixture's too", async ({
+test("[UI-09] a direct Routes URL explains the missing step without a fixture preview", async ({
   page,
 }) => {
   await signIn(page, "ada", chapterUrl("routes"));
-  await expect(page.getByRole("heading", { level: 1, name: "Routes" })).toBeVisible();
-  await expect(page.getByText("Not built yet", { exact: true })).toBeVisible();
-  await expect(page.getByText(/^Route search isn't ready yet/)).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Routes needs an earlier step" }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open Options" })).toBeVisible();
   await expect(page.getByText("Fixture preview: not your routes")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Route A/ })).toHaveCount(0);
 });

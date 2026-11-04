@@ -64,7 +64,7 @@ from careerwright.evidence.records import (
 )
 from careerwright.evidence.redaction import redact_shown
 from careerwright.identity.model_registry import worst_case_cost_nano_usd
-from careerwright.profile.slate_explanation import span_offsets, unwrapped
+from careerwright.quote_spans import span_offsets, unwrapped
 
 PROMPT_VERSION = "page-extraction-1"
 INPUT_FORMAT: Literal["careerwright.page-extraction-input"] = "careerwright.page-extraction-input"

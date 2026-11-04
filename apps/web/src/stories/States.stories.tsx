@@ -25,15 +25,8 @@ export const Loading: Story = {
 export const Empty: Story = {
   render: () => (
     <div className="max-w-[720px]">
-      <EmptyState
-        state="notStarted"
-        title="No routes yet"
-        next={<Button>Review what we know</Button>}
-      >
-        <p>
-          Routes are compared once your options are reviewed. Careerwright's route search isn't part
-          of this build yet, so no route has been computed for this workspace.
-        </p>
+      <EmptyState state="notStarted" title="No routes yet" next={<Button>Review options</Button>}>
+        <p>Review your options and missing facts, then search for routes to your target.</p>
       </EmptyState>
     </div>
   ),
@@ -48,8 +41,8 @@ export const Unknown: Story = {
         detail={`total ${describeField(unknownDocument.direct_spend_cap).toLowerCase()}, not £0`}
       />
       <p className="small">
-        Monthly limit: {describeField(unknownDocument.monthly_payment_cap)}. Routes are shown
-        without a spending check until you answer.
+        Monthly limit: {describeField(unknownDocument.monthly_payment_cap)}. A spending-qualified
+        route search needs your stated limits.
       </p>
     </div>
   ),

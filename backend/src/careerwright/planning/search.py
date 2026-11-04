@@ -125,6 +125,7 @@ from careerwright.planning.families import (
 )
 from careerwright.planning.layers import rank
 from careerwright.planning.ledgers import LoanToRepay
+from careerwright.planning.months import Month
 
 ALGORITHM_VERSION = "canonical-dfs-1"
 PRUNING_VERSION = "sound-pruning-6"  # the six rules above: change it with any rule
@@ -459,6 +460,7 @@ class _Search:
         self.set_aside: list[SetAside] = []
         self.excluded: set[str] = set()
         self.spend: dict[str, _Spend] = {}
+        self.fixed_spend = _fixed_spend(monthly)
         self.pruned: Counter[PruningRule] = Counter()
         self.unexplored = 0
         self.stop: StopReason | None = None
@@ -526,7 +528,7 @@ class _Search:
                 )
                 self.excluded.add(variant.variant_id)
                 continue
-            self.spend[variant.variant_id] = _spend(check)
+            self.spend[variant.variant_id] = _spend(check, self.fixed_spend)
             singles.append(self._child(root, variant, check))
         return singles
 
@@ -656,9 +658,12 @@ class _Search:
         combine) is summed all the same."""
         inputs = self.monthly.inputs
         months = len(self.monthly.months)
-        direct = sum(self.spend[v.variant_id].direct for v in (*node.route, variant))
+        direct = self.fixed_spend.direct + sum(
+            self.spend[v.variant_id].direct for v in (*node.route, variant)
+        )
         payments = [
-            sum(self.spend[v.variant_id].payments[m] for v in (*node.route, variant))
+            self.fixed_spend.payments[m]
+            + sum(self.spend[v.variant_id].payments[m] for v in (*node.route, variant))
             for m in range(months)
         ]
         cap = inputs.direct_spend_cap_minor
@@ -897,14 +902,31 @@ def _active(variant: CompiledVariant, month: int) -> bool:
     return variant.start_index <= month <= variant.finish_index
 
 
-def _spend(check: RouteCheck) -> _Spend:
+def _fixed_spend(monthly: MonthlyInput) -> _Spend:
+    payments = [0] * len(monthly.months)
+    replan = monthly.inputs.replan
+    if replan is not None:
+        for payment in replan.remaining_payments:
+            month = str(Month.of(payment.due))
+            if month in monthly.months:
+                payments[monthly.months.index(month)] += payment.amount_minor
+    return _Spend(
+        direct=sum(p.amount_minor for p in replan.remaining_payments) if replan else 0,
+        payments=tuple(payments),
+    )
+
+
+def _spend(check: RouteCheck, fixed: _Spend) -> _Spend:
     """A variant's own spend, from its check alone. A searched variant's amounts are all known
     (rule 2 sets aside an option whose amounts are not); were one not, 0 could only prune
     less."""
-    direct = check.direct_cost.minor_units if check.direct_cost is not None else 0
+    direct = (check.direct_cost.minor_units if check.direct_cost is not None else 0) - fixed.direct
     return _Spend(
         direct=direct,
-        payments=tuple(m.payments_minor or 0 for m in check.ledgers.direct.months),
+        payments=tuple(
+            (m.payments_minor or 0) - fixed.payments[n]
+            for n, m in enumerate(check.ledgers.direct.months)
+        ),
     )
 
 

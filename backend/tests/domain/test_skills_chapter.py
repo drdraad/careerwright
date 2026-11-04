@@ -6,7 +6,7 @@ own text."""
 
 import hashlib
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
@@ -18,7 +18,7 @@ from careerwright.capability.adverts import (
     read_spans,
 )
 from careerwright.capability.commands import committed_data
-from careerwright.capability.evidence import Holding
+from careerwright.capability.evidence import Answer, Holding
 from careerwright.capability.matrix import (
     EscoSeed,
     EscoSkillRelation,
@@ -38,12 +38,14 @@ from careerwright.capability.readiness import (
 from careerwright.capability.reference import PINS as REFERENCE_PINS
 from careerwright.capability.reference import reference_path
 from careerwright.capability.skills import (
+    ChosenPart,
     EntryStanding,
     NotAssessedReason,
     PersonQualification,
     SeedState,
     SkillsAssessmentState,
     TargetSkills,
+    chosen_parts,
     entry_facts,
     names,
     target_skills,
@@ -208,6 +210,66 @@ def test_the_nurse_target_with_only_its_registration_gate_is_still_not_assessed(
     assert found.assessment_state is SkillsAssessmentState.NOT_ASSESSED
     assert found.not_assessed_reason is NotAssessedReason.NO_RUBRIC
     assert (found.readiness, found.rubric_review) == (None, None)
+
+
+def test_unknown_registration_keeps_its_answer_and_cited_advert_urls() -> None:
+    matrix = pack_matrix("registered-nurse-manchester")
+    registration = next(
+        row for row in matrix.rows if row.gate is not None and row.gate.kind == "legal_practice"
+    )
+    answer = statement(registration.subject, Holding.UNKNOWN)
+    found = target_skills(
+        matrix,
+        assess(matrix, evidence=[], statements=[answer], outcomes=OUTCOMES, evidence_version=1),
+        none_of_these=False,
+        marks=frozenset(),
+        details_version=0,
+        examples=[],
+        qualifications=[],
+        keys={},
+        statements=[answer],
+    )
+    shown = next(row for row in found.requirements if row.subject == registration.subject)
+    assert shown.latest_holding is Holding.UNKNOWN
+    assert shown.source_urls == list(dict.fromkeys(c.claim.url for c in registration.citations))
+
+
+def test_correcting_a_claim_to_unsure_removes_the_old_usable_skill_level() -> None:
+    matrix = pack_matrix("data-quality-analyst-manchester")
+    row = next(row for row in matrix.rows if row.required and row.rubric is not None)
+    assert row.rubric is not None
+    earlier = self_report(row.subject, 2, row.rubric.version_id, at=NOW)
+    correction = self_report(
+        row.subject,
+        None,
+        row.rubric.version_id,
+        answer=Answer.UNSURE,
+        example=None,
+        last_done=None,
+        at=NOW + timedelta(seconds=1),
+    )
+    evidence = [earlier, correction]
+    assessment = assess(
+        matrix, evidence=evidence, statements=[], outcomes=OUTCOMES, evidence_version=2
+    )
+    found = target_skills(
+        matrix,
+        assessment,
+        none_of_these=False,
+        marks=frozenset(),
+        details_version=0,
+        examples=[],
+        qualifications=[],
+        keys={},
+        evidence=evidence,
+    )
+    shown = next(item for item in found.requirements if item.row_id == row.row_id)
+    assessed = next(item for item in assessment.rows if item.row_id == row.row_id)
+    assert shown.rubric_anchors == row.rubric.anchors
+    assert shown.latest_skill is not None
+    assert shown.latest_skill.answer is Answer.UNSURE
+    assert assessed.evidence is not None
+    assert assessed.evidence.level is None
 
 
 @pytest.mark.req("RDY1-03", "OPTN-09")
@@ -417,6 +479,42 @@ def test_an_achieved_qualification_beside_a_protected_gate_stays_unresolved() ->
     held = statement(gate.subject, Holding.HELD, verified=False)
     unverified = assess(matrix, evidence=[], statements=[held], outcomes=[], evidence_version=1)
     assert unverified.rows[0].status.value == "unresolved"
+
+
+@pytest.mark.req("PROF-13", "MAP1-01")
+def test_a_part_the_person_chose_in_their_advert_carries_the_qualifications_that_name_it() -> None:
+    # An advert's line is never a protected gate, so achieved is their own statement, and
+    # expected is never met ("if you get your grades").
+    text = "Lab technician.\nThree A levels or equivalent.\nGCSE Maths and English at grade 4.\n"
+    first = text.index("Lab technician")
+    asks = text.index("Three A levels or equivalent")
+    maths = text.index("GCSE Maths and English at grade 4")
+    spans = read_spans(
+        text,
+        check_spans(
+            text,
+            [
+                AdvertSpan(start=first, end=first + 14),
+                AdvertSpan(start=asks, end=asks + 28),
+                AdvertSpan(start=maths, end=maths + 33),
+            ],
+        ),
+    )
+    keys = {**KEYS, "Lab technician": "lab technician"}
+
+    parts = chosen_parts(spans, [A_LEVELS, GCSE], keys)
+
+    assert [(p.start, p.end, p.excerpt) for p in parts] == [
+        (s.start, s.end, s.excerpt) for s in spans
+    ]
+    assert [[(f.qualification, f.standing) for f in p.entry_facts] for p in parts] == [
+        [],
+        [("A levels", EntryStanding.EXPECTED_NOT_MET)],
+        [("GCSE Maths", EntryStanding.ACHIEVED_STATED)],
+    ]
+    assert chosen_parts(spans, [], {}) == [
+        ChosenPart(**s.model_dump(), entry_facts=[]) for s in spans
+    ]
 
 
 def test_a_qualification_names_a_requirement_only_by_its_whole_words() -> None:

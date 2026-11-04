@@ -80,6 +80,7 @@ def start_worker(
     `production_model`: the configured production model, as `make session` sets it."""
     env = {
         **infra.worker_env(),
+        "PYTHONPATH": f"{BACKEND / 'src'}:{BACKEND}",
         "CAREERWRIGHT_WORKER_HEARTBEAT": str(log_path.with_suffix(".heartbeat")),
         "PYDANTIC_AI_NO_BANNER": "1",
         **({"CAREERWRIGHT_ACQUISITION_URL": acquisition_url} if acquisition_url else {}),

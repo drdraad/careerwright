@@ -11,6 +11,8 @@ changed; one kept unchanged from the current version stays, even if its option h
 a stored answer never blocks the next write.
 """
 
+import hashlib
+import json
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -26,6 +28,7 @@ from careerwright.catalogue import taxonomy_store
 from careerwright.db import Tx
 from careerwright.errors import CareerwrightError, ErrorCode, ErrorStage
 from careerwright.evidence.jobs import title_key
+from careerwright.evidence.option_store import active_records
 from careerwright.identity import store as identity_store
 from careerwright.identity.access import Actor
 from careerwright.identity.keyring import Keyring
@@ -165,11 +168,49 @@ def target_catalogues(
     `planning.pack.target_options` gives with their records beside it. The person's answers
     go in later, per use (`inputs.with_answers`)."""
     texts = pasted_texts(tx, keyring, workspace_id, [o.text_id for o in own if o.text_id])
+    researched = active_records(tx, workspace_id)
     found = []
     for matrix in matrices:
         options = target_options(matrix, data.pack)
         mine = [o for o in own if title_key(o.target) == matrix.target_key]
         merged = beside(options.catalogue, mine, texts)
+        records = [row for target, row in researched if title_key(target) == matrix.target_key]
+        sources = [row.catalogue for row in records]
+        if sources:
+            # The pack label alone cannot reveal a researched record's refresh or expiry.
+            fingerprint = hashlib.sha256(
+                json.dumps(
+                    [
+                        (
+                            str(row.record_id),
+                            row.expires_at.isoformat(),
+                            row.catalogue.model_dump(mode="json"),
+                        )
+                        for row in sorted(records, key=lambda row: str(row.record_id))
+                    ],
+                    sort_keys=True,
+                ).encode()
+            ).hexdigest()
+            all_catalogues = [*([merged] if merged else []), *sources]
+            merged = Catalogue(
+                label=(
+                    merged.label if merged else max(sources, key=lambda c: c.label.dated).label
+                ).model_copy(update={"research_fingerprint": fingerprint}),
+                concepts=[
+                    concept for catalogue in all_catalogues for concept in catalogue.concepts
+                ],
+                offerings=[
+                    offering for catalogue in all_catalogues for offering in catalogue.offerings
+                ],
+                instruments=[
+                    instrument
+                    for catalogue in all_catalogues
+                    for instrument in catalogue.instruments
+                ],
+                variants=[
+                    variant for catalogue in all_catalogues for variant in catalogue.variants
+                ],
+            )
         found.append((matrix, options.model_copy(update={"catalogue": merged})))
     return found
 

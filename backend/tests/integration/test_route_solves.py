@@ -12,13 +12,15 @@ import json
 import signal
 import time
 import uuid
-from datetime import date
+from dataclasses import replace
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
 import psycopg
 import pytest
 
+from careerwright.api.deps import ApiDependencies
 from careerwright.planning.months import Month
 from careerwright.seed import INVITED_ACTORS
 from tests.integration.durable import fresh_actor
@@ -558,6 +560,99 @@ def test_a_solve_that_finds_routes_stores_and_serves_them_with_their_schedules(
     assert no_reason_anywhere(result)
 
 
+@pytest.mark.req("PLAN-05", "EXP-01", "DUR-06", "SEC-10")
+def test_a_chosen_route_is_immutable_idempotent_private_and_deleted_with_its_workspace(
+    person: Person, workers: Any, infra: Infra, ben: str, api_deps: ApiDependencies
+) -> None:
+    person.ready_for_the_target()
+    run_id = person.ask().json()["run"]["run_id"]
+    worker = workers("worker")
+    person.wait_terminal(run_id)
+    worker.stop()
+    path = f"{person.base}/planning/plans"
+    assert person.api.get(f"{path}/current", person.token).status_code == 404
+    body = {
+        "expected_version": 0,
+        "solve_run_id": run_id,
+        "schedule_index": 0,
+        "assumptions_confirmed": True,
+    }
+    original = api_deps.capability
+    updated_pack = original.pack.model_copy(
+        update={"dated": original.pack.dated + timedelta(days=1)}
+    )
+    object.__setattr__(api_deps, "capability", replace(original, pack=updated_pack))
+    try:
+        source_stale = person.api.write("POST", path, person.token, body)
+    finally:
+        object.__setattr__(api_deps, "capability", original)
+    assert source_stale.json()["error"]["details"]["reason"] == "solve_source_changed"
+    key = uuid.uuid4()
+    first = person.api.write("POST", path, person.token, body, key=key)
+    repeated = person.api.write("POST", path, person.token, body, key=key)
+    assert first.status_code == repeated.status_code == 201
+    saved = first.json()
+    assert repeated.json() == saved
+    assert saved["version"] == 1
+    assert saved["source"]["solve_run_id"] == run_id
+    assert (
+        saved["route"]["schedule"]
+        == person.api.get(
+            f"{person.base}/planning/solves/{run_id}/schedules/0", person.token
+        ).json()["schedule"]
+    )
+    assert person.api.get(f"{path}/current", person.token).json() == saved
+    assert person.api.get(f"{path}/1", person.token).json() == saved
+    assert person.api.get(f"{path}/changes", person.token).json()["new_solve_needed"] is False
+    assert person.api.get(f"{path}/1", ben).status_code == 404
+    assert person.api.write("POST", path, person.token, body).json()["error"]["code"] == (
+        "STALE_INPUT_VERSION"
+    )
+    exported = person.api.get(f"{path}/1/export.json", person.token).json()
+    assert exported == saved
+    omitted = person.api.get(
+        f"{path}/1/export.json",
+        person.token,
+        omit_financial_detail=True,
+        omit_sensitive_detail=True,
+    ).json()
+    assert omitted["plan_id"] == saved["plan_id"]
+    assert "costs" not in omitted["route"]
+    assert person.api.get(f"{path}/1/calendar.ics", person.token).status_code == 200
+    progress_body = {"expected_version": 1, "kind": "rest", "until": f"{next_month()}-01"}
+    progress_key = uuid.uuid4()
+    rest = person.api.write(
+        "POST", f"{path}/progress", person.token, progress_body, key=progress_key
+    )
+    assert rest.status_code == 201, rest.text
+    assert rest.json()["version"] == 2
+    assert rest.json()["progress"]["rest_until"] == progress_body["until"]
+    assert (
+        person.api.write(
+            "POST", f"{path}/progress", person.token, progress_body, key=progress_key
+        ).json()
+        == rest.json()
+    )
+    assert [item["version"] for item in person.api.get(f"{path}/history", person.token).json()] == [
+        1,
+        2,
+    ]
+    assert person.api.get(f"{path}/1", person.token).json() == saved
+    person.state(stated(opening_cash=gbp(900000)))
+    stale = person.api.write("POST", path, person.token, {**body, "expected_version": 2})
+    assert stale.json()["error"]["details"]["reason"] == "solve_inputs_changed"
+    assert person.api.get(f"{path}/changes", person.token).json()["planning_inputs"] is True
+    assert person.api.get(f"{path}/1", person.token).json() == saved
+    infra.query(
+        "DELETE FROM careerwright.workspaces WHERE workspace_id = %s", (person.workspace_id,)
+    )
+    assert infra.query(
+        "SELECT count(*) AS n FROM careerwright.plan_versions WHERE workspace_id = %s",
+        (person.workspace_id,),
+    ) == [{"n": 0}]
+    assert person.api.get(f"{path}/1", person.token).status_code == 404
+
+
 C01_FULL_TIME = "offering:C01#full_time"
 C01_CONDITIONS = (
     "eligibility_area",
@@ -565,6 +660,250 @@ C01_CONDITIONS = (
     "eligibility_earnings",
     "eligibility_no_other_funded_training",
 )
+
+
+@pytest.mark.req("PLAN-05", "STATE-06")
+def test_a_mistaken_commitment_can_be_retracted_before_a_remaining_replan(
+    person: Person, workers: Any
+) -> None:
+    person.ready_for_the_target()
+    person.state(
+        stated(
+            offering_figures=[
+                {
+                    "offering_id": C01_FULL_TIME,
+                    "start": {"on": f"{next_month()}-01", "basis": "own_figure"},
+                    "weekly_hours": 9,
+                    "cost": gbp(0),
+                }
+            ],
+            variants=[
+                {
+                    "variant_id": C01_FULL_TIME,
+                    "condition_statuses": dict.fromkeys(C01_CONDITIONS, "confirmed"),
+                }
+            ],
+        )
+    )
+    run_id = person.ask().json()["run"]["run_id"]
+    worker = workers("worker")
+    person.wait_terminal(run_id)
+    worker.stop()
+    schedules = person.solve(run_id).json()["result"]["schedules"]
+    index = next(i for i, row in enumerate(schedules) if row["route"] == [C01_FULL_TIME])
+    plans = f"{person.base}/planning/plans"
+    chosen = person.api.write(
+        "POST",
+        plans,
+        person.token,
+        {
+            "expected_version": 0,
+            "solve_run_id": run_id,
+            "schedule_index": index,
+            "assumptions_confirmed": True,
+        },
+    )
+    assert chosen.status_code == 201, chosen.text
+    accepted = person.api.write(
+        "POST",
+        f"{plans}/progress",
+        person.token,
+        {"expected_version": 1, "kind": "commitment_accepted", "variant_id": C01_FULL_TIME},
+    )
+    assert accepted.status_code == 201, accepted.text
+    assert accepted.json()["commitments"] == [C01_FULL_TIME]
+    corrected = person.api.write(
+        "POST",
+        f"{plans}/progress",
+        person.token,
+        {"expected_version": 2, "kind": "commitment_retracted", "variant_id": C01_FULL_TIME},
+    )
+    assert corrected.status_code == 201, corrected.text
+    assert corrected.json()["commitments"] == []
+    assert corrected.json()["progress"]["completed_steps"] == []
+    assert [item["kind"] for item in corrected.json()["progress"]["activity"]] == [
+        "commitment_accepted",
+        "commitment_retracted",
+    ]
+    assert person.api.get(f"{plans}/2", person.token).json() == accepted.json()
+    repeated = person.api.write(
+        "POST",
+        f"{plans}/progress",
+        person.token,
+        {"expected_version": 3, "kind": "commitment_retracted", "variant_id": C01_FULL_TIME},
+    )
+    assert repeated.json()["error"]["code"] == "ALREADY_DECIDED"
+    remaining_start = Month.parse(next_month()).plus(1)
+    replan = person.api.write(
+        "POST",
+        f"{person.base}/planning/solves/replan",
+        person.token,
+        {
+            "expected_inputs_version": person.inputs_version,
+            "expected_plan_version": 3,
+            "target": DATA,
+            "planning_start": str(remaining_start),
+            "horizon_months": 23,
+            "opening_cash": gbp(500000),
+            "sunk_paid": gbp(0),
+            "remaining_payments": [],
+            "all_remaining_payments_confirmed": True,
+            "no_ongoing_steps_confirmed": True,
+        },
+    )
+    assert replan.status_code == 202, replan.text
+
+
+@pytest.mark.req("PLAN-05", "FIN1-02", "STATE-06")
+def test_replan_uses_confirmed_remaining_actuals_without_recharging_completed_work(
+    person: Person, workers: Any
+) -> None:
+    person.ready_for_the_target()
+    person.state(
+        stated(
+            offering_figures=[
+                {
+                    "offering_id": C01_FULL_TIME,
+                    "start": {"on": f"{next_month()}-01", "basis": "own_figure"},
+                    "weekly_hours": 9,
+                    "cost": gbp(0),
+                }
+            ],
+            variants=[
+                {
+                    "variant_id": C01_FULL_TIME,
+                    "condition_statuses": dict.fromkeys(C01_CONDITIONS, "confirmed"),
+                }
+            ],
+        )
+    )
+    first_run = person.ask().json()["run"]["run_id"]
+    first_worker = workers("first")
+    person.wait_terminal(first_run)
+    first_worker.stop()
+    result = person.solve(first_run).json()["result"]
+    assert result is not None, (person.run(first_run)["status"], person.attempts(first_run))
+    index = next(i for i, row in enumerate(result["schedules"]) if row["route"] == [C01_FULL_TIME])
+    plans = f"{person.base}/planning/plans"
+    chosen = person.api.write(
+        "POST",
+        plans,
+        person.token,
+        {
+            "expected_version": 0,
+            "solve_run_id": first_run,
+            "schedule_index": index,
+            "assumptions_confirmed": True,
+        },
+    )
+    assert chosen.status_code == 201, chosen.text
+    committed = person.api.write(
+        "POST",
+        f"{plans}/progress",
+        person.token,
+        {"expected_version": 1, "kind": "commitment_accepted", "variant_id": C01_FULL_TIME},
+    )
+    assert committed.status_code == 201, committed.text
+    remaining_start = Month.parse(next_month()).plus(1)
+    body = {
+        "expected_inputs_version": person.inputs_version,
+        "expected_plan_version": 2,
+        "target": DATA,
+        "planning_start": str(remaining_start),
+        "horizon_months": 23,
+        "opening_cash": gbp(500000),
+        "sunk_paid": gbp(20000),
+        "remaining_payments": [
+            {
+                "variant_id": C01_FULL_TIME,
+                "due": str(remaining_start.first_day()),
+                "amount": gbp(30000),
+            }
+        ],
+        "all_remaining_payments_confirmed": True,
+        "no_ongoing_steps_confirmed": True,
+    }
+    path = f"{person.base}/planning/solves/replan"
+    missing_confirmation = person.api.write(
+        "POST",
+        path,
+        person.token,
+        {k: v for k, v in body.items() if k != "no_ongoing_steps_confirmed"},
+    )
+    assert missing_confirmation.status_code == 422
+    prepaid = person.api.write("POST", path, person.token, {**body, "remaining_payments": []})
+    assert prepaid.json()["error"]["details"]["reason"] == "ongoing_step_not_modelled"
+    assert prepaid.json()["error"]["details"]["variant_id"] == C01_FULL_TIME
+    unfinished = person.api.write("POST", path, person.token, body)
+    assert unfinished.json()["error"]["details"]["reason"] == "ongoing_step_not_modelled"
+    assert unfinished.json()["error"]["details"]["variant_id"] == C01_FULL_TIME
+    completed = person.api.write(
+        "POST",
+        f"{plans}/progress",
+        person.token,
+        {"expected_version": 2, "kind": "step_completed", "variant_id": C01_FULL_TIME},
+    )
+    assert completed.status_code == 201, completed.text
+    body = {**body, "expected_plan_version": 3}
+    stale = person.api.write("POST", path, person.token, {**body, "expected_plan_version": 2})
+    assert stale.json()["error"]["code"] == "STALE_INPUT_VERSION"
+    key = uuid.uuid4()
+    asked = person.api.write("POST", path, person.token, body, key=key)
+    assert asked.status_code == 202, asked.text
+    assert person.api.write("POST", path, person.token, body, key=key).json() == asked.json()
+    run_id = asked.json()["run"]["run_id"]
+    worker = workers("remaining")
+    person.wait_terminal(run_id)
+    worker.stop()
+    solved = person.solve(run_id).json()
+    assert solved["remaining_horizon_recalculated"] is True
+    assert all(C01_FULL_TIME not in row["route"] for row in solved["result"]["schedules"])
+    empty = next(i for i, row in enumerate(solved["result"]["schedules"]) if not row["route"])
+    preview = person.api.get(
+        f"{plans}/revision-preview", person.token, solve_run_id=run_id, schedule_index=empty
+    )
+    assert preview.status_code == 200, preview.text
+    difference = preview.json()["difference"]
+    assert difference["remaining_horizon_recalculated"] is True
+    assert difference["same_accounting_basis"] is False
+    assert difference["old_basis"]["planning_start"] == next_month()
+    assert difference["new_basis"]["planning_start"] == str(remaining_start)
+    assert difference["new_basis"]["replan"]["sunk_paid"] == gbp(20000)
+    assert difference["new_direct_cost"] == gbp(30000)
+    revised = person.api.write(
+        "POST",
+        plans,
+        person.token,
+        {
+            "expected_version": 3,
+            "solve_run_id": run_id,
+            "schedule_index": empty,
+            "assumptions_confirmed": True,
+        },
+    )
+    assert revised.status_code == 201, revised.text
+    assert revised.json()["version"] == 4
+    assert revised.json()["route"]["basis"]["replan"]["sunk_paid"] == gbp(20000)
+    assert revised.json()["progress"]["completed_steps"] == []
+    assert person.api.get(f"{plans}/3", person.token).json() == completed.json()
+    reused = person.api.write(
+        "POST",
+        plans,
+        person.token,
+        {
+            "expected_version": 4,
+            "solve_run_id": run_id,
+            "schedule_index": empty,
+            "assumptions_confirmed": True,
+        },
+    )
+    assert reused.json()["error"]["details"]["reason"] == "replan_source_changed"
+    omitted = person.api.get(
+        f"{plans}/4/export.json", person.token, omit_financial_detail=True
+    ).json()
+    assert "20000" not in str(omitted)
+    assert "30000" not in str(omitted)
+    assert omitted["route"]["basis"]["replan"] == {"from_plan_version": 3}
 
 
 @pytest.mark.req("OPTN-13", "OPTN-09", "OPT1-07", "API-06")
@@ -660,6 +999,121 @@ def test_the_routes_chapter_reads_a_solve_s_comparison_pages_and_a_chosen_route(
     assert pages["next_cursor"] is not None  # more than one schedule: the empty route and C01
     index = next(i["index"] for i in [*pages["items"], *rest["items"]] if i["route"])
     detail = person.api.get(f"{base}/schedules/{index}", person.token)
+    plans = f"{person.base}/planning/plans"
+    chosen = person.api.write(
+        "POST",
+        plans,
+        person.token,
+        {
+            "expected_version": 0,
+            "solve_run_id": run_id,
+            "schedule_index": index,
+            "assumptions_confirmed": True,
+        },
+    )
+    assert chosen.status_code == 201, chosen.text
+    committed = person.api.write(
+        "POST",
+        f"{plans}/progress",
+        person.token,
+        {"expected_version": 1, "kind": "commitment_accepted", "variant_id": C01_FULL_TIME},
+    )
+    assert committed.status_code == 201, committed.text
+    assert committed.json()["commitments"] == [C01_FULL_TIME]
+    reported = person.api.write(
+        "POST",
+        f"{plans}/progress",
+        person.token,
+        {"expected_version": 2, "kind": "step_completed", "variant_id": C01_FULL_TIME},
+    )
+    assert reported.status_code == 201, reported.text
+    assert reported.json()["progress"]["completed_steps"] == [C01_FULL_TIME]
+    step_title = chosen.json()["route"]["steps"][0]["title"]
+    assert reported.json()["progress"]["activity"][-1]["step_title"] == step_title
+    assert reported.json()["route"] == chosen.json()["route"]
+    assert reported.json()["source"] == chosen.json()["source"]
+    assert "BEGIN:VEVENT" not in person.api.get(f"{plans}/3/calendar.ics", person.token).text
+    retracted = person.api.write(
+        "POST",
+        f"{plans}/progress",
+        person.token,
+        {"expected_version": 3, "kind": "step_retracted", "variant_id": C01_FULL_TIME},
+    )
+    assert retracted.status_code == 201, retracted.text
+    assert retracted.json()["progress"]["completed_steps"] == []
+    assert retracted.json()["progress"]["activity"][-1]["step_title"] == step_title
+    assert "BEGIN:VEVENT" in person.api.get(f"{plans}/4/calendar.ics", person.token).text
+    duplicate_retraction = person.api.write(
+        "POST",
+        f"{plans}/progress",
+        person.token,
+        {"expected_version": 4, "kind": "step_retracted", "variant_id": C01_FULL_TIME},
+    )
+    assert duplicate_retraction.json()["error"]["code"] == "ALREADY_DECIDED"
+    reported_again = person.api.write(
+        "POST",
+        f"{plans}/progress",
+        person.token,
+        {"expected_version": 4, "kind": "step_completed", "variant_id": C01_FULL_TIME},
+    )
+    assert reported_again.status_code == 201, reported_again.text
+    assert reported_again.json()["progress"]["completed_steps"] == [C01_FULL_TIME]
+    preview = person.api.get(
+        f"{plans}/revision-preview", person.token, solve_run_id=run_id, schedule_index=0
+    )
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["from_version"] == 5
+    assert preview.json()["difference"]["removed_steps"] == [C01_FULL_TIME]
+    assert preview.json()["difference"]["remaining_horizon_recalculated"] is False
+    assert person.api.get(f"{plans}/current", person.token).json()["version"] == 5
+    revision_body = {
+        "expected_version": 5,
+        "solve_run_id": run_id,
+        "schedule_index": 0,
+        "assumptions_confirmed": True,
+    }
+    refused = person.api.write("POST", plans, person.token, revision_body)
+    assert refused.json()["error"]["details"]["reason"] == "full_horizon_accounting"
+    accepted = person.api.write(
+        "POST",
+        plans,
+        person.token,
+        {**revision_body, "full_horizon_accounting_acknowledged": True},
+    )
+    assert accepted.status_code == 201, accepted.text
+    assert accepted.json()["version"] == 6
+    assert accepted.json()["progress"]["completed_steps"] == []
+    assert any(
+        item["kind"] == "step_completed" and item["variant_id"] == C01_FULL_TIME
+        for item in accepted.json()["progress"]["activity"]
+    )
+    assert accepted.json()["commitments"] == []
+    assert all(
+        item["step_title"] == step_title
+        for item in accepted.json()["progress"]["activity"]
+        if item["variant_id"] == C01_FULL_TIME
+    )
+    assert any(
+        item["kind"] == "commitment_accepted" and item["variant_id"] == C01_FULL_TIME
+        for item in accepted.json()["progress"]["activity"]
+    )
+    assert person.api.get(f"{plans}/1", person.token).json() == chosen.json()
+    assert person.api.get(f"{plans}/2", person.token).json()["commitments"] == [C01_FULL_TIME]
+    matrices = person.api.get(f"{person.base}/capability/matrices", person.token).json()
+    row = next(r for m in matrices["matrices"] for r in m["rows"] if r["required"])
+    corrected = person.api.write(
+        "POST",
+        f"{person.base}/capability/evidence",
+        person.token,
+        {
+            "expected_version": matrices["version"],
+            "subject": row["subject"],
+            "rubric_version": row["rubric"]["version_id"],
+            "answer": "unsure",
+        },
+    )
+    assert corrected.status_code == 201, corrected.text
+    skill_later = person.api.get(f"{base}/comparison", person.token).json()
     person.state(stated(opening_cash=gbp(900000)))  # a later edit
     later = person.api.get(f"{base}/comparison", person.token).json()
     missing = person.api.get(f"{base}/schedules/999", person.token)
@@ -678,7 +1132,20 @@ def test_the_routes_chapter_reads_a_solve_s_comparison_pages_and_a_chosen_route(
     assert body["basis"]["horizon_months"] == 24
     assert body["label"]["dated"]  # the pack's date (R9)
     assert body["points_shown"] == body["points_total"]
-    assert body["changed_since"] == {"planning_inputs": False, "profile": False}
+    assert body["changed_since"] == {
+        "planning_inputs": False,
+        "profile": False,
+        "capability": False,
+        "target_matrix": False,
+        "option_pack": False,
+    }
+    assert skill_later["changed_since"] == {
+        "planning_inputs": False,
+        "profile": False,
+        "capability": True,
+        "target_matrix": True,
+        "option_pack": False,
+    }
     assert later["changed_since"]["planning_inputs"] is True
     # Every retained schedule, once, across the pages.
     seen = [i["index"] for i in [*pages["items"], *rest["items"]]]

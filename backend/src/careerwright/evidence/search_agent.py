@@ -32,11 +32,14 @@ from careerwright.evidence import search
 from careerwright.evidence.search import (
     INSTRUCTIONS,
     MAX_REQUESTS,
+    OPTION_INSTRUCTIONS,
     ROLE_INSTRUCTIONS,
+    OptionSearchInput,
     RoleSearchInput,
     SearchOutput,
     SearchProposal,
     bounds_for,
+    render_option_prompt,
     render_prompt,
     render_role_prompt,
 )
@@ -87,6 +90,8 @@ def run_search(
     # deeper search, told only the title and England.
     if isinstance(context, RoleSearchInput):
         instructions, prompt = ROLE_INSTRUCTIONS, render_role_prompt(context)
+    elif isinstance(context, OptionSearchInput):
+        instructions, prompt = OPTION_INSTRUCTIONS, render_option_prompt(context)
     else:
         instructions, prompt = INSTRUCTIONS, render_prompt(context)
     bounds = bounds_for(context)

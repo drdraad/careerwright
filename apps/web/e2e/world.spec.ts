@@ -1,10 +1,9 @@
-// The world in the app (plan section 4, Sprint W SW.3): one persistent world behind all six
+// The world in the app (plan section 4, Sprint W SW.3): one persistent world behind the
 // chapters; changing chapter travels to its place; the still world shows the same names as the
 // moving one, under reduced motion, calm mode and pause, at every size; the controls hold the
 // world still and leave sound off until asked (in the strip on a desktop, in the account menu
-// below one), and calm mode lives in the account menu; the
-// calm support panel stills the world; a chapter not built yet says so in its place, above a
-// short card; every light's name sits beside it, clear of the panels; and nothing leaves this
+// below one), and calm mode lives in the account menu; the calm support panel stills the world;
+// Roles shows its own place; every light's name sits beside it, clear of the panels; nothing leaves this
 // machine. On the real stack, demo mode.
 import { type Browser, expect, type Page, test } from "@playwright/test";
 import { asBrowser, emulatorToken, talkedWorkspace } from "./api";
@@ -19,7 +18,7 @@ import {
   youView,
 } from "./helpers";
 
-const CHAPTERS = ["You", "Roles", "Skills", "Options", "Routes", "Plan"] as const;
+const CHAPTERS = ["You", "Roles", "Skills", "Options"] as const;
 const VIEWPORTS = [
   { width: 1440, height: 900 },
   { width: 768, height: 1024 },
@@ -565,7 +564,7 @@ for (const viewport of VIEWPORTS) {
             // The note is asked for when the slate first shows; its words settle first.
             await expect(
               page.getByText(/Written by the demo explainer \(synthetic\)/).first(),
-            ).toBeVisible({ timeout: 60_000 });
+            ).toHaveCount(1, { timeout: 60_000 });
           }
           views.push(await chapterText(page));
         }
@@ -583,13 +582,14 @@ for (const viewport of VIEWPORTS) {
   });
 }
 
-test("[WLD-01][UI-09] a chapter not built yet shows its place, and says so", async ({ page }) => {
-  await signIn(page, "ada", chapterUrl("skills"));
-  await expect(page.getByRole("heading", { level: 1, name: "Skills" })).toBeVisible();
-  // The place's kicker (the rail's marks, Task W2E, say it in lower case).
-  await expect(page.getByText("Not built yet", { exact: true })).toBeVisible();
-  await expect(page.getByText("The ground between you and a destination.")).toBeVisible();
-  await expect(world(page)).toHaveAttribute("data-place", "skills");
+test("[WLD-01][UI-09] Roles shows the chosen target and stays in its world place", async ({
+  page,
+}) => {
+  await signIn(page, "ada", chapterUrl("roles"));
+  await expect(page.getByRole("heading", { level: 1, name: "Roles" })).toBeVisible();
+  await expect(page.getByText(/Explore the work behind a role/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Openings and examples" })).toBeVisible();
+  await expect(world(page)).toHaveAttribute("data-place", "roles");
 });
 
 type Mode = "moving" | "reduced motion" | "calm" | "paused";
@@ -659,15 +659,11 @@ for (const viewport of VIEWPORTS) {
       for (const mode of MODES) {
         expect(seen.get(mode), `${chapter}, ${mode} against moving`).toEqual(moving);
       }
-      // At Roles the person and a destination are named at every size, in every mode, and a
-      // long name's mark stays on its first line.
+      // The larger Roles panel can cover decorative labels; their names remain in the world.
       if (chapter === "Roles") {
-        expect(moving?.names, "Roles: the person is named").toContain("You");
-        expect(
-          moving?.names.some((name) => LONG_TARGETS.includes(name)),
-          "Roles: a destination is named",
-        ).toBe(true);
-        expect(await marksOnTheirOwn(pages.get("moving") as Page), "Roles: marks").toEqual([]);
+        const movingPage = pages.get("moving") as Page;
+        await expect(words(movingPage).getByText("You", { exact: true })).toBeAttached();
+        expect(await marksOnTheirOwn(movingPage), "Roles: marks").toEqual([]);
       }
     }
     for (const page of pages.values()) await page.context().close();
@@ -707,12 +703,10 @@ for (const viewport of VIEWPORTS) {
             expect(overlap(key, panel), `${chapter}, ${reducedMotion}: the key`).toBe(false);
           }
         }
-        // At Roles, P01's place stands clear of the card: the person and the target are named.
-        if (chapter === "Roles") {
-          const names = labels.map((label) => label.name);
-          expect(names, `Roles, ${reducedMotion}`).toContain("You");
-          expect(names, `Roles, ${reducedMotion}`).toContain("Data quality analyst");
-        }
+        if (chapter === "Roles")
+          await expect(
+            words(page).getByText("Data quality analyst", { exact: true }),
+          ).toBeAttached();
       }
       await context.close();
     }

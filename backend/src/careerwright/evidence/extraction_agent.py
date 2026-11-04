@@ -14,12 +14,14 @@ page's text) is erased once the run is terminal.
 """
 
 import asyncio
+import json
 
+from pydantic import BaseModel
 from pydantic_ai import Agent, NativeOutput
 from pydantic_ai.models import Model
 from pydantic_ai.usage import UsageLimits
 
-from careerwright.evidence import extraction, extraction_runs
+from careerwright.evidence import extraction, extraction_runs, option_extraction
 from careerwright.evidence.extraction import (
     INSTRUCTIONS,
     MAX_OUTPUT_TOKENS,
@@ -27,7 +29,6 @@ from careerwright.evidence.extraction import (
     REPAIR_ALLOWANCE_TOKENS,
     ExtractionInput,
     ExtractionOutput,
-    ExtractionProposal,
     render_prompt,
 )
 from careerwright.identity.activity import PartialSink, RepairBound, RunTask, TruncationGuard
@@ -47,11 +48,30 @@ def extraction_agent(model: Model) -> Agent[None, ExtractionOutput]:
 
 def run_extraction(
     model: Model, mode: ModelMode, raw_input: bytes | None, _sink: PartialSink
-) -> ExtractionProposal:
+) -> BaseModel:
     if raw_input is None:
         raise ValueError("a page extraction has a sealed input")
     if mode is ModelMode.FIXTURE:
         raise ValueError("a page extraction never runs on a fixture model")
+    if json.loads(raw_input).get("format") == option_extraction.INPUT_FORMAT:
+        option_context = option_extraction.OptionExtractionInput.model_validate_json(raw_input)
+        option_result = asyncio.run(
+            Agent(
+                model,
+                output_type=NativeOutput(option_extraction.OptionExtractionOutput),
+                instructions=option_extraction.INSTRUCTIONS,
+                retries={"tools": 0, "output": option_extraction.MAX_REQUESTS - 1},
+                capabilities=[
+                    TruncationGuard(),
+                    RepairBound(option_extraction.REPAIR_ALLOWANCE_TOKENS),
+                ],
+            ).run(
+                option_extraction.render_prompt(option_context),
+                usage_limits=UsageLimits(request_limit=option_extraction.MAX_REQUESTS),
+                model_settings={"max_tokens": option_extraction.MAX_OUTPUT_TOKENS},
+            )
+        )
+        return option_extraction.check_extraction(option_result.output, option_context)
     context = ExtractionInput.model_validate_json(raw_input)
     result = asyncio.run(
         extraction_agent(model).run(
