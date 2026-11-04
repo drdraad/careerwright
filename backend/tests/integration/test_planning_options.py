@@ -54,6 +54,7 @@ def test_each_target_s_pack_options_are_served_with_their_labels(api: ApiClient,
         "name": "nessa-england-option-pack 0.4.0",
         "dated": "2026-11-01",
         "synthetic": False,
+        "research_fingerprint": None,
     }
     assert sorted(c["concept_id"] for c in catalogue["concepts"]) == ["option:C01", "option:C04"]
     assert {o["review_state"] for o in catalogue["offerings"]} == {"proposed"}
