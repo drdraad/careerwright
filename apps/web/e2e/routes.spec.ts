@@ -81,7 +81,11 @@ async function giveOptionFacts(page: Page, token: string) {
   if (!target) throw new Error("The seeded P01 target is missing");
   const index = target.options.findIndex((item) => item.variant_id === OFFERING);
   if (index < 0) throw new Error("The seeded P01 offering is missing");
-  await page.locator(".option-grid button").nth(index).click();
+  await page
+    .getByRole("group", { name: "Options to inspect" })
+    .getByRole("button")
+    .nth(index)
+    .click();
   const detail = page.locator(".option-detail");
   const start = new Date();
   start.setUTCDate(1);
@@ -207,29 +211,40 @@ test("[OPTN-13][VIS2-08][PLAN-01][STATE-06] P01 computes a route, saves a plan a
   await expect(chapters.getByRole("link", { name: "Options, ready for routes" })).toBeVisible();
   await expect(chapters.getByRole("link", { name: "Routes, available" })).toBeVisible();
   await page.goto(chapterUrl("routes"));
-  await expect(page.getByRole("heading", { level: 1, name: "Routes" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Compare your routes" })).toBeVisible();
   await page.getByRole("button", { name: "Find routes" }).click();
+  await page.getByText("About this search and its assumptions", { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Best trade-offs found" })).toBeVisible({
     timeout: 90_000,
   });
   await expect(chapters.getByRole("link", { name: "Routes, route found" })).toBeVisible();
   await expect(chapters.getByRole("link", { name: /Plan/ })).toHaveCount(0);
-  const qualified = page
-    .getByRole("button", {
-      name: /Uses a figure you supplied that has not been checked/,
-    })
-    .first();
+  const archive = page.getByRole("region", { name: "Route archive" });
+  const qualifiedCards = archive.getByRole("listitem").filter({
+    hasText: /Uses a figure you supplied that has not been checked/,
+  });
+  const card = qualifiedCards.first();
+  await card.locator("summary").click();
+  await expect(
+    card.getByText(/Uses a figure you supplied that has not been checked/),
+  ).toBeVisible();
+  const qualified = card.getByRole("button");
   await expect(qualified).toBeVisible();
-  const title = (await qualified.locator(".font-semibold").textContent()) ?? "";
-  const figures = (await qualified.locator(".tnum").textContent()) ?? "";
-  const route = /Route (\d+)/.exec(title)?.[1];
-  const months = /(\d+) months to/.exec(figures)?.[1];
-  const rank = /in (F[123])/.exec(figures)?.[1];
-  if (!route || !months || !rank) throw new Error(`Unrecognised route card: ${title} ${figures}`);
+  const words = (await card.textContent()) ?? "";
+  const route = /Route (\d+)/.exec(words)?.[1];
+  const monthLabel = (await qualified.getByText(/^\d+-month route$/).textContent()) ?? "";
+  const months = /^(\d+)-month route$/.exec(monthLabel)?.[1];
+  const rank = /Recorded rank (F[123])/.exec(words)?.[1];
+  if (!route || !months || !rank) throw new Error(`Unrecognised route card: ${words}`);
+  expect(Number(months)).toBeGreaterThanOrEqual(0);
+  expect(Number(months)).toBeLessThanOrEqual(24);
   await qualified.click();
+  await page.getByText(`Full breakdown for Route ${route}`, { exact: true }).click();
   await expect(page.getByRole("heading", { name: `Route ${route}` })).toBeVisible();
   await expect(
-    page.getByText(/Uses a figure you supplied that has not been checked/).last(),
+    page
+      .getByRole("region", { name: `Route ${route}`, exact: true })
+      .getByText(/Uses a figure you supplied that has not been checked/),
   ).toBeVisible();
   await page.getByText("Filter this view").click();
   const filtered = page.waitForResponse(
@@ -238,9 +253,14 @@ test("[OPTN-13][VIS2-08][PLAN-01][STATE-06] P01 computes a route, saves a plan a
   );
   await page.getByRole("spinbutton", { name: "Exact maximum months" }).fill(months);
   await filtered;
-  await expect(
-    page.getByRole("button", { name: new RegExp(`Route ${route}.*in ${rank}`) }),
-  ).toBeVisible();
+  const filteredCard = archive.getByRole("listitem").filter({
+    has: page.getByRole("button", { name: new RegExp(`^Route ${route}(?:\\s|$)`) }),
+  });
+  await expect(filteredCard.getByRole("button")).toBeVisible();
+  if ((await filteredCard.locator("details").getAttribute("open")) === null) {
+    await filteredCard.locator("summary").click();
+  }
+  await expect(filteredCard.getByText(new RegExp(`Recorded rank ${rank}`))).toBeVisible();
   await expect(page.getByText(/Recorded ranks do not change when you filter/)).toBeVisible();
 
   await page.getByRole("link", { name: "Choose this route in Plan" }).click();
@@ -262,11 +282,13 @@ test("[OPTN-13][VIS2-08][PLAN-01][STATE-06] P01 computes a route, saves a plan a
 
   const overview = page.getByRole("region", { name: "Chosen plan overview" });
   await expect(overview.getByRole("heading", { name: TARGET })).toBeVisible();
-  await expect(overview.getByText(/^Next action:/)).toBeVisible();
+  await expect(overview.getByRole("heading", { name: "Your next action" })).toBeVisible();
+  await expect(overview.locator(".decision-next-action p")).not.toBeEmpty();
   await expect(overview.getByText(/Plan version 1/)).toBeVisible();
   await expect(chapters.getByRole("link", { name: "Plan, plan saved" })).toBeVisible();
   const snapshot = await asBrowser<{
     version: number;
+    source: { solve_run_id: string };
     route: { schedule: { index: number }; steps: { variant_id: string }[] };
   }>("GET", `${BASE}/planning/plans/current`, token);
   expect(snapshot.version).toBe(1);
@@ -309,6 +331,7 @@ test("[OPTN-13][VIS2-08][PLAN-01][STATE-06] P01 computes a route, saves a plan a
   const firstStep = snapshot.route.steps[0];
   if (!firstStep) throw new Error("The chosen route has no step to report complete");
   const progress = page.getByRole("region", { name: "Planning progress" });
+  await page.getByText("Update your progress", { exact: true }).click();
   await progress.getByRole("button", { name: "Report step complete" }).first().click();
   await expect(overview.getByText(/Plan version 2/)).toBeVisible();
   const updated = await asBrowser<{
@@ -319,10 +342,21 @@ test("[OPTN-13][VIS2-08][PLAN-01][STATE-06] P01 computes a route, saves a plan a
   expect(updated.progress.completed_steps).toContain(firstStep.variant_id);
 
   await page.goto(chapterUrl("routes"));
-  await page
-    .getByRole("button", { name: /Uses a figure you supplied that has not been checked/ })
-    .first()
-    .click();
+  // A fresh comparison keeps the saved plan in place until its result is chosen.
+  const refreshedArchive = page.waitForResponse(
+    (response) =>
+      response.url().includes("/schedules?") &&
+      !response.url().includes(snapshot.source.solve_run_id),
+    { timeout: 90_000 },
+  );
+  await page.getByText("Change comparison", { exact: true }).click();
+  await page.getByRole("button", { name: "Search again", exact: true }).click();
+  await refreshedArchive;
+  const revisedChoice = qualifiedCards.first().getByRole("button");
+  await expect(revisedChoice).toBeVisible();
+  const revisedRoute = /Route (\d+)/.exec((await revisedChoice.textContent()) ?? "")?.[1];
+  if (!revisedRoute) throw new Error("The new archive needs a qualified route to review");
+  await revisedChoice.click();
   await page.getByRole("link", { name: "Choose this route in Plan" }).click();
   await expect(candidate.getByRole("region", { name: "Proposed plan changes" })).toBeVisible();
   await expect(
@@ -341,12 +375,14 @@ test("[OPTN-13][VIS2-08][PLAN-01][STATE-06] P01 computes a route, saves a plan a
     route: { schedule: { index: number } };
   }>("GET", `${BASE}/planning/plans/current`, token);
   expect(revised.version).toBe(3);
-  expect(revised.route.schedule.index).toBe(Number(route) - 1);
+  expect(revised.route.schedule.index).toBe(Number(revisedRoute) - 1);
   await page.reload();
   await expect(overview.getByText(/Plan version 3/)).toBeVisible();
+  await page.getByText("Update your progress", { exact: true }).click();
   await progress.getByRole("button", { name: "Record my commitment" }).first().click();
   await expect(overview.getByText(/Plan version 4/)).toBeVisible();
   await page.reload();
+  await page.getByText("Update your progress", { exact: true }).click();
   await progress.getByRole("button", { name: "Correct commitment report" }).first().click();
   await expect(overview.getByText(/Plan version 5/)).toBeVisible();
   const corrected = await asBrowser<{

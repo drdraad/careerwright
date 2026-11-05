@@ -36,16 +36,15 @@ test("[UI-09] the rail names saved milestones and leaves blocked chapters out of
 test.describe("phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("[UI-09] the chapter menu gives the same availability and saved milestone", async ({
+  test("[UI-09] the phone rail gives the same availability and saved milestone", async ({
     page,
   }) => {
     await signIn(page, "ada", chapterUrl("you"));
-    await page.getByRole("button", { name: /open chapter menu/ }).click();
-    const menu = page.getByRole("navigation", { name: "Chapters" });
-    await expect(menu.getByRole("link", { name: "You, direction chosen" })).toBeVisible();
-    await expect(menu.getByRole("link", { name: "Roles, available" })).toBeVisible();
-    await expect(menu.getByText(/Routes.*Locked/)).toBeVisible();
-    await expect(menu.getByRole("link", { name: /Routes/ })).toHaveCount(0);
+    const rail = page.getByRole("navigation", { name: "Chapters" });
+    await expect(rail.getByRole("link", { name: "You, direction chosen" })).toBeVisible();
+    await expect(rail.getByRole("link", { name: "Roles, available" })).toBeVisible();
+    await expect(rail.getByText(/Routes.*Locked/)).toBeVisible();
+    await expect(rail.getByRole("link", { name: /Routes/ })).toHaveCount(0);
   });
 });
 

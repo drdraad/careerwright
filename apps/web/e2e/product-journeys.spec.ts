@@ -136,6 +136,7 @@ test("[JOURNEY-01] an empty demo discovery gives a school leaver a way to contin
           .current_role.state,
     )
     .toBe("no_job_yet");
+  await expect(page.getByRole("heading", { name: "How would you like to start?" })).toBeVisible();
   await youView(page, "What we know");
   await page.getByRole("button", { name: "Edit answers directly" }).click();
   await page.getByLabel("How you answer tasks you enjoy").selectOption("provided");

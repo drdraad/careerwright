@@ -1,16 +1,12 @@
-// The world in the app (plan section 4, Sprint W SW.3): one persistent world behind the
-// chapters; changing chapter travels to its place; the still world shows the same names as the
-// moving one, under reduced motion, calm mode and pause, at every size; the controls hold the
-// world still and leave sound off until asked (in the strip on a desktop, in the account menu
-// below one), and calm mode lives in the account menu; the calm support panel stills the world;
-// Roles shows its own place; every light's name sits beside it, clear of the panels; nothing leaves this
-// machine. On the real stack, demo mode.
+// The persistent atmosphere and saved career facts across chapters: controls, motion settings,
+// support, keyboard access and readable facts on the real demo stack. Nothing leaves this machine.
 import { type Browser, expect, type Page, test } from "@playwright/test";
 import { asBrowser, emulatorToken, talkedWorkspace } from "./api";
 import {
   chapterUrl,
   externalRequests,
   liveUpdates,
+  overprintedLabels,
   recordRequests,
   saved,
   signIn,
@@ -31,8 +27,8 @@ const LONG_TARGETS = [
   "Clinical data standards and interoperability specialist",
 ];
 
-const world = (page: Page) => page.locator(".world");
-const words = (page: Page) => page.getByRole("complementary", { name: "Your world" });
+const world = (page: Page) => page.locator(".decision-atmosphere");
+const light = (page: Page) => page.locator(".decision-atmosphere-light");
 
 /** A new synthetic demo workspace whose three targets have long names. */
 async function longTargetsWorkspace(): Promise<string> {
@@ -60,72 +56,6 @@ async function longTargetsWorkspace(): Promise<string> {
   return id;
 }
 
-/** The names in sight in the world, and whether the key to the lights is in sight. */
-function inSight(page: Page) {
-  return page.evaluate(() => ({
-    names: [
-      ...document.querySelectorAll<HTMLElement>(
-        ".world-label[data-shown='true'] .world-label-name",
-      ),
-    ]
-      .map((e) => e.textContent ?? "")
-      .sort(),
-    key: document.querySelector<HTMLElement>(".world-key")?.dataset.placed === "true",
-  }));
-}
-
-/**
- * Shown names whose label is taller than the name itself: a mark left on a line of its own
- * above a long, wrapped name (the label's padding is 2 px above and below).
- */
-function marksOnTheirOwn(page: Page) {
-  return page.evaluate(() =>
-    [...document.querySelectorAll<HTMLElement>(".world-label[data-shown='true']")]
-      .filter((label) => {
-        const name = label.querySelector(".world-label-name");
-        return (
-          name !== null &&
-          label.getBoundingClientRect().height > name.getBoundingClientRect().height + 6
-        );
-      })
-      .map((label) => label.textContent ?? ""),
-  );
-}
-
-/** The visible names in the world, with their boxes, and the panels over it. */
-function layout(page: Page) {
-  return page.evaluate(() => {
-    const box = (e: Element) => {
-      const r = e.getBoundingClientRect();
-      return { x: r.left, y: r.top, w: r.width, h: r.height };
-    };
-    const labels = [
-      ...document.querySelectorAll<HTMLElement>(".world-label[data-shown='true']"),
-    ].map((e) => ({
-      name: e.querySelector(".world-label-name")?.textContent ?? "",
-      // A light the key explains (every light but the person's).
-      keyed: e.dataset.keyed === "true",
-      ...box(e),
-    }));
-    const panels = [...document.querySelectorAll("[data-covers-world]")]
-      .map(box)
-      .filter((b) => b.w > 0 && b.h > 0);
-    const key = document.querySelector(".world-key[data-placed='true']");
-    return {
-      labels,
-      key: key === null ? null : box(key),
-      panels,
-      vw: window.innerWidth,
-      vh: window.innerHeight,
-    };
-  });
-}
-
-const overlap = (
-  a: { x: number; y: number; w: number; h: number },
-  b: { x: number; y: number; w: number; h: number },
-) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
-
 /** Opens the account menu and turns calm mode on or off. */
 async function toggleCalm(page: Page) {
   await page.getByRole("button", { name: "Account and settings" }).click();
@@ -142,45 +72,36 @@ async function holdStill(page: Page) {
   if (inMenu) await page.keyboard.press("Escape");
 }
 
-/**
- * Opens a menu, stands the key to the lights where the menu is and reports whether the menu is
- * what shows there: wherever the two meet, the menu is on top.
- */
-async function menuOverKey(page: Page, opener: { name: string | RegExp }) {
-  await page.getByRole("button", opener).click();
-  await expect(page.locator(".popover")).toBeVisible();
-  // Let the world re-place its names for the open menu first (once a frame).
-  await page.waitForTimeout(200);
-  const onTop = await page.evaluate(() => {
-    const key = document.querySelector<HTMLElement>(".world-key");
-    const menu = document.querySelector<HTMLElement>(".popover");
-    if (key === null || menu === null) return null;
-    const m = menu.getBoundingClientRect();
-    key.dataset.placed = "true";
-    key.style.right = `${window.innerWidth - m.right}px`;
-    key.style.bottom = `${window.innerHeight - m.bottom}px`;
-    const k = key.getBoundingClientRect();
-    const x = (Math.max(k.left, m.left) + Math.min(k.right, m.right)) / 2;
-    const y = (Math.max(k.top, m.top) + Math.min(k.bottom, m.bottom)) / 2;
-    return menu.contains(document.elementFromPoint(x, y));
+/** Menus receive pointer input above the atmosphere and return keyboard focus on Escape. */
+async function menuOnTop(page: Page, opener: { name: string | RegExp }) {
+  const trigger = page.getByRole("button", opener);
+  await trigger.click();
+  const menu = page.locator(".popover");
+  await expect(menu).toBeVisible();
+  const onTop = await menu.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return element.contains(
+      document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2),
+    );
   });
   await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(trigger).toBeFocused();
   return onTop;
 }
 
 test.describe("moving", () => {
   test.use({ reducedMotion: "no-preference" });
 
-  test("[WLD-01][UI-09][UI-05][BND1-11] one world stays behind every chapter while the view travels", async ({
+  test("[WLD-01][UI-09][UI-05][BND1-11] one atmosphere stays behind every chapter and navigation names its current place", async ({
     page,
   }) => {
     const requests = recordRequests(page);
     await signIn(page, "ada", chapterUrl("you"));
     await expect(page.getByRole("heading", { level: 1, name: "You" })).toBeVisible();
-    await expect(world(page)).toHaveAttribute("data-world-mode", "moving");
-    // Mark the canvas itself: if any chapter made a new one (and a new WebGL context), the
-    // mark would be gone.
-    await page.getByTestId("moving-world").evaluate((element) => {
+    await expect(light(page)).toHaveCSS("animation-play-state", "running");
+    // Changing chapter keeps the same atmosphere and its current motion state.
+    await world(page).evaluate((element) => {
       (element as HTMLElement & { persisted?: boolean }).persisted = true;
     });
 
@@ -188,15 +109,20 @@ test.describe("moving", () => {
     for (const chapter of CHAPTERS) {
       await rail.getByRole("link", { name: new RegExp(`^${chapter}`) }).click();
       await expect(page.getByRole("heading", { level: 1, name: chapter })).toBeVisible();
-      await expect(world(page)).toHaveAttribute("data-place", chapter.toLowerCase());
+      await expect(rail.getByRole("link", { name: new RegExp(`^${chapter}`) })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
       expect(
         await page
-          .getByTestId("moving-world")
+          .locator(".decision-atmosphere")
           .evaluate((element) => (element as HTMLElement & { persisted?: boolean }).persisted),
       ).toBe(true);
     }
-    // P01's own target stands on the horizon, named in the page.
-    await expect(words(page).getByText("Data quality analyst")).toBeAttached();
+    // The chapter keeps the person's chosen target in view.
+    await expect(page.getByRole("banner").locator(".strip-target")).toContainText(
+      "Data quality analyst",
+    );
     expect(externalRequests(requests)).toEqual([]);
   });
 
@@ -204,18 +130,17 @@ test.describe("moving", () => {
     page,
   }) => {
     await signIn(page, "ada", chapterUrl("roles"));
-    await expect(world(page)).toHaveAttribute("data-world-mode", "moving");
-    await expect(world(page)).toHaveAttribute("data-motion", "running");
+    await expect(light(page)).toHaveCSS("animation-play-state", "running");
 
     // Named apart from the interview's "Pause the interview" (the audit's F17).
     const pause = page.getByRole("button", { name: /^Hold the world still/ });
     await expect(page.getByRole("button", { name: /^Pause motion/ })).toHaveCount(0);
     await pause.click();
     await expect(pause).toHaveAttribute("aria-pressed", "true");
-    await expect(world(page)).toHaveAttribute("data-motion", "still");
+    await expect(light(page)).toHaveCSS("animation-play-state", "paused");
     await pause.click();
     await expect(pause).toHaveAttribute("aria-pressed", "false");
-    await expect(world(page)).toHaveAttribute("data-motion", "running");
+    await expect(light(page)).toHaveCSS("animation-play-state", "running");
 
     const sound = page.getByRole("button", { name: /^Sound/ });
     await expect(sound).toHaveAttribute("aria-pressed", "false");
@@ -225,13 +150,12 @@ test.describe("moving", () => {
     );
 
     await toggleCalm(page);
-    await expect(world(page)).toHaveAttribute("data-world-mode", "still");
-    await expect(page.getByTestId("still-world")).toBeVisible();
+    await expect(light(page)).toHaveCSS("animation-play-state", "paused");
     await page.reload();
     await expect(page.getByRole("heading", { level: 1, name: "Roles" })).toBeVisible();
-    await expect(world(page)).toHaveAttribute("data-world-mode", "still");
+    await expect(light(page)).toHaveCSS("animation-play-state", "paused");
     await toggleCalm(page);
-    await expect(world(page)).toHaveAttribute("data-world-mode", "moving");
+    await expect(light(page)).toHaveCSS("animation-play-state", "running");
   });
 
   test("[WLD-08][UI-05][PROF-09] the calm support panel stills the world, and holding it keeps the person's own choice", async ({
@@ -247,7 +171,7 @@ test.describe("moving", () => {
     await signIn(page, "ada", chapterUrl("you", id));
     await skipFirstQuestion(page);
     await page.getByRole("button", { name: "Help me explore" }).click();
-    await expect(world(page)).toHaveAttribute("data-world-mode", "moving");
+    await expect(light(page)).toHaveCSS("animation-play-state", "running");
     await page
       .getByRole("textbox", { name: "Reply to Careerwright" })
       .fill("Some days I just want to die.");
@@ -255,7 +179,7 @@ test.describe("moving", () => {
 
     const panel = page.getByRole("region", { name: "Support is available" });
     await expect(panel).toBeVisible();
-    await expect(world(page)).toHaveAttribute("data-world-mode", "still");
+    await expect(light(page)).toHaveCSS("animation-play-state", "paused");
     await expect(world(page)).toHaveAttribute("data-distress", "true");
     await expect(
       page.getByRole("status").filter({ hasText: "Still while support is shown" }),
@@ -267,15 +191,15 @@ test.describe("moving", () => {
 
     await panel.getByRole("button", { name: "Dismiss the support note" }).click();
     await expect(world(page)).toHaveAttribute("data-distress", "false");
-    await expect(world(page)).toHaveAttribute("data-world-mode", "moving");
+    await expect(light(page)).toHaveCSS("animation-play-state", "running");
   });
 });
 
-test("[WLD-06][UI-06] the menus open over the key to the lights", async ({ page }) => {
+test("[WLD-06][UI-06] the menus open above the atmosphere", async ({ page }) => {
   await signIn(page, "ada", chapterUrl("roles"));
-  await expect(page.locator(".world-key")).toHaveAttribute("data-placed", "true");
-  expect(await menuOverKey(page, { name: /^Workspace/ }), "the workspace menu").toBe(true);
-  expect(await menuOverKey(page, { name: "Account and settings" }), "the account menu").toBe(true);
+  await expect(light(page)).toBeAttached();
+  expect(await menuOnTop(page, { name: /^Workspace/ }), "the workspace menu").toBe(true);
+  expect(await menuOnTop(page, { name: "Account and settings" }), "the account menu").toBe(true);
 });
 
 test.describe("phone", () => {
@@ -294,9 +218,11 @@ test.describe("phone", () => {
     await expect(calm.locator(".world-switch")).toBeVisible();
   });
 
-  test("[WLD-06][UI-06] the chapter menu opens over the key to the lights", async ({ page }) => {
+  test("[WLD-06][UI-06] the mobile account menu receives input above the atmosphere and restores focus", async ({
+    page,
+  }) => {
     await signIn(page, "ada", chapterUrl("roles"));
-    expect(await menuOverKey(page, { name: /open chapter menu/ })).toBe(true);
+    expect(await menuOnTop(page, { name: "Account and settings" })).toBe(true);
   });
 
   test("[WLD-08][UI-05][PROF-09] the support status sits in the top bar and adds no row to the strip", async ({
@@ -359,94 +285,49 @@ async function settledHeight(page: Page): Promise<number> {
   );
 }
 
-test("[WLD-02][UI-07][UI-05] with no light the key explains, the key is not shown", async ({
+test("[WLD-02][UI-07][UI-05] an unanswered workspace keeps its starting facts unknown", async ({
   page,
 }) => {
-  // W2A re-review 2, Minor 3: the empty-key case. A new workspace has no destination, skill or
-  // opening: the person's light is named, and nothing it draws needs a key.
-  const token = await emulatorToken("ada");
   const { workspace_id: id } = await asBrowser<{ workspace_id: string }>(
     "POST",
     "/v1/workspaces",
-    token,
-    { name: "Nothing to explain (synthetic)", data_mode: "demo", synthetic: true },
+    await emulatorToken("ada"),
+    { name: "Nothing answered (synthetic)", data_mode: "demo", synthetic: true },
   );
   await signIn(page, "ada", chapterUrl("you", id));
-  for (const chapter of ["you", "roles"]) {
-    await page.goto(chapterUrl(chapter, id));
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await page.waitForTimeout(900); // travel, then the names settle
-    const { labels, key } = await layout(page);
-    expect(
-      labels.map((label) => label.name),
-      chapter,
-    ).toEqual(["You"]);
-    expect(
-      labels.some((label) => label.keyed),
-      chapter,
-    ).toBe(false);
-    expect(key, `${chapter}: the key`).toBeNull();
-    await expect(page.locator(".world-key")).toHaveCount(0);
-  }
+  const startingPoint = page.getByRole("complementary", { name: "Your starting point" });
+  await expect(startingPoint.getByRole("definition")).toHaveText([
+    "Not asked yet",
+    "Not asked yet",
+    "Not asked yet",
+  ]);
+  await expect(saved(page)).toHaveText("Nothing saved yet");
+  await page.goto(chapterUrl("roles", id));
+  await expect(page.getByRole("heading", { level: 1, name: "Roles" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Your target roles" })).toHaveCount(0);
 });
 
-/**
- * The person's light's name, the key to the lights (when placed), the You console and its three
- * tabs, as they stand now, and whether each tab is what a tap at its centre reaches.
- */
-function youBoxes(page: Page) {
-  return page.evaluate(() => {
-    const box = (e: Element | null) => {
-      if (e === null) return null;
-      const r = e.getBoundingClientRect();
-      return { x: r.left, y: r.top, w: r.width, h: r.height };
-    };
-    const tabs = [...document.querySelectorAll<HTMLElement>("[role='tab']")];
-    return {
-      you: box(document.querySelector(".world-label[data-label='origin'][data-shown='true']")),
-      key: box(document.querySelector(".world-key[data-placed='true']")),
-      console: box(document.querySelector("[data-world-panel]")),
-      tabs: tabs.map(box),
-      onTop: tabs.map((tab) => {
-        const r = tab.getBoundingClientRect();
-        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-        return hit !== null && tab.contains(hit);
-      }),
-    };
-  });
-}
-
 for (const viewport of VIEWPORTS.filter((v) => v.width < 968)) {
-  test(`[WLD-07][UI-07][UI-12][UI-05] after every change of view the person's light stands above the console, and the key covers neither it nor a tab (${viewport.width}×${viewport.height})`, async ({
+  test(`[WLD-07][UI-07][UI-12][UI-05] chapter tabs remain unobscured after every view change (${viewport.width}×${viewport.height})`, async ({
     browser,
   }) => {
-    // Re-review N1 (the audit's F8): the views switch by `hidden`, so the world must place
-    // itself again with no scroll and no child added. Each box is read where it stands now,
-    // after the change, never a value left by the view before.
     const context = await browser.newContext({ viewport, reducedMotion: "reduce" });
     const page = await context.newPage();
     await signIn(page, "ada", chapterUrl("you"));
-    await expect(page.getByRole("heading", { level: 1, name: "You" })).toBeVisible();
     for (const view of ["What we know", "Suggestions", "Conversation", "What we know"] as const) {
       const tab = page.getByRole("tab", { name: view });
-      await tab.click(); // the tabs are in view at the top: the page does not scroll
+      await tab.click();
       await expect(tab).toHaveAttribute("aria-selected", "true");
       expect(await page.evaluate(() => window.scrollY), `${view}: no scroll`).toBe(0);
-      await page.waitForTimeout(300); // a frame or two: the world places itself again
-      const { you, key, console: panel, tabs, onTop } = await youBoxes(page);
-      expect(panel, view).not.toBeNull();
-      expect(you, `${view}: the person's light is named, in view`).not.toBeNull();
-      if (you === null || panel === null) continue;
-      expect(you.y + you.h, `${view}: "You" above the console`).toBeLessThanOrEqual(panel.y);
-      if (key !== null) {
-        expect(overlap(key, panel), `${view}: the key over the console`).toBe(false);
-        for (const [i, shown] of tabs.entries()) {
-          if (shown !== null)
-            expect(overlap(key, shown), `${view}: the key over tab ${i}`).toBe(false);
-        }
-      }
-      // An "on top" check: a tap at each tab's centre reaches the tab, nothing over it (F8).
-      expect(onTop, `${view}: each tab on top`).toEqual([true, true, true]);
+      const reachable = await page.getByRole("tab").evaluateAll((tabs) =>
+        tabs.map((tab) => {
+          const box = tab.getBoundingClientRect();
+          return tab.contains(
+            document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2),
+          );
+        }),
+      );
+      expect(reachable, `${view}: every tab receives input`).toEqual([true, true, true]);
     }
     await context.close();
   });
@@ -560,6 +441,12 @@ for (const viewport of VIEWPORTS) {
             "true",
           );
           await expect(page.getByText("Loading the early sketch")).toHaveCount(0);
+          if (workspace === talked && view === "What we know") {
+            // The role's ESCO list arrives independently of the chapter's loading state.
+            await expect(
+              page.getByRole("tabpanel", { name: view }).getByText(/^The \d+ skills that ESCO,/),
+            ).toBeVisible();
+          }
           if (workspace === talked && view === "Suggestions") {
             // The note is asked for when the slate first shows; its words settle first.
             await expect(
@@ -582,14 +469,16 @@ for (const viewport of VIEWPORTS) {
   });
 }
 
-test("[WLD-01][UI-09] Roles shows the chosen target and stays in its world place", async ({
+test("[WLD-01][UI-09] Roles shows the chosen target alongside openings and examples", async ({
   page,
 }) => {
   await signIn(page, "ada", chapterUrl("roles"));
   await expect(page.getByRole("heading", { level: 1, name: "Roles" })).toBeVisible();
   await expect(page.getByText(/Explore the work behind a role/)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Openings and examples" })).toBeVisible();
-  await expect(world(page)).toHaveAttribute("data-place", "roles");
+  await expect(page.getByRole("banner").locator(".strip-target")).toContainText(
+    "Data quality analyst",
+  );
 });
 
 type Mode = "moving" | "reduced motion" | "calm" | "paused";
@@ -609,67 +498,23 @@ async function modePage(browser: Browser, viewport: (typeof VIEWPORTS)[number], 
   return page;
 }
 
-/**
- * Opens a chapter in a mode, waits until it has loaded (its heading shows while it still loads,
- * and the panel's size, which decides where names fit, changes when it has), then lets travel
- * finish (600 ms) and the names settle. With `targets`, it also waits until the world names
- * each of them (shown in sight or not): the world has the person's targets.
- */
-async function open(
-  page: Page,
-  url: string,
-  chapter: string,
-  mode: Mode,
-  targets: readonly string[] = [],
-) {
+/** Wait for saved chapter facts before comparing motion settings. */
+async function open(page: Page, url: string, chapter: string, mode: Mode) {
   await page.goto(url);
   await expect(page.getByRole("heading", { level: 1, name: chapter })).toBeVisible();
   await expect(page.locator("main .skeleton").filter({ visible: true })).toHaveCount(0);
-  for (const name of targets) {
-    await expect(words(page).getByText(name, { exact: true })).toBeAttached();
-  }
-  await expect(world(page)).toHaveAttribute(
-    "data-world-mode",
-    mode === "moving" || mode === "paused" ? "moving" : "still",
-  );
-  if (mode === "paused") {
-    await holdStill(page);
-    await expect(world(page)).toHaveAttribute("data-motion", "still");
-  }
-  await page.waitForTimeout(900);
+  await expect(saved(page)).toHaveText("Answers saved");
+  if (mode === "paused") await holdStill(page);
+  if (mode === "reduced motion") await expect(light(page)).toHaveCSS("animation-name", "none");
+  else
+    await expect(light(page)).toHaveCSS(
+      "animation-play-state",
+      mode === "moving" ? "running" : "paused",
+    );
 }
 
 for (const viewport of VIEWPORTS) {
-  test(`[WLD-03][UI-05][UI-07] the still world shows the same names as the moving one, in every chapter (${viewport.width}×${viewport.height}, three long targets)`, async ({
-    browser,
-  }) => {
-    test.setTimeout(240_000);
-    const workspace = await longTargetsWorkspace();
-    const pages = new Map<Mode, Page>();
-    for (const mode of MODES) pages.set(mode, await modePage(browser, viewport, mode));
-    for (const chapter of CHAPTERS) {
-      const url = chapterUrl(chapter.toLowerCase(), workspace);
-      const seen = new Map<Mode, Awaited<ReturnType<typeof inSight>>>();
-      for (const mode of MODES) {
-        const page = pages.get(mode) as Page;
-        await open(page, url, chapter, mode, LONG_TARGETS);
-        seen.set(mode, await inSight(page));
-      }
-      const moving = seen.get("moving");
-      for (const mode of MODES) {
-        expect(seen.get(mode), `${chapter}, ${mode} against moving`).toEqual(moving);
-      }
-      // The larger Roles panel can cover decorative labels; their names remain in the world.
-      if (chapter === "Roles") {
-        const movingPage = pages.get("moving") as Page;
-        await expect(words(movingPage).getByText("You", { exact: true })).toBeAttached();
-        expect(await marksOnTheirOwn(movingPage), "Roles: marks").toEqual([]);
-      }
-    }
-    for (const page of pages.values()) await page.context().close();
-  });
-
-  test(`[WLD-06][UI-07] every name in the world sits clear of the panels and of each other (${viewport.width}×${viewport.height})`, async ({
+  test(`[WLD-06][UI-07] chapter labels do not cover their values and facts stay inside the page (${viewport.width}×${viewport.height})`, async ({
     browser,
   }) => {
     for (const reducedMotion of ["reduce", "no-preference"] as const) {
@@ -679,34 +524,13 @@ for (const viewport of VIEWPORTS) {
       for (const chapter of CHAPTERS) {
         await page.goto(chapterUrl(chapter.toLowerCase()));
         await expect(page.getByRole("heading", { level: 1, name: chapter })).toBeVisible();
-        // Let travel finish (600 ms) and the names settle.
-        await page.waitForTimeout(900);
-        const { labels, key, panels, vw, vh } = await layout(page);
-        for (const [i, label] of labels.entries()) {
-          const where = `${chapter}, ${reducedMotion}: "${label.name}"`;
-          expect(label.x, where).toBeGreaterThanOrEqual(0);
-          expect(label.y, where).toBeGreaterThanOrEqual(0);
-          expect(label.x + label.w, where).toBeLessThanOrEqual(vw);
-          expect(label.y + label.h, where).toBeLessThanOrEqual(vh);
-          for (const panel of panels) expect(overlap(label, panel), where).toBe(false);
-          if (key !== null) expect(overlap(label, key), `${where} and the key`).toBe(false);
-          for (const other of labels.slice(i + 1)) expect(overlap(label, other), where).toBe(false);
-        }
-        // A light the key explains is named in view: the key to the lights is shown too. The
-        // person's own light needs no key (W2A re-review 2, Minor 3: "You" alone is no reason).
-        if (labels.some((label) => label.keyed)) {
-          expect(key, `${chapter}, ${reducedMotion}: lights in view, but no key`).not.toBeNull();
-        }
-        // The key to the lights, when shown, is not under a panel either.
-        if (key !== null) {
-          for (const panel of panels) {
-            expect(overlap(key, panel), `${chapter}, ${reducedMotion}: the key`).toBe(false);
-          }
-        }
-        if (chapter === "Roles")
-          await expect(
-            words(page).getByText("Data quality analyst", { exact: true }),
-          ).toBeAttached();
+        await expect(page.locator("main .skeleton").filter({ visible: true })).toHaveCount(0);
+        await page.evaluate(() => document.fonts.ready);
+        expect(await overprintedLabels(page), `${chapter}: labels and values`).toEqual([]);
+        const overflow = await page.evaluate(
+          () => document.documentElement.scrollWidth - window.innerWidth,
+        );
+        expect(overflow, `${chapter}: no horizontal scrolling`).toBeLessThanOrEqual(1);
       }
       await context.close();
     }

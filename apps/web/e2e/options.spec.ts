@@ -19,7 +19,11 @@ test("[OPTN-03][OPTN-09] a person adds an option and sees its unreviewed source 
   await page.getByRole("button", { name: "Save this option" }).click();
 
   await expect(page.getByRole("button", { name: /Evening course/ })).toBeVisible();
-  await expect(page.getByText(/Your own option, not reviewed/)).toBeVisible();
+  await expect(
+    page
+      .getByRole("region", { name: "Evening course details" })
+      .getByText(/Your own option, not reviewed/),
+  ).toBeVisible();
   await expect(page.getByText("Local college", { exact: true })).toBeVisible();
   await expect(page.getByText(/Not known yet: start date/)).toBeVisible();
 });
@@ -31,9 +35,15 @@ test.describe("phone", () => {
     page,
   }) => {
     await signIn(page, "ada", chapterUrl("options"));
-    const first = page.locator(".option-grid button").first();
+    const first = page.locator(".option-detail").getByRole("heading", { level: 3 }).first();
     await expect(first).toBeVisible();
-    expect((await first.boundingBox())?.y).toBeLessThan(844);
+    const box = await first.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box?.y).toBeGreaterThanOrEqual(0);
+    expect(box ? box.y + box.height : null).toBeLessThanOrEqual(844);
+    await expect(
+      page.locator(".option-detail").getByText(/Not known yet: start date/),
+    ).toBeVisible();
     await expect(page.getByRole("region", { name: "Your next step" })).toHaveCount(0);
   });
 });
