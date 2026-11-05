@@ -456,6 +456,21 @@
   .career-workspace[data-drawer="open"] .chapter-frame { padding-bottom: calc(var(--sheet-peek) + 16px); }
 }
 
+/* Short landscape windows reserve their first screen for the current question. */
+@media (max-width: 967px) and (max-height: 560px) {
+  .career-workspace .chapter-layout:has(> .you-landscape) { padding-top: 12px; }
+  .career-workspace .chapter-layout:has(> .you-landscape) > .chapter-reading { gap: 12px; padding: 16px; }
+  .career-workspace .chapter-layout:has(> .you-landscape) > .chapter-reading > .chapter-heading {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .career-workspace .chapter-layout:has(> .you-landscape) .question .display { font-size: var(--type-25); max-width: none; }
+}
+
 .career-workspace > .decision-atmosphere { position: absolute; inset: 0; pointer-events: none; z-index: -1; }
 .skill-path { display: grid; grid-template-columns: minmax(80px, 0.65fr) minmax(180px, 1.8fr) minmax(100px, 0.8fr); gap: 24px; align-items: center; padding: 36px 0; }
 .skill-path-origin, .skill-path-destination { display: grid; justify-items: center; gap: 16px; text-align: center; font-family: var(--font-display); font-size: 18px; line-height: 1.3; }

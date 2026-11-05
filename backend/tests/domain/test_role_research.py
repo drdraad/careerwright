@@ -8,12 +8,13 @@ import json
 import uuid
 from dataclasses import replace
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import cast
 
 import pytest
 
 from careerwright.db import Tx
-from careerwright.evidence import role_research, role_store
+from careerwright.evidence import role_research, role_store, store
 from careerwright.evidence.acquire import FetchRequest, Pacer, acquire_page
 from careerwright.evidence.acquisition import MAX_ROLE_PAGES
 from careerwright.evidence.corroboration import (
@@ -26,7 +27,7 @@ from careerwright.evidence.corroboration import (
 )
 from careerwright.evidence.fetcher import Fetcher
 from careerwright.evidence.pages import EXCERPT_CHARS, EXTRACTION_TEXT_BYTES, role_text
-from careerwright.evidence.records import AdvertiserKind, JobCopy, RightsClass
+from careerwright.evidence.records import AdvertiserKind, AttemptStatus, JobCopy, RightsClass
 from careerwright.evidence.role_research import ResearchState, pages_to_read
 from careerwright.evidence.search import (
     INSTRUCTIONS,
@@ -635,6 +636,90 @@ def test_one_page_leaves_it_not_yet_found_in_independent_sources() -> None:
     assert result.verdict is RoleVerdict.NOT_YET_FOUND
     assert result.reason is NotYetFoundReason.ONE_SOURCE_ONLY
     assert result.sources == 1
+
+
+@pytest.mark.req("DIV1-15", "DIV1-04")
+@pytest.mark.parametrize(
+    ("requested", "final", "rights", "verdict", "sources"),
+    [
+        (
+            ("forward-one.example", "forward-two.example"),
+            ("same-employer.example", "same-employer.example"),
+            RightsClass.OTHER,
+            RoleVerdict.NOT_YET_FOUND,
+            1,
+        ),
+        (
+            ("forwarder.example", "forwarder.example"),
+            ("northwind.example", "greenfields.example"),
+            RightsClass.OTHER,
+            RoleVerdict.FOUND,
+            2,
+        ),
+        (
+            ("northwind.example", "greenfields.example"),
+            (None, None),
+            RightsClass.OTHER,
+            RoleVerdict.FOUND,
+            2,
+        ),
+        (
+            ("forwarder.example",),
+            ("www.gov.uk",),
+            RightsClass.GOVUK,
+            RoleVerdict.FOUND,
+            1,
+        ),
+    ],
+    ids=["one final site", "distinct final sites", "no final URL", "one official source"],
+)
+def test_role_reading_counts_the_final_page_sites_without_rewriting_requested_sources(
+    monkeypatch: pytest.MonkeyPatch,
+    requested: tuple[str, ...],
+    final: tuple[str | None, ...],
+    rights: RightsClass,
+    verdict: RoleVerdict,
+    sources: int,
+) -> None:
+    targets = []
+    attempts = []
+    checks = {}
+    contexts = (
+        "checks mature apple branches and trains orchard growers with local tools",
+        "prepares young pear saplings under glass while recording graft union growth",
+    )
+    for index, (requested_host, final_host) in enumerate(zip(requested, final, strict=True)):
+        attempt_id = uuid.uuid4()
+        url = f"https://{requested_host}/roles/{index}"
+        targets.append(SimpleNamespace(position=index, status="succeeded", url=url))
+        attempts.append(
+            SimpleNamespace(
+                attempt_id=attempt_id,
+                position=index,
+                provider=requested_host,
+                final_url=f"https://{final_host}/roles/{index}" if final_host else None,
+                status=AttemptStatus.SUCCEEDED,
+                reason=None,
+                rights_class=rights.value,
+                finished_at=NOW,
+                http_status=200,
+            )
+        )
+        checks[attempt_id] = check_title(
+            TITLE, f"{TITLE} {contexts[index]}.", provider=requested_host
+        )
+    monkeypatch.setattr(store, "targets", lambda *_args: targets)
+    monkeypatch.setattr(store, "attempts_of_run", lambda *_args: attempts)
+    monkeypatch.setattr(role_store, "page_checks", lambda *_args: checks)
+
+    pages, result = role_research._pages(
+        cast(Tx, None), cast(Run, SimpleNamespace(run_id=uuid.uuid4()))
+    )
+
+    assert result.verdict is verdict
+    assert result.sources == sources
+    assert [page.host for page in pages] == list(requested)
+    assert [attempt.provider for attempt in attempts] == list(requested)
 
 
 @pytest.mark.req("DIV1-15", "DIV1-04", "JOB-02")
