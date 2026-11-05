@@ -399,7 +399,7 @@ const you =
   (routes: Route[], view: YouView = "conversation", shown: ProfileOut = profile) =>
   () => (
     <Api routes={routes}>
-      <div className="chapter chapter-you on-reading">
+      <div className="career-workspace on-reading">
         <YouChapter workspace={workspace("demo")} profile={shown} initialView={view} />
       </div>
     </Api>

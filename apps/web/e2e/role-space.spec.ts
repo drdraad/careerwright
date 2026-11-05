@@ -47,16 +47,17 @@ async function statesNoSkills(workspace: string) {
 }
 
 const field = (page: Page) => page.getByRole("combobox", { name: "Your job title" });
-const origin = (page: Page) => page.locator(".world-label[data-label='origin']");
+const experience = (page: Page) =>
+  page.getByRole("complementary", { name: "Your starting point" }).getByRole("definition").first();
 const ukTitle = (page: Page, title: string) =>
   page.getByRole("option", { name: new RegExp(`^${title}\\s*,\\s*UK job title \\(ONS\\)$`) });
 
-/** Picks an option and returns how long the world took to answer: the person's light lit. */
-async function answer(page: Page, pick: () => Promise<void>): Promise<number> {
-  await expect(origin(page)).toContainText("Your light comes on with your first answer");
+/** Measures how quickly the first saved answer appears in the person's starting point. */
+async function answer(page: Page, expected: string, pick: () => Promise<void>): Promise<number> {
+  await expect(experience(page)).toHaveText("Not asked yet");
   const started = Date.now();
   await pick();
-  await expect(origin(page)).toContainText("Your light, lit by your answers", {
+  await expect(experience(page)).toHaveText(expected, {
     timeout: ANSWERED_WITHIN_MS,
   });
   return Date.now() - started;
@@ -84,7 +85,9 @@ test("[DIV1-13][DIV1-14][WLD-01] any UK title is offered as you type; picking on
   // Acceptance 2: picking one keeps the exact words, the world answers, and the ESCO
   // occupations in its ISCO-08 group are offered with "None of these is my job".
   await field(page).fill("Registered nurse");
-  const took = await answer(page, () => ukTitle(page, "Registered nurse").click());
+  const took = await answer(page, "Registered nurse", () =>
+    ukTitle(page, "Registered nurse").click(),
+  );
   console.log(`the world answered the first answer in ${took} ms`);
   expect(took).toBeLessThan(ANSWERED_WITHIN_MS);
   await expect(page.getByRole("heading", { name: "Which of these is closest?" })).toBeFocused();
@@ -128,7 +131,7 @@ test("[STATE-11][PROF-14] “I haven't had a job yet” lights the world within 
     page.getByRole("heading", { name: "What do you do now, or what did you do last?" }),
   ).toBeVisible();
 
-  const took = await answer(page, () =>
+  const took = await answer(page, "I haven't had a job yet", () =>
     page.getByRole("button", { name: "I haven't had a job yet" }).click(),
   );
   console.log(`the world answered "I haven't had a job yet" in ${took} ms`);
@@ -217,7 +220,7 @@ test("[DIV1-13][DIV1-03][WLD-01] a title neither list holds is kept in the perso
   ).toBeVisible();
   const own = page.getByRole("option", { name: /^None of these is my job/ });
   await expect(own).toContainText("Use my own words: “Bookkeeping assistant”");
-  const took = await answer(page, () => own.click());
+  const took = await answer(page, "Bookkeeping assistant", () => own.click());
   expect(took).toBeLessThan(ANSWERED_WITHIN_MS);
 
   await expect(
@@ -254,7 +257,7 @@ test("[PROF-09][DIV1-13][WLD-08] a risk phrase at the first question shows the c
   );
   await expect(panel).toContainText("Samaritans: Call 116 123");
   await expect(panel).toContainText("Childline: Call 0800 1111"); // support-policy-12
-  await expect(page.locator(".world")).toHaveAttribute("data-distress", "true");
+  await expect(page.locator(".decision-atmosphere")).toHaveAttribute("data-distress", "true");
   await expect(page.getByRole("option")).toHaveCount(0); // nothing offered in those words
   await field(page).press("Enter");
 
@@ -264,7 +267,7 @@ test("[PROF-09][DIV1-13][WLD-08] a risk phrase at the first question shows the c
   await expect(panel.getByRole("button", { name: "Keep it as my job title" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Skip for now" })).toBeVisible();
   await panel.getByRole("button", { name: "Dismiss the support note" }).click();
-  await expect(page.locator(".world")).toHaveAttribute("data-distress", "false");
+  await expect(page.locator(".decision-atmosphere")).toHaveAttribute("data-distress", "false");
   await expect(field(page)).toBeFocused();
 });
 

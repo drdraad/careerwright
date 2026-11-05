@@ -1,7 +1,7 @@
 // Keyboard only (UI-06): available chapters and the evidence drawer are reachable with Tab and
 // Enter, and closing the drawer returns focus to what opened it; the You chapter completes from
 // the keyboard, its views are tabs, and focus lands on what each decision did. Desktop rail and
-// phone menu.
+// phone rail.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { asBrowser, emulatorToken, talkedWorkspace } from "./api";
 import { chapterUrl, saved, signIn } from "./helpers";
@@ -174,17 +174,14 @@ test("[UI-06][REC1-07] a suggestion opens and becomes a target from the keyboard
 test.describe("phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("[UI-06][UI-09] the chapter menu and the bottom sheet work from the keyboard", async ({
+  test("[UI-06][UI-09] the chapter rail and the bottom sheet work from the keyboard", async ({
     page,
   }) => {
-    const menu = page.getByRole("button", { name: /open chapter menu/ });
     await page.locator("body").focus();
-    await tabTo(page, menu);
-    await page.keyboard.press("Enter");
     const skills = page
       .getByRole("navigation", { name: "Chapters" })
-      .getByRole("link", { name: "Skills" });
-    await tabTo(page, skills, 10);
+      .getByRole("link", { name: /^Skills,/ });
+    await tabTo(page, skills, 20);
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(chapterUrl("skills"));
 

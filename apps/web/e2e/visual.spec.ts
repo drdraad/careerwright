@@ -36,7 +36,7 @@ import {
   signIn,
   youView,
 } from "./helpers";
-import { FIXTURE_WORKSPACE, stack } from "./stack";
+import { FIXTURE_WORKSPACE, stack, WEB_ORIGIN } from "./stack";
 
 const VIEWPORTS = [
   { name: "1440x900", width: 1440, height: 900 },
@@ -1026,7 +1026,9 @@ for (const viewport of VIEWPORTS) {
         title: "Registered nurse",
       });
       const results: Result[] = [];
-      const errors: string[] = [];
+      const errors: { text: string; url: string }[] = [];
+      const missingPlans = new Map<string, number>();
+      const responseChecks: Promise<void>[] = [];
       const pages = new Map<string, Page>();
 
       for (const shot of shots(scratch)) {
@@ -1040,23 +1042,66 @@ for (const viewport of VIEWPORTS) {
           });
           page = await context.newPage();
           page.on("console", (message) => {
-            if (message.type() === "error") errors.push(message.text());
+            if (message.type() === "error") {
+              errors.push({ text: message.text(), url: message.location().url });
+            }
+          });
+          page.on("request", (request) => {
+            const url = new URL(request.url());
+            if (
+              request.method() !== "GET" ||
+              url.origin !== WEB_ORIGIN ||
+              !/^\/api\/v1\/workspaces\/[^/]+\/planning\/plans\/current$/.test(url.pathname)
+            )
+              return;
+            responseChecks.push(
+              request
+                .response()
+                .then(async (response) => {
+                  if (response === null || response.status() !== 404) return;
+                  const body = await response.json();
+                  if (
+                    body?.error?.code === "NOT_FOUND" &&
+                    body.error.stage === "planning" &&
+                    body.error.retryable === false
+                  ) {
+                    missingPlans.set(request.url(), (missingPlans.get(request.url()) ?? 0) + 1);
+                  }
+                })
+                .catch(() => {}),
+            );
           });
           await shot.prepare?.(page);
           if (shot.as !== null) await signIn(page, shot.as, shot.url);
           pages.set(key, page);
         }
+        while (responseChecks.length > 0) await Promise.all(responseChecks.splice(0));
         errors.length = 0;
+        missingPlans.clear();
         await page.goto(shot.url);
         await shot.ready(page);
         const file = `${shot.name}--${viewport.name}.png`;
         const checks = await measure(page, join(directory, file));
-        const unexpected = errors.filter(
-          (line) => !(shot.refused && line.startsWith("Failed to load resource")),
-        );
+        while (responseChecks.length > 0) await Promise.all(responseChecks.splice(0));
+        const unexpected = errors
+          .filter(({ text, url }) => {
+            if (shot.refused && text.startsWith("Failed to load resource")) return false;
+            const expected = missingPlans.get(url) ?? 0;
+            if (
+              expected > 0 &&
+              text ===
+                "Failed to load resource: the server responded with a status of 404 (Not Found)"
+            ) {
+              missingPlans.set(url, expected - 1);
+              return false;
+            }
+            return true;
+          })
+          .map(({ text }) => text);
         results.push({ file, ...checks, errors: [...unexpected] });
       }
 
+      while (responseChecks.length > 0) await Promise.all(responseChecks.splice(0));
       for (const page of pages.values()) await page.context().close();
       writeFileSync(
         join(directory, `checks-${viewport.name}.json`),
