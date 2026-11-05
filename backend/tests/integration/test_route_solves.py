@@ -1143,7 +1143,7 @@ def test_the_routes_chapter_reads_a_solve_s_comparison_pages_and_a_chosen_route(
         "planning_inputs": False,
         "profile": False,
         "capability": True,
-        "target_matrix": True,
+        "target_matrix": False,
         "option_pack": False,
     }
     assert later["changed_since"]["planning_inputs"] is True
