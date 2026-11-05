@@ -342,6 +342,51 @@ describe("[PLAN-01][STATE-06] Plan saves a reviewed computed route", () => {
     });
   });
 
+  it("explains how to recover when replacing a route would change an accepted unfinished step", async () => {
+    window.history.replaceState({}, "", `/?solve_run_id=${RUN}&schedule_index=1`);
+    fakeApi([
+      { method: "GET", path: /\/planning\/plans\/current$/, answer: savedPlan },
+      {
+        method: "GET",
+        path: /\/planning\/solves\/[^/]+$/,
+        answer: { run: { run_id: RUN, status: "complete" }, target_title: savedPlan.target_title },
+      },
+      { method: "GET", path: /\/schedules\/1$/, answer: planRoute },
+      { method: "GET", path: /\/planning\/plans\/revision-preview$/, answer: revision },
+      { method: "GET", path: /\/planning\/plans\/changes$/, answer: { new_solve_needed: false } },
+      { method: "GET", path: /\/planning\/plans\/history$/, answer: [] },
+      {
+        method: "POST",
+        path: /\/planning\/plans$/,
+        status: 422,
+        answer: {
+          error: {
+            code: "VALIDATION_FAILED",
+            message: "never shown",
+            retryable: false,
+            stage: "planning",
+            correlation_id: "c-commitment",
+            details: { reason: "ongoing_step_not_modelled", variant_id: "step-1" },
+          },
+        },
+      },
+    ]);
+    render(<PlanChapter workspaceId="workspace" />, { wrapper });
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: /I have reviewed this route/ }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Save this plan" }));
+
+    expect(await screen.findByText("An accepted step would change")).toBeVisible();
+    expect(screen.getByText(/If its accepted commitment is no longer correct/)).toBeVisible();
+    expect(screen.getByRole("link", { name: "Review saved plan" })).toHaveAttribute(
+      "href",
+      `/w/${savedPlan.workspace_id}/plan`,
+    );
+    expect(screen.getByText("Reference c-commitment")).toBeVisible();
+    expect(screen.queryByText("never shown")).toBeNull();
+  });
+
   it("labels a remaining-horizon revision and does not ask for full-horizon acknowledgment", async () => {
     window.history.replaceState({}, "", `/?solve_run_id=${RUN}&schedule_index=1`);
     const previous = {

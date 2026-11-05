@@ -17,7 +17,7 @@ from careerwright.evidence.option_research import (
     ResearchStatus,
     ResearchView,
 )
-from careerwright.evidence.records import AttemptStatus, RightsClass
+from careerwright.evidence.records import AttemptStatus, ExtractionOutcome, RightsClass
 from careerwright.identity.keyring import Keyring
 from careerwright.vocabulary import DataMode, WorkState
 
@@ -99,12 +99,42 @@ def test_extraction_keeps_research_running_after_fetch_finishes(
         run_status=WorkState.RUNNING,
         not_run=None,
         failure_class=None,
+        outcome=None,
     )
 
     view = _research(monkeypatch, rights=RightsClass.COURSE_PROVIDER.value, extraction=extraction)
 
     assert view.status is ResearchStatus.READING
     assert view.coverage is OptionResearchCoverage.PARTIAL
+    assert view.pages_read == 1
+
+
+@pytest.mark.req("STATE-02", "OPTN-16")
+@pytest.mark.parametrize(
+    ("outcome", "coverage"),
+    [
+        (ExtractionOutcome.OPTIONS_RECORDED, OptionResearchCoverage.COMPLETE),
+        (ExtractionOutcome.NO_OPTION_FOUND, OptionResearchCoverage.COMPLETE),
+        (ExtractionOutcome.OPTIONS_UNVERIFIED, OptionResearchCoverage.PARTIAL),
+    ],
+)
+def test_completed_extractions_keep_unverified_option_claims_distinct_from_empty_results(
+    monkeypatch: pytest.MonkeyPatch,
+    outcome: ExtractionOutcome,
+    coverage: OptionResearchCoverage,
+) -> None:
+    extraction = SimpleNamespace(
+        run_id=uuid.uuid4(),
+        run_status=WorkState.COMPLETE,
+        not_run=None,
+        failure_class=None,
+        outcome=outcome,
+    )
+
+    view = _research(monkeypatch, rights=RightsClass.COURSE_PROVIDER.value, extraction=extraction)
+
+    assert view.status is ResearchStatus.COMPLETED
+    assert view.coverage is coverage
     assert view.pages_read == 1
 
 

@@ -7,6 +7,7 @@ import type {
   ReplanPayment,
   RouteDetail,
 } from "@/generated/api";
+import { ApiError } from "@/lib/api";
 import { chapterHref } from "@/lib/chapters";
 import { formatDay, formatMonth, isDayInput, londonToday } from "@/lib/dates";
 import { formatMoney, formatSignedMoney, parseMoneyInput } from "@/lib/money";
@@ -28,6 +29,7 @@ import {
 import { useCheckpoint, useProfile } from "@/lib/queries";
 import { useRouteComparison } from "@/lib/routeQueries";
 import { ROUTE_CONDITION } from "@/lib/routeWords";
+import { Alert } from "./Alert";
 import { Button } from "./Button";
 import { LoadingState } from "./LoadingState";
 import { RequestFailure } from "./PageState";
@@ -309,6 +311,10 @@ function CandidatePreview({
 }) {
   const accountingRequired =
     (current?.progress?.completed_steps?.length ?? 0) > 0 && route.basis.replan == null;
+  const commitmentChanged =
+    error instanceof ApiError &&
+    error.code === "VALIDATION_FAILED" &&
+    error.body?.details?.reason === "ongoing_step_not_modelled";
   return (
     <section className="grid gap-16" aria-label="Route to choose">
       <h2 className="section-title">Review this route before choosing it</h2>
@@ -356,7 +362,25 @@ function CandidatePreview({
           Save this plan
         </Button>
       </div>
-      {error != null && <RequestFailure error={error} />}
+      {commitmentChanged && current ? (
+        <Alert
+          tone="error"
+          title="An accepted step would change"
+          actions={
+            <Link className="btn btn-secondary" href={chapterHref(current.workspace_id, "plan")}>
+              Review saved plan
+            </Link>
+          }
+        >
+          <p>
+            Keep the unfinished step as it is. If its accepted commitment is no longer correct,
+            update it in your saved plan before choosing a different route.
+          </p>
+          <p className="muted">Reference {error.body?.correlation_id}</p>
+        </Alert>
+      ) : error != null ? (
+        <RequestFailure error={error} />
+      ) : null}
     </section>
   );
 }

@@ -118,6 +118,45 @@ function shown(
 }
 
 describe("[DIV1-15][MODEL-08] research this role", () => {
+  it("does not offer a new search when earlier research could not be loaded", async () => {
+    const list: Route = {
+      method: "GET",
+      path: /\/role-research$/,
+      status: 503,
+      answer: {
+        error: {
+          code: "STORE_UNAVAILABLE",
+          message: "",
+          retryable: true,
+          stage: "storage",
+          correlation_id: "c1",
+          details: {},
+        },
+      },
+    };
+    const sent = fakeApi([list]);
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retryDelay: 0 } } })}
+      >
+        <RoleResearchList
+          workspaceId={WS}
+          profile={profile}
+          titles={[{ title: TITLE, why: "idea" }]}
+          canWrite
+        />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByRole("alert");
+    expect(screen.queryByRole("button", { name: ROLE_RESEARCH.start })).toBeNull();
+    list.status = 200;
+    list.answer = [];
+    await userEvent.click(screen.getByRole("button", { name: "Try loading research again" }));
+    expect(await screen.findByRole("button", { name: ROLE_RESEARCH.start })).toBeVisible();
+    expect(sent.filter((item) => item.method === "POST")).toHaveLength(0);
+  });
+
   it("shows the estimated cost first, then sends only the title, on the version shown", async () => {
     const { sent, user } = shown(
       [],
@@ -167,6 +206,37 @@ describe("[DIV1-15][MODEL-08] research this role", () => {
 
     await waitFor(() =>
       expect(sent.some((s) => s.path === `/v1/workspaces/${WS}/runs/s1/cancel`)).toBe(true),
+    );
+  });
+
+  it("offers a retry when starting the automatic page reading fails", async () => {
+    const ready = research({ state: "ready_to_read", search: run("s1"), candidates: 3 });
+    const reading: Route = {
+      method: "POST",
+      path: /\/role-research\/r1\/reading$/,
+      status: 503,
+      answer: {
+        error: {
+          code: "STORE_UNAVAILABLE",
+          message: "",
+          retryable: true,
+          stage: "storage",
+          correlation_id: "c1",
+          details: {},
+        },
+      },
+    };
+    const { sent, user } = shown([ready], [reading]);
+
+    const retry = await screen.findByRole("button", { name: "Try reading the pages again" });
+    reading.status = 202;
+    reading.answer = research({ state: "reading", reading: run("a1", "running") });
+    await user.click(retry);
+
+    await waitFor(() =>
+      expect(sent.filter((item) => item.path.endsWith("/role-research/r1/reading"))).toHaveLength(
+        2,
+      ),
     );
   });
 

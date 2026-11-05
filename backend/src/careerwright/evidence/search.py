@@ -349,11 +349,14 @@ def sealed_search_input(raw: bytes) -> SearchInput | RoleSearchInput | OptionSea
 
 def _grounding_key(url: str) -> str:
     """One page's address however it is written: the fetch checks' canonical form (scheme
-    and host case, the default port, the fragment dropped), then without a trailing "/" and in
-    one case. An address the checks refuse keeps its own text: no checked candidate matches
-    it."""
+    and host case, the default port, the fragment dropped), then without a trailing path "/".
+    Paths keep their case and queries stay unchanged: they can name different pages. An address the
+    checks refuse keeps its own text: no checked candidate matches it."""
     checked = check_url(url.strip())
-    return (checked.url if isinstance(checked, CheckedUrl) else url).strip().rstrip("/").lower()
+    if not isinstance(checked, CheckedUrl):
+        return url.strip()
+    parts = urlsplit(checked.url)
+    return parts._replace(path=parts.path.rstrip("/")).geturl()
 
 
 def _words(text: str) -> str:

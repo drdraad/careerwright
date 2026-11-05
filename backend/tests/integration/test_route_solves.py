@@ -1020,6 +1020,24 @@ def test_the_routes_chapter_reads_a_solve_s_comparison_pages_and_a_chosen_route(
     )
     assert committed.status_code == 201, committed.text
     assert committed.json()["commitments"] == [C01_FULL_TIME]
+    replacement = person.api.write(
+        "POST",
+        plans,
+        person.token,
+        {
+            "expected_version": 2,
+            "solve_run_id": run_id,
+            "schedule_index": 0,
+            "assumptions_confirmed": True,
+            "full_horizon_accounting_acknowledged": True,
+        },
+    )
+    assert replacement.status_code == 422, replacement.text
+    assert replacement.json()["error"]["details"] == {
+        "reason": "ongoing_step_not_modelled",
+        "variant_id": C01_FULL_TIME,
+    }
+    assert person.api.get(f"{plans}/current", person.token).json() == committed.json()
     reported = person.api.write(
         "POST",
         f"{plans}/progress",

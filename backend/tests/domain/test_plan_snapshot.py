@@ -11,7 +11,8 @@ from icalendar import Calendar
 from careerwright.api.routes_plans import export_data
 from careerwright.capability.commands import CapabilityData
 from careerwright.db import Tx
-from careerwright.errors import CareerwrightError
+from careerwright.errors import CareerwrightError, ErrorCode
+from careerwright.identity.access import Actor
 from careerwright.identity.keyring import Keyring
 from careerwright.money import Money
 from careerwright.planning import plans, store
@@ -19,6 +20,7 @@ from careerwright.planning.calendar import calendar_text
 from careerwright.planning.comparison import AccountingPayment, Gate, ReplanAccounting, route_detail
 from careerwright.planning.compiler import compile_input
 from careerwright.planning.plan_records import (
+    ChoosePlan,
     PlanActivity,
     PlanEvent,
     PlanProgress,
@@ -444,6 +446,82 @@ def test_revised_step_keeps_completion_report_but_never_marks_changed_work_compl
     assert removed.completed_steps == []
     assert removed.activity == [activity]
     assert _stable_step_ids(previous, snapshot.route.model_copy(update={"steps": []})) == set()
+
+
+@pytest.mark.req("PLAN-07", "STATE-06")
+@pytest.mark.parametrize("change", ["removed", "changed", "retained", "completed", "retracted"])
+def test_replacing_a_plan_preserves_unfinished_accepted_commitments(
+    monkeypatch: pytest.MonkeyPatch, change: str
+) -> None:
+    snapshot = trace_b().model_copy(update={"commitments": ["TRACE-01/B"]})
+    if change == "completed":
+        snapshot = snapshot.model_copy(
+            update={"progress": PlanProgress(completed_steps=["TRACE-01/B"])}
+        )
+    elif change == "retracted":
+        snapshot = snapshot.model_copy(update={"commitments": []})
+    [step] = snapshot.route.steps
+    proposed = snapshot.route.model_copy(
+        update={
+            "steps": []
+            if change in ("removed", "completed", "retracted")
+            else [step]
+            if change == "retained"
+            else [step.model_copy(update={"finish_date": date(2027, 5, 1)})]
+        }
+    )
+    monkeypatch.setattr(plans, "visible_workspace", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(store, "plan", lambda *_args, **_kwargs: snapshot)
+    monkeypatch.setattr(
+        plans,
+        "_fresh_route",
+        lambda *_args: (
+            SimpleNamespace(
+                result=SimpleNamespace(
+                    **snapshot.source.model_dump(),
+                    **snapshot.search.model_dump(),
+                    target_title=snapshot.target_title,
+                ),
+                solve=snapshot.source,
+            ),
+            proposed,
+            SimpleNamespace(profile_version=1, version=1),
+            SimpleNamespace(version=1),
+        ),
+    )
+    saved: list[PlanSnapshot] = []
+    monkeypatch.setattr(store, "insert_plan", lambda _tx, plan: saved.append(plan))
+
+    def choose() -> PlanSnapshot:
+        return plans.choose_plan(
+            cast(Tx, None),
+            Actor(snapshot.selected_by, "person@example.org", "Person"),
+            snapshot.workspace_id,
+            ChoosePlan(
+                expected_version=snapshot.version,
+                solve_run_id=snapshot.source.solve_run_id,
+                schedule_index=0,
+                assumptions_confirmed=True,
+                full_horizon_accounting_acknowledged=True,
+            ),
+            keyring=cast(Keyring, None),
+            data=cast(CapabilityData, None),
+            now=datetime(2027, 1, 1, tzinfo=UTC),
+        )
+
+    if change in ("removed", "changed"):
+        with pytest.raises(CareerwrightError) as refused:
+            choose()
+        assert refused.value.code is ErrorCode.VALIDATION_FAILED
+        assert refused.value.details == {
+            "reason": "ongoing_step_not_modelled",
+            "variant_id": "TRACE-01/B",
+        }
+        assert saved == []
+    else:
+        selected = choose()
+        assert saved == [selected]
+        assert selected.commitments == (["TRACE-01/B"] if change == "retained" else [])
 
 
 def test_progress_requests_require_the_fields_for_their_kind() -> None:

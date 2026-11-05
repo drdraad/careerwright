@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 import { CHAPTERS, type ChapterId, chapterHref } from "@/lib/chapters";
 import type { Journey } from "@/lib/journey";
@@ -50,6 +51,7 @@ function BlockedChapter({
 }
 
 export function ChapterView({ chapter }: { chapter: ChapterId }) {
+  const search = useSearchParams().toString();
   const { workspace, profile, profileError, retryProfile, journey, planCandidate } =
     useWorkspaceData();
   const label = CHAPTERS.find((item) => item.id === chapter)?.label ?? "";
@@ -94,9 +96,9 @@ export function ChapterView({ chapter }: { chapter: ChapterId }) {
       ) : chapter === "options" ? (
         <OptionsChapter workspaceId={workspace.workspace_id} />
       ) : chapter === "routes" ? (
-        <RoutesChapter workspaceId={workspace.workspace_id} />
+        <RoutesChapter key={search} workspaceId={workspace.workspace_id} />
       ) : chapter === "plan" ? (
-        <PlanChapter workspaceId={workspace.workspace_id} />
+        <PlanChapter key={search} workspaceId={workspace.workspace_id} />
       ) : (
         <RolesChapter workspaceId={workspace.workspace_id} profile={profile} />
       );

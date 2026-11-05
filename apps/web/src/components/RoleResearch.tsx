@@ -16,6 +16,7 @@ import {
 } from "@/lib/queries";
 import { ROLE_RESEARCH, SEARCH_EMPTY_REASON } from "@/lib/vocabulary";
 import { Button } from "./Button";
+import { LoadingState } from "./LoadingState";
 import { RequestFailure } from "./PageState";
 import { RunEstimate } from "./RunEstimate";
 
@@ -65,17 +66,28 @@ export function RoleResearchList({
       <p className="small measure">
         {ROLE_RESEARCH.intro} {ROLE_RESEARCH.sends}
       </p>
-      {researches.error !== null && <RequestFailure error={researches.error} />}
-      {titles.map((item) => (
-        <RoleResearch
-          key={item.title}
-          workspaceId={workspaceId}
-          profile={profile}
-          item={item}
-          research={latestFor(researches.data ?? [], item.title)}
-          canWrite={canWrite}
+      {researches.error !== null && (
+        <RequestFailure
+          error={researches.error}
+          actions={
+            <Button onClick={() => void researches.refetch()}>Try loading research again</Button>
+          }
         />
-      ))}
+      )}
+      {researches.data === undefined && !researches.error && (
+        <LoadingState stage="Loading earlier role research" />
+      )}
+      {researches.data !== undefined &&
+        titles.map((item) => (
+          <RoleResearch
+            key={item.title}
+            workspaceId={workspaceId}
+            profile={profile}
+            item={item}
+            research={latestFor(researches.data, item.title)}
+            canWrite={canWrite}
+          />
+        ))}
     </section>
   );
 }
@@ -143,6 +155,17 @@ function RoleResearch({
         <div>
           <Button variant="secondary" onClick={() => cancel.mutate(activeRun.run_id)}>
             {ROLE_RESEARCH.cancel}
+          </Button>
+        </div>
+      )}
+      {readable && read.error !== null && (
+        <div>
+          <Button
+            variant="secondary"
+            onClick={() => read.mutate(research.research_id)}
+            disabledReason={read.isPending ? "Starting the page checks…" : undefined}
+          >
+            Try reading the pages again
           </Button>
         </div>
       )}

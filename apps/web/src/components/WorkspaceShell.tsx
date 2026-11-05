@@ -1,8 +1,8 @@
 "use client";
 // One workspace session and atmosphere across all six chapters. Chapters share the same server
 // state, account controls and evidence drawer; support stills the world while it is shown.
-import { usePathname, useRouter, useSelectedLayoutSegment } from "next/navigation";
-import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams, useSelectedLayoutSegment } from "next/navigation";
+import { createContext, type ReactNode, useContext, useEffect } from "react";
 import type { ProfileOut, WorkspaceOut } from "@/generated/api";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -11,7 +11,6 @@ import type { StreamStatus } from "@/lib/events";
 import { type Journey, journeyOf } from "@/lib/journey";
 import { readPlanCandidate, useCurrentPlan } from "@/lib/planQueries";
 import {
-  firstLoadFailed,
   refreshFailed,
   useCheckpoint,
   useMe,
@@ -24,6 +23,7 @@ import { useLatestRouteSolve } from "@/lib/routeQueries";
 import { useSkills } from "@/lib/skillQueries";
 import { worldFromProfile } from "@/lib/world/model";
 import { SupportShown, useSupportPanels, useWorldSettings } from "@/lib/world/settings";
+import { Button } from "./Button";
 import { ChapterMenu, ChapterRail } from "./ChapterNav";
 import { ConversationTone } from "./ConversationTone";
 import { DecisionAtmosphere } from "./DecisionAtmosphere";
@@ -66,17 +66,8 @@ export function WorkspaceShell({
   const auth = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const [candidateCheck, setCandidateCheck] = useState<{
-    pathname: string;
-    candidate: boolean;
-  } | null>(null);
-  const planCandidate = candidateCheck?.pathname === pathname ? candidateCheck.candidate : null;
-  useEffect(() => {
-    setCandidateCheck({
-      pathname,
-      candidate: pathname.endsWith("/plan") && readPlanCandidate(window.location.search) !== null,
-    });
-  }, [pathname]);
+  const search = useSearchParams();
+  const planCandidate = chapter === "plan" && readPlanCandidate(search.toString()) !== null;
   const { evidence, close } = useEvidence();
   const world = useWorldSettings();
   // A calm support panel is showing (each panel reports itself): the world stays still.
@@ -129,8 +120,12 @@ export function WorkspaceShell({
   if (auth.state.status !== "signed_in") return <PageLoading stage="Checking your sign-in" />;
   // Only a first load that fails replaces the shell. A failed refresh (Careerwright restarting) keeps
   // what was last loaded on screen and says so in the strip; the next event refreshes it.
-  if (firstLoadFailed(me, workspace)) {
-    const error = me.error ?? workspace.error;
+  const prerequisite =
+    chapter === "routes" && hasTarget ? checkpoint : chapter === "plan" ? currentPlan : null;
+  const required = [me, workspace, ...(prerequisite === null ? [] : [prerequisite])];
+  const failed = required.find((load) => load.isError && load.data === undefined);
+  if (failed) {
+    const error = failed.error;
     const signOut = (
       <button type="button" className="btn btn-secondary" onClick={() => void auth.signOut()}>
         Sign out
@@ -150,6 +145,9 @@ export function WorkspaceShell({
           error={error}
           actions={
             <>
+              <Button onClick={() => void Promise.all(required.map((load) => load.refetch()))}>
+                Try again
+              </Button>
               <a className="btn btn-secondary" href="/">
                 Your workspaces
               </a>
@@ -161,6 +159,13 @@ export function WorkspaceShell({
     );
   }
   if (workspace.data === undefined) return <PageLoading stage="Opening your workspace" />;
+  if (prerequisite !== null && prerequisite.data === undefined) {
+    return (
+      <PageLoading
+        stage={chapter === "plan" ? "Checking your saved plan" : "Checking what the routes need"}
+      />
+    );
+  }
 
   const data: WorkspaceData = {
     workspace: workspace.data,

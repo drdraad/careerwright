@@ -15414,7 +15414,7 @@
         "properties": {
           "state": {
             "$ref": "#/components/schemas/ModelExtractionState",
-            "description": "no_posting_found: the page was read and no job advert was found on it, which is not evidence that there are no vacancies."
+            "description": "no_posting_found: the page was read and no job advert was found on it, which is not evidence that there are no vacancies. options_read: verified course or funding records were recorded. no_option_found: this page was read and no course or funding scheme was found."
           },
           "not_run": {
             "anyOf": [
@@ -15461,7 +15461,7 @@
           "failure_class"
         ],
         "title": "ModelExtractionOut",
-        "description": "How model extraction went for a retrieved page whose structured data gave no posting\n(fix round 2). Its claims are `validation: model`; nothing here says there is no\nvacancy."
+        "description": "How model extraction went for a retrieved job or option page. Its claims are\n`validation: model`; nothing here establishes that no vacancy or option exists."
       },
       "ModelExtractionState": {
         "type": "string",
@@ -15470,6 +15470,8 @@
           "postings_read",
           "postings_conflicting",
           "no_posting_found",
+          "options_read",
+          "no_option_found",
           "not_read",
           "not_run"
         ],
@@ -26464,7 +26466,7 @@
                 "type": "null"
               }
             ],
-            "description": "For a page whose structured data gave no posting: its model extraction."
+            "description": "For a page without structured job or option records: its model extraction."
           },
           "transient": {
             "type": "boolean",

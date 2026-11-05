@@ -18,6 +18,7 @@ from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
+from careerwright.api.research_schemas import ModelExtractionOut
 from careerwright.config import ApiSettings
 from careerwright.evidence import extraction_runs
 from careerwright.evidence.acquire import AcquisitionResult, Pacer, acquire_page
@@ -417,6 +418,26 @@ def test_an_extraction_s_state_follows_what_it_recorded_then_its_run(
     status: WorkState, outcome: ExtractionOutcome | None, state: ModelExtractionState
 ) -> None:
     assert extraction_state(_extraction_row(status, outcome)) is state
+
+
+@pytest.mark.req("STATE-02", "OPTN-16")
+@pytest.mark.parametrize("outcome", list(ExtractionOutcome))
+def test_every_recorded_extraction_outcome_can_be_served_from_its_acquisition(
+    outcome: ExtractionOutcome,
+) -> None:
+    expected = {
+        ExtractionOutcome.POSTINGS_RECORDED: "postings_read",
+        ExtractionOutcome.NO_POSTING_FOUND: "no_posting_found",
+        ExtractionOutcome.POSTINGS_UNVERIFIED: "not_read",
+        ExtractionOutcome.POSTINGS_CONFLICTING: "postings_conflicting",
+        ExtractionOutcome.OPTIONS_RECORDED: "options_read",
+        ExtractionOutcome.NO_OPTION_FOUND: "no_option_found",
+        ExtractionOutcome.OPTIONS_UNVERIFIED: "not_read",
+    }
+
+    shown = ModelExtractionOut.of(_extraction_row(WorkState.COMPLETE, outcome))
+
+    assert shown.model_dump(mode="json")["state"] == expected[outcome]
 
 
 def test_postings_past_the_limit_are_dropped_not_read() -> None:

@@ -52,13 +52,14 @@ from careerwright.money import Money
 
 
 class ModelExtractionOut(ResponseModel):
-    """How model extraction went for a retrieved page whose structured data gave no posting
-    (fix round 2). Its claims are `validation: model`; nothing here says there is no
-    vacancy."""
+    """How model extraction went for a retrieved job or option page. Its claims are
+    `validation: model`; nothing here establishes that no vacancy or option exists."""
 
     state: ModelExtractionState = Field(
         description="no_posting_found: the page was read and no job advert was found on it, "
-        "which is not evidence that there are no vacancies."
+        "which is not evidence that there are no vacancies. options_read: verified course "
+        "or funding records were recorded. no_option_found: this page was read and no "
+        "course or funding scheme was found."
     )
     not_run: ExtractionNotRun | None = Field(description="Why no extraction run was started.")
     run_id: uuid.UUID | None = Field(description="The extraction run, if one was started.")
@@ -94,7 +95,7 @@ class SourceAttemptOut(ResponseModel):
         "its postings could not be read from its structured data."
     )
     model_extraction: ModelExtractionOut | None = Field(
-        description="For a page whose structured data gave no posting: its model extraction."
+        description="For a page without structured job or option records: its model extraction."
     )
     transient: bool
     retry_of: uuid.UUID | None
