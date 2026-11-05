@@ -353,7 +353,7 @@ def _pages(tx: Tx, reading: Run) -> tuple[list[PageView], Corroboration]:
     evidence = [
         PageEvidence(
             ref=str(a.attempt_id),
-            host=a.provider,
+            host=_host(a.final_url) or a.provider,
             rights_class=RightsClass(a.rights_class) if a.rights_class else None,
             check=checks[a.attempt_id],
         )
