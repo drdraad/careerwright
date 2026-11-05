@@ -469,6 +469,8 @@ class ModelExtractionState(StrEnum):
     # (review C M5).
     POSTINGS_CONFLICTING = "postings_conflicting"
     NO_POSTING_FOUND = "no_posting_found"  # read, and no advert found: not "none found"
+    OPTIONS_READ = "options_read"  # verified course or funding records were recorded
+    NO_OPTION_FOUND = "no_option_found"  # read, and no course or funding scheme found
     NOT_READ = "not_read"  # its run failed or was cancelled first, or verified nothing
     NOT_RUN = "not_run"  # never started: `not_run` says why
 
@@ -478,6 +480,9 @@ _RECORDED_STATES = {
     ExtractionOutcome.POSTINGS_CONFLICTING: ModelExtractionState.POSTINGS_CONFLICTING,
     ExtractionOutcome.NO_POSTING_FOUND: ModelExtractionState.NO_POSTING_FOUND,
     ExtractionOutcome.POSTINGS_UNVERIFIED: ModelExtractionState.NOT_READ,
+    ExtractionOutcome.OPTIONS_RECORDED: ModelExtractionState.OPTIONS_READ,
+    ExtractionOutcome.NO_OPTION_FOUND: ModelExtractionState.NO_OPTION_FOUND,
+    ExtractionOutcome.OPTIONS_UNVERIFIED: ModelExtractionState.NOT_READ,
 }
 
 

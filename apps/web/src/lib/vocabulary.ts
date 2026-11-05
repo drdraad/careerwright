@@ -646,15 +646,14 @@ export const EMPTY_REASON: Record<EmptyReason, { title: string; detail: string }
   },
 };
 
-/** How a page went that Careerwright's model read for a job advert (fix round 3, review C M5).
- * None says there are no vacancies. */
+/** What a page reading verified; failure and an empty result stay distinct. */
 export const MODEL_EXTRACTION_STATE: Record<
   ModelExtractionState,
   { title: string; detail: string }
 > = {
   pending: {
     title: "Careerwright is reading this page",
-    detail: "Its job advert, if it has one, appears here when the reading is done.",
+    detail: "Details it can verify appear here when the reading is done.",
   },
   postings_read: {
     title: "Careerwright read a job advert on this page",
@@ -669,13 +668,25 @@ export const MODEL_EXTRACTION_STATE: Record<
     title: "Careerwright read this page and found no job advert on it",
     detail: "This isn't a sign there are no vacancies. Paste the advert, or try another page.",
   },
+  options_read: {
+    title: "Careerwright checked course or funding details on this page",
+    detail:
+      "Quoted values matched the page's own words. Check the source and current terms before relying on them.",
+  },
+  no_option_found: {
+    title: "Careerwright read this page and found no course or funding details",
+    detail:
+      "This does not establish that no options exist. Try another page or add an option you know.",
+  },
   not_read: {
-    title: "Careerwright couldn't read a job advert on this page",
-    detail: "This isn't a sign there are no vacancies. Paste the advert, or try another page.",
+    title: "Careerwright couldn't verify details from this page",
+    detail:
+      "This does not establish that no vacancies or training options exist. Paste the relevant details, or try another page.",
   },
   not_run: {
     title: "Careerwright didn't read this page",
-    detail: "This isn't a sign there are no vacancies. Paste the advert, or try another page.",
+    detail:
+      "This does not establish that no vacancies or training options exist. Paste the relevant details, or try another page.",
   },
 };
 

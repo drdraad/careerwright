@@ -17,6 +17,7 @@ from typing import Any
 
 from pydantic_ai import Agent, NativeOutput, RunContext
 from pydantic_ai.capabilities import AbstractCapability, NativeTool
+from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import (
     ModelMessage,
     ModelResponse,
@@ -52,21 +53,27 @@ def searched(messages: list[ModelMessage]) -> tuple[list[str], list[str]]:
     queries it ran), from the native tool parts of the run's responses."""
     sources: list[str] = []
     queries: list[str] = []
+    completed = False
     for message in messages:
         if not isinstance(message, ModelResponse):
             continue
         for part in message.parts:
-            if isinstance(part, NativeToolReturnPart) and isinstance(part.content, dict):
+            if isinstance(part, NativeToolReturnPart) and part.tool_name == "web_search":
+                if not isinstance(part.content, dict) or part.content.get("status") != "completed":
+                    raise UnexpectedModelBehavior("The native web search did not complete.")
+                completed = True
                 listed: Any = part.content.get("sources")
                 for source in listed if isinstance(listed, list) else []:
                     if isinstance(source, dict) and isinstance(source.get("url"), str):
                         sources.append(source["url"])
-            elif isinstance(part, NativeToolCallPart):
+            elif isinstance(part, NativeToolCallPart) and part.tool_name == "web_search":
                 args: Any = part.args if isinstance(part.args, dict) else {}
                 if isinstance(args.get("query"), str):
                     queries.append(args["query"][:200])
                 if isinstance(args.get("url"), str):  # an open-page action
                     sources.append(args["url"])
+    if not completed:
+        raise UnexpectedModelBehavior("The reply has no completed native web search.")
     return list(dict.fromkeys(sources)), queries
 
 

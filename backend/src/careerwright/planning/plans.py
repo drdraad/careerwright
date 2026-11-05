@@ -477,6 +477,23 @@ def choose_plan(
     solve, route, inputs, capability = _fresh_route(
         tx, workspace_id, request.solve_run_id, request.schedule_index, keyring, data
     )
+    stable = _stable_step_ids(previous, route) if previous else set()
+    if previous is not None:
+        unfinished = next(
+            (
+                variant_id
+                for variant_id in previous.commitments
+                if variant_id not in previous.progress.completed_steps and variant_id not in stable
+            ),
+            None,
+        )
+        if unfinished is not None:
+            raise CareerwrightError(
+                ErrorCode.VALIDATION_FAILED,
+                "Keep the unfinished step or retract its accepted commitment before replacing it.",
+                stage=ErrorStage.PLANNING,
+                details={"reason": "ongoing_step_not_modelled", "variant_id": unfinished},
+            )
     if (
         previous is not None
         and previous.progress.completed_steps
@@ -525,11 +542,7 @@ def choose_plan(
         events=events,
         next_action=_next_action(events, progress, now),
         progress=progress,
-        commitments=[
-            variant_id
-            for variant_id in previous.commitments
-            if variant_id in _stable_step_ids(previous, route)
-        ]
+        commitments=[variant_id for variant_id in previous.commitments if variant_id in stable]
         if previous
         else [],
     )

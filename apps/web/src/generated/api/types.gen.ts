@@ -4692,13 +4692,12 @@ export type MissingFact = typeof MissingFact[keyof typeof MissingFact];
 /**
  * ModelExtractionOut
  *
- * How model extraction went for a retrieved page whose structured data gave no posting
- * (fix round 2). Its claims are `validation: model`; nothing here says there is no
- * vacancy.
+ * How model extraction went for a retrieved job or option page. Its claims are
+ * `validation: model`; nothing here establishes that no vacancy or option exists.
  */
 export type ModelExtractionOut = {
     /**
-     * no_posting_found: the page was read and no job advert was found on it, which is not evidence that there are no vacancies.
+     * no_posting_found: the page was read and no job advert was found on it, which is not evidence that there are no vacancies. options_read: verified course or funding records were recorded. no_option_found: this page was read and no course or funding scheme was found.
      */
     state: ModelExtractionState;
     /**
@@ -4727,6 +4726,8 @@ export const ModelExtractionState = {
     POSTINGS_READ: 'postings_read',
     POSTINGS_CONFLICTING: 'postings_conflicting',
     NO_POSTING_FOUND: 'no_posting_found',
+    OPTIONS_READ: 'options_read',
+    NO_OPTION_FOUND: 'no_option_found',
     NOT_READ: 'not_read',
     NOT_RUN: 'not_run'
 } as const;
@@ -11173,7 +11174,7 @@ export type SourceAttemptOut = {
      */
     extraction: Extraction | null;
     /**
-     * For a page whose structured data gave no posting: its model extraction.
+     * For a page without structured job or option records: its model extraction.
      */
     model_extraction: ModelExtractionOut | null;
     /**

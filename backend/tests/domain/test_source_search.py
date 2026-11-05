@@ -9,7 +9,14 @@ from typing import Any
 import pytest
 from pydantic_ai import capture_run_messages
 from pydantic_ai.exceptions import UnexpectedModelBehavior
-from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    NativeToolCallPart,
+    NativeToolReturnPart,
+    TextPart,
+)
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.usage import RequestUsage
 
@@ -277,6 +284,76 @@ def test_an_unusable_answer_ends_the_run_without_a_repair_request() -> None:
     assert classify_failure(raised.value).failure is FailureClass.INVALID_MODEL_OUTPUT
     assert provider.requests == 1  # a repair would pay for every search again
     assert len([m for m in messages if isinstance(m, ModelRequest)]) == 1
+
+
+@pytest.mark.req("STATE-02", "ACQ-06")
+@pytest.mark.parametrize("status", [None, "failed", "in_progress"])
+def test_an_empty_answer_without_a_completed_search_is_a_failure(status: str | None) -> None:
+    parts: list[Any] = [TextPart('{"candidates": []}')]
+    if status is not None:
+        parts[:0] = [
+            NativeToolCallPart(
+                tool_name="web_search", tool_call_id="ws_1", args={"query": "nursing Leeds"}
+            ),
+            NativeToolReturnPart(
+                tool_name="web_search",
+                tool_call_id="ws_1",
+                content={"status": status, "sources": []},
+            ),
+        ]
+    provider = Provider(parts)
+
+    with pytest.raises(UnexpectedModelBehavior) as raised:
+        run_search(
+            provider.model(), ModelMode.CONTRIBUTOR, CONTEXT.model_dump_json().encode(), ignore
+        )
+
+    assert classify_failure(raised.value).failure is FailureClass.INVALID_MODEL_OUTPUT
+    assert provider.requests == 1
+
+
+@pytest.mark.req("STATE-02", "ACQ-06")
+def test_a_completed_search_that_returned_no_page_can_be_an_empty_success() -> None:
+    provider = Provider(
+        [
+            NativeToolCallPart(
+                tool_name="web_search", tool_call_id="ws_1", args={"query": "nursing Leeds"}
+            ),
+            NativeToolReturnPart(
+                tool_name="web_search",
+                tool_call_id="ws_1",
+                content={"status": "completed", "sources": []},
+            ),
+            TextPart('{"candidates": []}'),
+        ]
+    )
+
+    proposal = run_search(
+        provider.model(), ModelMode.CONTRIBUTOR, CONTEXT.model_dump_json().encode(), ignore
+    )
+
+    assert proposal.empty_reason is SearchEmptyReason.SEARCH_RETURNED_NOTHING
+    assert proposal.queries == ["nursing Leeds"]
+    assert provider.requests == 1
+
+
+@pytest.mark.req("STATE-02", "ACQ-06")
+def test_a_failed_search_is_not_hidden_by_another_completed_search() -> None:
+    parts = search_parts(request(), "")
+    parts.insert(
+        -1,
+        NativeToolReturnPart(
+            tool_name="web_search", tool_call_id="ws_2", content={"status": "failed"}
+        ),
+    )
+    provider = Provider(parts)
+
+    with pytest.raises(UnexpectedModelBehavior):
+        run_search(
+            provider.model(), ModelMode.CONTRIBUTOR, CONTEXT.model_dump_json().encode(), ignore
+        )
+
+    assert provider.requests == 1
 
 
 @pytest.mark.req("MODEL-08")

@@ -5,11 +5,15 @@ and the corroboration rule decides whether the role is found. Offline: a fake pr
 the controlled source server; every page is synthetic and labelled so."""
 
 import json
+import uuid
 from dataclasses import replace
 from datetime import UTC, datetime
+from typing import cast
 
 import pytest
 
+from careerwright.db import Tx
+from careerwright.evidence import role_research, role_store
 from careerwright.evidence.acquire import FetchRequest, Pacer, acquire_page
 from careerwright.evidence.acquisition import MAX_ROLE_PAGES
 from careerwright.evidence.corroboration import (
@@ -23,7 +27,7 @@ from careerwright.evidence.corroboration import (
 from careerwright.evidence.fetcher import Fetcher
 from careerwright.evidence.pages import EXCERPT_CHARS, EXTRACTION_TEXT_BYTES, role_text
 from careerwright.evidence.records import AdvertiserKind, JobCopy, RightsClass
-from careerwright.evidence.role_research import pages_to_read
+from careerwright.evidence.role_research import ResearchState, pages_to_read
 from careerwright.evidence.search import (
     INSTRUCTIONS,
     ROLE_CANDIDATES,
@@ -41,8 +45,11 @@ from careerwright.evidence.search import (
     role_prompt_bytes,
 )
 from careerwright.evidence.search_agent import run_search
+from careerwright.identity.keyring import Keyring
 from careerwright.identity.model_registry import ModelMode
+from careerwright.identity.records import Run, RunKind
 from careerwright.profile.records import TargetCoverage, TargetKind, TargetLink, TargetRecord
+from careerwright.vocabulary import DataMode, WorkState
 from tests.domain.test_source_search import Provider, ignore
 from tests.support.acquisition_service import LOOPBACK, scripted_resolver
 from tests.support.fake_models import SEARCHED, search_parts
@@ -117,6 +124,59 @@ def test_a_role_search_is_one_deeper_request_whose_candidates_are_checked_by_cod
         ("https://jobs.board.example/ad/9", "not_returned_by_search"),
         ("https://www.linkedin.com/jobs/view/1", "source_not_permitted"),
     ]
+
+
+@pytest.mark.req("STATE-02", "DIV1-15")
+@pytest.mark.parametrize(
+    ("status", "state"),
+    [
+        (WorkState.QUEUED, ResearchState.SEARCHING),
+        (WorkState.RUNNING, ResearchState.SEARCHING),
+        (WorkState.FAILED, ResearchState.SEARCH_STOPPED),
+        (WorkState.CANCELLED, ResearchState.SEARCH_STOPPED),
+        (WorkState.PROVIDER_UNAVAILABLE, ResearchState.SEARCH_STOPPED),
+    ],
+)
+def test_a_failed_role_search_stops_instead_of_staying_in_progress(
+    monkeypatch: pytest.MonkeyPatch, status: WorkState, state: ResearchState
+) -> None:
+    workspace_id = uuid.uuid4()
+    search = Run(
+        run_id=uuid.uuid4(),
+        workspace_id=workspace_id,
+        kind=RunKind.SOURCE_SEARCH,
+        data_mode=DataMode.LIVE_ASSISTED,
+        synthetic=True,
+        requested_by=uuid.uuid4(),
+        model_id="muse-wonder-1.0",
+        model_mode=ModelMode.STANDARD.value,
+        status=status,
+        failure_class="provider_unavailable" if status is WorkState.PROVIDER_UNAVAILABLE else None,
+        output_id=None,
+        created_at=NOW,
+        started_at=NOW,
+        finished_at=NOW,
+    )
+    row = role_store.ResearchRow(
+        research_id=uuid.uuid4(),
+        workspace_id=workspace_id,
+        title=TITLE,
+        title_key=TITLE.casefold(),
+        search_run_id=search.run_id,
+        reading_run_id=None,
+        review_state="proposed",
+        created_at=NOW,
+        reading_started_at=None,
+    )
+    monkeypatch.setattr(role_research, "visible_run", lambda _tx, _ws, _run_id: search)
+
+    view = role_research.research_view(
+        cast(Tx, object()), cast(Keyring, object()), workspace_id, row
+    )
+
+    assert view.state is state
+    assert view.candidates == 0
+    assert view.corroboration is None
 
 
 # --- never a home page; only pages the search returned; up to 20 read (3 November 2026) ----
@@ -218,6 +278,34 @@ def test_a_page_the_search_returned_is_grounded_however_its_address_is_written(
     assert [(c.url, c.grounded) for c in proposal.candidates] == [(page, True)]
     assert proposal.excluded == []
     assert pages_to_read(proposal) == [page]
+
+
+@pytest.mark.req("DIV1-15", "ACQ-06")
+@pytest.mark.parametrize(
+    ("returned", "guessed"),
+    [
+        (
+            "https://careers.northwind.example/roles/Nurse",
+            "https://careers.northwind.example/roles/nurse",
+        ),
+        (
+            "https://careers.northwind.example/role?id=Nurse",
+            "https://careers.northwind.example/role?id=nurse",
+        ),
+        (
+            "https://careers.northwind.example/role?ref=https://reference.example/",
+            "https://careers.northwind.example/role?ref=https://reference.example",
+        ),
+    ],
+    ids=["path case", "query case", "query trailing slash"],
+)
+def test_different_page_addresses_are_never_grounded_as_the_same_page(
+    returned: str, guessed: str
+) -> None:
+    proposal = check_search(role_output(guessed), ROLE, sources=[returned], queries=["q"])
+
+    assert [(c.url, c.grounded) for c in proposal.candidates] == [(returned, True)]
+    assert [(e.url, e.reason) for e in proposal.excluded] == [(guessed, "not_returned_by_search")]
 
 
 @pytest.mark.req("DIV1-15")

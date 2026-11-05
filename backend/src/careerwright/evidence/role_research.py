@@ -83,7 +83,9 @@ from careerwright.profile.store import stale_version
 from careerwright.vocabulary import WorkState
 
 LIST_LIMIT = 20
-_SETTLED = frozenset({WorkState.COMPLETE, WorkState.FAILED, WorkState.CANCELLED})
+_SETTLED = frozenset(
+    {WorkState.COMPLETE, WorkState.FAILED, WorkState.CANCELLED, WorkState.PROVIDER_UNAVAILABLE}
+)
 
 
 class StartRoleResearch(StrictModel):

@@ -1,12 +1,12 @@
 "use client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { EvidenceProvider } from "@/components/EvidenceDrawer";
 import { configureApiClient } from "@/lib/api";
 import { AuthProvider, type AuthSettings, useAuth } from "@/lib/auth";
 
-function ApiSession({ children }: { children: ReactNode }) {
-  const { state, token } = useAuth();
+function AccountSession({ children }: { children: ReactNode }) {
+  const { token } = useAuth();
   const [queries] = useState(
     () =>
       new QueryClient({
@@ -14,20 +14,24 @@ function ApiSession({ children }: { children: ReactNode }) {
       }),
   );
   configureApiClient(() => token(false));
-  // Another identity must never see the previous one's cached data.
-  const uid = state.status === "signed_in" ? state.uid : null;
-  useEffect(() => {
-    if (uid === null) queries.clear();
-  }, [uid, queries]);
   return <QueryClientProvider client={queries}>{children}</QueryClientProvider>;
+}
+
+function ApiSession({ children }: { children: ReactNode }) {
+  const { state } = useAuth();
+  // Changing accounts discards cached records, unsaved drafts and open evidence together.
+  const session = state.status === "signed_in" ? `user:${state.uid}` : state.status;
+  return (
+    <AccountSession key={session}>
+      <EvidenceProvider>{children}</EvidenceProvider>
+    </AccountSession>
+  );
 }
 
 export function Providers({ auth, children }: { auth: AuthSettings; children: ReactNode }) {
   return (
     <AuthProvider settings={auth}>
-      <ApiSession>
-        <EvidenceProvider>{children}</EvidenceProvider>
-      </ApiSession>
+      <ApiSession>{children}</ApiSession>
     </AuthProvider>
   );
 }

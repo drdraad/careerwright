@@ -13,7 +13,13 @@ from careerwright.errors import CareerwrightError, ErrorCode, ErrorStage
 from careerwright.evidence import option_store, store
 from careerwright.evidence.acquisition import MAX_OPTION_PAGES, RECORDABLE_PORTS
 from careerwright.evidence.addresses import CheckedUrl, check_url
-from careerwright.evidence.records import AttemptStatus, InputRoute, RightsClass, StrictModel
+from careerwright.evidence.records import (
+    AttemptStatus,
+    ExtractionOutcome,
+    InputRoute,
+    RightsClass,
+    StrictModel,
+)
 from careerwright.evidence.search import (
     OPTION_SEARCH,
     OptionSearchInput,
@@ -276,6 +282,7 @@ def research_view(
     )
     extraction_failed = any(
         e.run_status in (WorkState.FAILED, WorkState.CANCELLED, WorkState.PROVIDER_UNAVAILABLE)
+        or e.outcome is ExtractionOutcome.OPTIONS_UNVERIFIED
         for e in extractions.values()
     )
     extraction_not_run = any(e.not_run is not None for e in extractions.values())
